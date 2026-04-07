@@ -1,0 +1,29 @@
+---
+interface Props {
+  title: string;
+}
+
+const { title } = Astro.props;
+---
+
+<meta charset="UTF-8" />
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+/>
+<meta name="generator" content={Astro.generator} />
+<title>{title}</title>
+<meta name="robots" content="noindex, nofollow" />
+<meta name="turbo-cache-control" content="no-preview" />
+
+<script is:inline define:vars={{ title }}>
+  // 1. まず内部のドキュメントタイトルを更新
+  document.title = title;
+
+  // 2. TauriのAPIを叩いて、OSのウィンドウタイトルを更新
+  // @tauri-apps/api がなくても、window.__TAURI__ が使えます
+  if (window.__TAURI__) {
+    const { getCurrentWindow } = window.__TAURI__.window;
+    getCurrentWindow().setTitle(title);
+  }
+</script>

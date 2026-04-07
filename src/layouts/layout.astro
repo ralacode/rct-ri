@@ -1,0 +1,27 @@
+---
+import Meta from "@components/meta.astro";
+import { siteMeta } from "@lib/constants";
+import { getPageTitle } from "@lib/utils";
+
+interface Props {
+  pageTitle?: string;
+}
+
+const { pageTitle } = Astro.props;
+
+const title = getPageTitle(pageTitle);
+---
+
+<!doctype html>
+<html lang={siteMeta.siteLocale}>
+  <head>
+    <Meta title={title} />
+  </head>
+  <body>
+    <div class="global_grid">
+      <main class="main">
+        <slot />
+      </main>
+    </div>
+  </body>
+</html>
