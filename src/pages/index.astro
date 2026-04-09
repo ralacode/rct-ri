@@ -1,8 +1,11 @@
 ---
+import { PatientPage } from "@components/react/patient-page";
 import Layout from "@layouts/layout.astro";
 ---
 
 <Layout>
   <h1>Astro</h1>
   <a href="/test/">テスト</a>
+
+  <PatientPage client:load />
 </Layout>
