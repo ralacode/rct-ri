@@ -1,0 +1,8 @@
+---
+import Layout from "@layouts/layout.astro";
+import { PatientList } from "@components/react/patient/list";
+---
+
+<Layout pageTitle="患者一覧">
+  <PatientList client:load />
+</Layout>
