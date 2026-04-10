@@ -33,7 +33,9 @@ export const PatientList = () => {
     <>
       {patients.map((p) => (
         <div key={p.id}>
-          <p>{p.patient_id}</p>
+          <div>
+            <a href={`/patient/${p.patient_id}/`}>{p.patient_id}</a>
+          </div>
           <p>{p.patient_type}</p>
         </div>
       ))}
