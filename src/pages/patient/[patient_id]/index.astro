@@ -1,0 +1,18 @@
+---
+import Layout from "@layouts/layout.astro";
+import { PatientDetail } from "@components/react/patient/detail";
+
+const { patient_id } = Astro.params;
+
+if (!patient_id) {
+  return Astro.redirect("/patient/list/");
+}
+
+export const prerender = false;
+---
+
+<Layout>
+  <PatientDetail client:load patientId={patient_id} />
+  <a href={`/patient/${patient_id}/edit/`}>編集する</a>
+  <a href="/patient/list/">患者一覧</a>
+</Layout>

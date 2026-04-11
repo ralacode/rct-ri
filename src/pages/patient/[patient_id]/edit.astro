@@ -1,6 +1,6 @@
 ---
 import Layout from "@layouts/layout.astro";
-import { PatientDetail } from "@components/react/patient/detail";
+import { PatientEdit } from "@components/react/patient/edit";
 
 const { patient_id } = Astro.params;
 
@@ -12,6 +12,5 @@ export const prerender = false;
 ---
 
 <Layout>
-  <PatientDetail client:load patientId={patient_id} />
-  <a href="/patient/list/">患者一覧</a>
+  <PatientEdit client:load patientId={patient_id} />
 </Layout>
