@@ -1,6 +1,7 @@
 // src/components/PatientRegisterForm.tsx
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { validatePatientId } from "@lib/utils";
 
 export const PatientRegisterForm = () => {
   const [patientId, setPatientId] = useState("");
@@ -15,26 +16,17 @@ export const PatientRegisterForm = () => {
     setSaveMessage("");
     setIsError(false);
 
-    const normalized = patientId
-      .trim() // 前後の空白削除
-      .replace(/[０-９]/g, (s) =>
-        String.fromCharCode(s.charCodeAt(0) - 0xfee0),
-      );
-
-    if (!/^\d+$/.test(normalized)) {
-      setMessage("数字のみ入力してください");
-      return;
-    }
-
-    if (normalized.length > 10) {
-      setMessage("10桁以内で入力してください");
+    const validation = validatePatientId(patientId);
+    if (!validation.isValid) {
+      setIsError(true);
+      setMessage(validation.errorMessage);
       return;
     }
 
     try {
       // lib.rs の add_patient コマンドを呼び出し
       await invoke("add_patient", {
-        patientId: normalized,
+        patientId: validation.normalizedId,
         patientType,
       });
 

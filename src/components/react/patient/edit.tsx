@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
+import { validatePatientId } from "@lib/utils";
 
 export const PatientEdit = ({ patientId }: { patientId: string }) => {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -44,16 +45,22 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
 
     if (!patient) return;
 
+    const validation = validatePatientId(newPatientId);
+    if (!validation.isValid) {
+      setError(validation.errorMessage);
+      return;
+    }
+
     try {
       // Rustの edit_patient を呼び出し
       await invoke("edit_patient", {
         id: patient.id,
-        patientId: newPatientId,
-        patientType: patientType,
+        patientId: validation.normalizedId,
+        patientType,
       });
 
       // 更新成功後、詳細画面へ戻る
-      window.location.href = `/patient/${newPatientId}/`;
+      window.location.href = `/patient/${validation.normalizedId}/`;
     } catch (err) {
       setError(String(err)); // Rust側のResult::Errがここに入る
     }
