@@ -1,0 +1,9 @@
+.fieldControl {
+  border-radius: 10000px;
+  appearance: none;
+  outline: none;
+
+  &::placeholder {
+    opacity: 0.5;
+  }
+}

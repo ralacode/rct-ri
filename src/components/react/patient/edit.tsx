@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
 import { validatePatientId } from "@lib/utils";
+import { MyInput } from "../my-input";
 
 export const PatientEdit = ({ patientId }: { patientId: string }) => {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -73,14 +74,14 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
     <div>
       <h2>患者情報の編集</h2>
       <form onSubmit={handleUpdate}>
-        <div>
-          <label>患者ID: </label>
-          <input
-            type="text"
-            value={newPatientId}
-            onChange={(e) => setNewPatientId(e.target.value)}
-          />
-        </div>
+        <MyInput
+          id="patientId"
+          label="患者ID: "
+          required
+          value={newPatientId}
+          onChange={(e) => setNewPatientId(e.target.value)}
+        />
+
         <div>
           <label>区分: </label>
           <select

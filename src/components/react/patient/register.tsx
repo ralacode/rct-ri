@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { validatePatientId } from "@lib/utils";
+import { MyInput } from "@components/react/my-input";
 
 export const PatientRegisterForm = () => {
   const [patientId, setPatientId] = useState("");
@@ -41,18 +42,14 @@ export const PatientRegisterForm = () => {
   return (
     <div>
       <form onSubmit={handleSubmit}>
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            患者ID (10桁以内・数字のみ)
-          </label>
-          <input
-            type="text"
-            value={patientId}
-            onChange={(e) => setPatientId(e.target.value)}
-            placeholder="例: 12345"
-            required
-          />
-        </div>
+        <MyInput
+          id="patientId"
+          label="患者ID (10桁以内・数字のみ)"
+          placeholder="例: 12345"
+          required
+          value={patientId}
+          onChange={(e) => setPatientId(e.target.value)}
+        />
 
         <div>
           <label>区分</label>
