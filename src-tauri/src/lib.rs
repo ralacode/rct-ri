@@ -20,6 +20,10 @@ fn init_db() -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id TEXT NOT NULL UNIQUE,
             patient_type TEXT NOT NULL,
+            last_name_kanji TEXT NOT NULL DEFAULT '',
+            first_name_kanji TEXT NOT NULL DEFAULT '',
+            last_name_kana TEXT NOT NULL DEFAULT '',
+            first_name_kana TEXT NOT NULL DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )",
         [],
@@ -28,7 +32,14 @@ fn init_db() -> Result<()> {
     Ok(())
 }
 
-fn insert_patient(patient_id: &str, patient_type: &str) -> Result<(), String> {
+fn insert_patient(
+    patient_id: &str,
+    patient_type: &str,
+    last_name_kanji: &str,
+    first_name_kanji: &str,
+    last_name_kana: &str,
+    first_name_kana: &str,
+) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -40,8 +51,8 @@ fn insert_patient(patient_id: &str, patient_type: &str) -> Result<(), String> {
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "INSERT INTO patients (patient_id, patient_type) VALUES (?1, ?2)",
-        [&normalized_id, patient_type],
+        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        [&normalized_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana],
     );
 
     match result {
@@ -73,7 +84,15 @@ fn delete_patient(id: i32) -> Result<()> {
     Ok(())
 }
 
-fn update_patient(id: i32, patient_id: &str, patient_type: &str) -> Result<(), String> {
+fn update_patient(
+    id: i32,
+    patient_id: &str,
+    patient_type: &str,
+    last_name_kanji: &str,
+    first_name_kanji: &str,
+    last_name_kana: &str,
+    first_name_kana: &str,
+) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -85,8 +104,16 @@ fn update_patient(id: i32, patient_id: &str, patient_type: &str) -> Result<(), S
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "UPDATE patients SET patient_id = ?1, patient_type = ?2 WHERE id = ?3",
-        [&normalized_id, patient_type, &id.to_string()],
+        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6 WHERE id = ?7",
+        [
+            &normalized_id,
+            patient_type,
+            last_name_kanji,
+            first_name_kanji,
+            last_name_kana,
+            first_name_kana,
+            &id.to_string(),
+        ],
     );
 
     match result {
@@ -125,18 +152,16 @@ fn search_patients(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patie
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let mut query = String::from("SELECT id, patient_id, patient_type FROM patients");
+    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana FROM patients");
 
     let keyword = keyword.unwrap_or_default();
-
     if !keyword.is_empty() {
-        query.push_str(" WHERE patient_id LIKE ?1");
+        query.push_str(" WHERE patient_id LIKE ?1 OR last_name_kanji LIKE ?1 OR first_name_kanji LIKE ?1 OR last_name_kana LIKE ?1 OR first_name_kana LIKE ?1");
     }
 
     query.push_str(" ORDER BY created_at ");
     query.push_str(if sort_desc { "DESC" } else { "ASC" });
 
-    let params: Vec<String>;
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
 
     let mapper = |row: &rusqlite::Row| {
@@ -144,23 +169,25 @@ fn search_patients(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patie
             id: row.get(0)?,
             patient_id: row.get(1)?,
             patient_type: row.get(2)?,
+            last_name_kanji: row.get(3)?,
+            first_name_kanji: row.get(4)?,
+            last_name_kana: row.get(5)?,
+            first_name_kana: row.get(6)?,
         })
     };
 
+    let params = format!("%{}%", keyword);
     let patient_iter = if !keyword.is_empty() {
-        params = vec![format!("%{}%", keyword)];
-        stmt.query_map([&params[0]], mapper)
+        stmt.query_map([&params], mapper)
     } else {
         stmt.query_map([], mapper)
     }
     .map_err(|e| e.to_string())?;
 
     let mut patients = Vec::new();
-
     for p in patient_iter {
         patients.push(p.map_err(|e| e.to_string())?);
     }
-
     Ok(patients)
 }
 
@@ -169,39 +196,34 @@ struct Patient {
     id: i32,
     patient_id: String,
     patient_type: String,
+    last_name_kanji: String,
+    first_name_kanji: String,
+    last_name_kana: String,
+    first_name_kana: String,
 }
 
 #[tauri::command]
-fn add_patient(patient_id: String, patient_type: String) -> Result<(), String> {
-    insert_patient(&patient_id, &patient_type)
+fn add_patient(
+    patient_id: String,
+    patient_type: String,
+    last_name_kanji: String,
+    first_name_kanji: String,
+    last_name_kana: String,
+    first_name_kana: String,
+) -> Result<(), String> {
+    insert_patient(
+        &patient_id,
+        &patient_type,
+        &last_name_kanji,
+        &first_name_kanji,
+        &last_name_kana,
+        &first_name_kana,
+    )
 }
 
 #[tauri::command]
 fn get_patients() -> Result<Vec<Patient>, String> {
-    let db_path = get_db_path();
-    let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
-
-    let mut stmt = conn
-        .prepare("SELECT id, patient_id, patient_type FROM patients")
-        .map_err(|e| e.to_string())?;
-
-    let patient_iter = stmt
-        .query_map([], |row| {
-            Ok(Patient {
-                id: row.get(0)?,
-                patient_id: row.get(1)?,
-                patient_type: row.get(2)?,
-            })
-        })
-        .map_err(|e| e.to_string())?;
-
-    let mut patients = Vec::new();
-
-    for patient in patient_iter {
-        patients.push(patient.map_err(|e| e.to_string())?);
-    }
-
-    Ok(patients)
+    search_patients(None, false)
 }
 
 #[tauri::command]
@@ -210,8 +232,24 @@ fn remove_patient(id: i32) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn edit_patient(id: i32, patient_id: String, patient_type: String) -> Result<(), String> {
-    update_patient(id, &patient_id, &patient_type)
+fn edit_patient(
+    id: i32,
+    patient_id: String,
+    patient_type: String,
+    last_name_kanji: String,
+    first_name_kanji: String,
+    last_name_kana: String,
+    first_name_kana: String,
+) -> Result<(), String> {
+    update_patient(
+        id,
+        &patient_id,
+        &patient_type,
+        &last_name_kanji,
+        &first_name_kanji,
+        &last_name_kana,
+        &first_name_kana,
+    )
 }
 
 #[tauri::command]
