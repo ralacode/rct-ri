@@ -1,7 +1,11 @@
 // src/components/PatientRegisterForm.tsx
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { validatePatientId } from "@lib/utils";
+import {
+  validateHiragana,
+  validateKanjiName,
+  validatePatientId,
+} from "@lib/utils";
 import { MyInput } from "@components/react/my-input";
 
 export const PatientRegisterForm = () => {
@@ -21,17 +25,50 @@ export const PatientRegisterForm = () => {
     setSaveMessage("");
     setIsError(false);
 
-    const validation = validatePatientId(patientId);
-    if (!validation.isValid) {
+    // 1. 患者IDバリデーション
+    const idValidation = validatePatientId(patientId);
+    if (!idValidation.isValid) {
       setIsError(true);
-      setMessage(validation.errorMessage);
+      setMessage(idValidation.errorMessage);
+      return;
+    }
+
+    // 2. 名字（漢字）バリデーション - スペースチェック
+    const lnKanjiValidation = validateKanjiName(lastNameKanji);
+    if (!lnKanjiValidation.isValid) {
+      setIsError(true);
+      setMessage(`名字（漢字）: ${lnKanjiValidation.errorMessage}`);
+      return;
+    }
+
+    // 3. 名前（漢字）バリデーション - スペースチェック
+    const fnKanjiValidation = validateKanjiName(firstNameKanji);
+    if (!fnKanjiValidation.isValid) {
+      setIsError(true);
+      setMessage(`名前（漢字）: ${fnKanjiValidation.errorMessage}`);
+      return;
+    }
+
+    // 4. 名字（かな）バリデーション - スペース/ひらがなチェック
+    const lnKanaValidation = validateHiragana(lastNameKana);
+    if (!lnKanaValidation.isValid) {
+      setIsError(true);
+      setMessage(`名字（かな）: ${lnKanaValidation.errorMessage}`);
+      return;
+    }
+
+    // 5. 名前（かな）バリデーション - スペース/ひらがなチェック
+    const fnKanaValidation = validateHiragana(firstNameKana);
+    if (!fnKanaValidation.isValid) {
+      setIsError(true);
+      setMessage(`名前（かな）: ${fnKanaValidation.errorMessage}`);
       return;
     }
 
     try {
       // lib.rs の add_patient コマンドを呼び出し
       await invoke("add_patient", {
-        patientId: validation.normalizedId,
+        patientId: idValidation.normalizedId,
         patientType,
         lastNameKanji,
         firstNameKanji,
@@ -62,44 +99,59 @@ export const PatientRegisterForm = () => {
           placeholder="例: 12345"
           required
           value={patientId}
-          onChange={(e) => setPatientId(e.target.value)}
+          onChange={(e) => {
+            setPatientId(e.target.value);
+            setMessage("");
+          }}
         />
 
         <div className="name-fields">
           <MyInput
             id="lastNameKanji"
-            label="名字（漢字）"
+            label="姓"
             placeholder="例: 山田"
             required
             value={lastNameKanji}
-            onChange={(e) => setLastNameKanji(e.target.value)}
+            onChange={(e) => {
+              setLastNameKanji(e.target.value);
+              setMessage("");
+            }}
           />
           <MyInput
             id="firstNameKanji"
-            label="名前（漢字）"
+            label="名"
             placeholder="例: 太郎"
             required
             value={firstNameKanji}
-            onChange={(e) => setFirstNameKanji(e.target.value)}
+            onChange={(e) => {
+              setFirstNameKanji(e.target.value);
+              setMessage("");
+            }}
           />
         </div>
 
         <div className="name-fields">
           <MyInput
             id="lastNameKana"
-            label="名字（ひらがな）"
+            label="姓（ふりがな）"
             placeholder="例: やまだ"
             required
             value={lastNameKana}
-            onChange={(e) => setLastNameKana(e.target.value)}
+            onChange={(e) => {
+              setLastNameKana(e.target.value);
+              setMessage("");
+            }}
           />
           <MyInput
             id="firstNameKana"
-            label="名前（ひらがな）"
+            label="名（ふりがな）"
             placeholder="例: たろう"
             required
             value={firstNameKana}
-            onChange={(e) => setFirstNameKana(e.target.value)}
+            onChange={(e) => {
+              setFirstNameKana(e.target.value);
+              setMessage("");
+            }}
           />
         </div>
 
