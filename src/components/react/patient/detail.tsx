@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
+import { toKatakana } from "@lib/utils";
 
 interface Props {
   patientId: string | undefined;
@@ -63,37 +64,58 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   return (
     <div>
       <h2>患者詳細情報</h2>
-      <p>
-        表示中の患者ID: <span>{patient?.patient_id}</span>
-      </p>
-      {!showConfirm ? (
-        // 通常時のボタン
-        <button
-          onClick={() => setShowConfirm(true)}
-          className="delete-init-button"
-        >
-          この患者を削除する
-        </button>
-      ) : (
-        // 確認表示時の UI
-        <div className="delete-confirmation">
-          <p className="confirm-text">本当に削除してもよろしいですか？</p>
-          <button
-            onClick={executeDelete}
-            disabled={isDeleting}
-            className="delete-confirm-button"
-          >
-            {isDeleting ? "削除中..." : "はい"}
-          </button>
-          <button
-            onClick={() => setShowConfirm(false)}
-            disabled={isDeleting}
-            className="delete-cancel-button"
-          >
-            いいえ
-          </button>
+
+      <div className="detail-info-group">
+        <p className="detail-item">
+          患者ID: <span className="detail-value">{patient.patient_id}</span>
+        </p>
+        <p className="detail-item">
+          区分: <span className="detail-value">{patient.patient_type}</span>
+        </p>
+        {/* ルビ（ふりがな）付きの氏名表示 */}
+        <div className="detail-item name-display">
+          氏名:
+          <span className="detail-value">
+            <ruby className="name-ruby">
+              {patient.last_name_kanji}
+              <rt className="name-rt">{toKatakana(patient.last_name_kana)}</rt>
+            </ruby>{" "}
+            <ruby className="name-ruby">
+              {patient.first_name_kanji}
+              <rt className="name-rt">{toKatakana(patient.first_name_kana)}</rt>
+            </ruby>
+          </span>
         </div>
-      )}
+      </div>
+
+      <div className="action-area">
+        {!showConfirm ? (
+          <button
+            onClick={() => setShowConfirm(true)}
+            className="delete-init-button"
+          >
+            この患者を削除する
+          </button>
+        ) : (
+          <div className="delete-confirmation">
+            <p className="confirm-text">本当に削除してもよろしいですか？</p>
+            <button
+              onClick={executeDelete}
+              disabled={isDeleting}
+              className="delete-confirm-button"
+            >
+              {isDeleting ? "削除中..." : "はい"}
+            </button>
+            <button
+              onClick={() => setShowConfirm(false)}
+              disabled={isDeleting}
+              className="delete-cancel-button"
+            >
+              いいえ
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

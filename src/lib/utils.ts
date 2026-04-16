@@ -86,3 +86,9 @@ export const validateKanjiName = (
   // 現時点では「スペースなし」を保証する最小構成にしています。
   return { isValid: true, errorMessage: "" };
 };
+
+export const toKatakana = (str: string) => {
+  return str.replace(/[\u3041-\u3096]/g, (match) => {
+    return String.fromCharCode(match.charCodeAt(0) + 0x60);
+  });
+};
