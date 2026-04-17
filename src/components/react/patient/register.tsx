@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  toKatakana,
   validateHiragana,
   validateKanjiName,
   validatePatientId,
@@ -9,84 +10,91 @@ import {
 import { MyInput } from "@components/react/my-input";
 
 export const PatientRegisterForm = () => {
-  const [patientId, setPatientId] = useState("");
-  const [patientType, setPatientType] = useState("ri"); // 初期値
-  const [lastNameKanji, setLastNameKanji] = useState("");
-  const [firstNameKanji, setFirstNameKanji] = useState("");
-  const [lastNameKana, setLastNameKana] = useState("");
-  const [firstNameKana, setFirstNameKana] = useState("");
+  const [formData, setFormData] = useState({
+    patient_id: "",
+    patient_type: "ri",
+    last_name_kanji: "",
+    first_name_kanji: "",
+    last_name_kana: "",
+    first_name_kana: "",
+    height: "",
+    weight: "",
+  });
+
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [isError, setIsError] = useState(false);
+
+  const [lastRegistered, setLastRegistered] = useState<any>(null);
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
+    const { id, value } = e.target;
+    setFormData((prev) => ({ ...prev, [id]: value }));
+    setMessage("");
+    setSaveMessage("");
+    setLastRegistered(null);
+  };
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setMessage("");
     setSaveMessage("");
     setIsError(false);
+    setLastRegistered(null);
 
-    // 1. 患者IDバリデーション
-    const idValidation = validatePatientId(patientId);
-    if (!idValidation.isValid) {
-      setIsError(true);
-      setMessage(idValidation.errorMessage);
-      return;
-    }
+    // 1. バリデーション実行
+    // utils.ts の戻り値が { isValid, errorMessage } なので、.isValid をチェックする
+    const idRes = validatePatientId(formData.patient_id);
+    if (!idRes.isValid) return setMessage(`患者ID: ${idRes.errorMessage}`);
 
-    // 2. 名字（漢字）バリデーション - スペースチェック
-    const lnKanjiValidation = validateKanjiName(lastNameKanji);
-    if (!lnKanjiValidation.isValid) {
-      setIsError(true);
-      setMessage(`名字（漢字）: ${lnKanjiValidation.errorMessage}`);
-      return;
-    }
+    const lnkRes = validateKanjiName(formData.last_name_kanji);
+    if (!lnkRes.isValid)
+      return setMessage(`名字（漢字）: ${lnkRes.errorMessage}`);
 
-    // 3. 名前（漢字）バリデーション - スペースチェック
-    const fnKanjiValidation = validateKanjiName(firstNameKanji);
-    if (!fnKanjiValidation.isValid) {
-      setIsError(true);
-      setMessage(`名前（漢字）: ${fnKanjiValidation.errorMessage}`);
-      return;
-    }
+    const fnkRes = validateKanjiName(formData.first_name_kanji);
+    if (!fnkRes.isValid)
+      return setMessage(`名前（漢字）: ${fnkRes.errorMessage}`);
 
-    // 4. 名字（かな）バリデーション - スペース/ひらがなチェック
-    const lnKanaValidation = validateHiragana(lastNameKana);
-    if (!lnKanaValidation.isValid) {
-      setIsError(true);
-      setMessage(`名字（かな）: ${lnKanaValidation.errorMessage}`);
-      return;
-    }
+    const lnaRes = validateHiragana(formData.last_name_kana);
+    if (!lnaRes.isValid)
+      return setMessage(`名字（かな）: ${lnaRes.errorMessage}`);
 
-    // 5. 名前（かな）バリデーション - スペース/ひらがなチェック
-    const fnKanaValidation = validateHiragana(firstNameKana);
-    if (!fnKanaValidation.isValid) {
-      setIsError(true);
-      setMessage(`名前（かな）: ${fnKanaValidation.errorMessage}`);
-      return;
-    }
+    const fnaRes = validateHiragana(formData.first_name_kana);
+    if (!fnaRes.isValid)
+      return setMessage(`名前（かな）: ${fnaRes.errorMessage}`);
 
     try {
-      // lib.rs の add_patient コマンドを呼び出し
+      // 2. Rustコマンド呼び出し
       await invoke("add_patient", {
-        patientId: idValidation.normalizedId,
-        patientType,
-        lastNameKanji,
-        firstNameKanji,
-        lastNameKana,
-        firstNameKana,
+        patientId: idRes.normalizedId,
+        patientType: formData.patient_type,
+        lastNameKanji: formData.last_name_kanji,
+        firstNameKanji: formData.first_name_kanji,
+        lastNameKana: formData.last_name_kana,
+        firstNameKana: formData.first_name_kana,
+        height: formData.height ? parseFloat(formData.height) : null,
+        weight: formData.weight ? parseFloat(formData.weight) : null,
       });
 
-      setSaveMessage(`${lastNameKanji} ${firstNameKanji} 様を登録しました`);
+      setLastRegistered({ ...formData });
+      setSaveMessage("success");
 
-      // 入力欄をクリア
-      setPatientId("");
-      setLastNameKanji("");
-      setFirstNameKanji("");
-      setLastNameKana("");
-      setFirstNameKana("");
+      // 登録成功時にフォームをリセット
+      setFormData({
+        patient_id: "",
+        patient_type: "ri",
+        last_name_kanji: "",
+        first_name_kanji: "",
+        last_name_kana: "",
+        first_name_kana: "",
+        height: "",
+        weight: "",
+      });
     } catch (err) {
       setIsError(true);
-      setMessage(typeof err === "string" ? err : "エラーが発生しました");
+      setMessage(String(err));
     }
   };
 
@@ -94,82 +102,100 @@ export const PatientRegisterForm = () => {
     <div>
       <form onSubmit={handleSubmit}>
         <MyInput
-          id="patientId"
-          label="患者ID (10桁以内・数字のみ)"
-          placeholder="例: 12345"
+          id="patient_id"
+          label="患者ID"
+          placeholder="例: 0000000123"
           required
-          value={patientId}
-          onChange={(e) => {
-            setPatientId(e.target.value);
-            setMessage("");
-          }}
+          value={formData.patient_id}
+          onChange={handleChange}
         />
 
-        <div className="name-fields">
+        <div>
           <MyInput
-            id="lastNameKanji"
-            label="姓"
+            id="last_name_kanji"
+            label="姓（漢字）"
             placeholder="例: 山田"
             required
-            value={lastNameKanji}
-            onChange={(e) => {
-              setLastNameKanji(e.target.value);
-              setMessage("");
-            }}
+            value={formData.last_name_kanji}
+            onChange={handleChange}
           />
           <MyInput
-            id="firstNameKanji"
-            label="名"
+            id="first_name_kanji"
+            label="名（漢字）"
             placeholder="例: 太郎"
             required
-            value={firstNameKanji}
-            onChange={(e) => {
-              setFirstNameKanji(e.target.value);
-              setMessage("");
-            }}
-          />
-        </div>
-
-        <div className="name-fields">
-          <MyInput
-            id="lastNameKana"
-            label="姓（ふりがな）"
-            placeholder="例: やまだ"
-            required
-            value={lastNameKana}
-            onChange={(e) => {
-              setLastNameKana(e.target.value);
-              setMessage("");
-            }}
-          />
-          <MyInput
-            id="firstNameKana"
-            label="名（ふりがな）"
-            placeholder="例: たろう"
-            required
-            value={firstNameKana}
-            onChange={(e) => {
-              setFirstNameKana(e.target.value);
-              setMessage("");
-            }}
+            value={formData.first_name_kanji}
+            onChange={handleChange}
           />
         </div>
 
         <div>
-          <label>区分</label>
+          <MyInput
+            id="last_name_kana"
+            label="姓（ふりがな）"
+            placeholder="例: やまだ"
+            required
+            value={formData.last_name_kana}
+            onChange={handleChange}
+          />
+          <MyInput
+            id="first_name_kana"
+            label="名（ふりがな）"
+            placeholder="例: たろう"
+            required
+            value={formData.first_name_kana}
+            onChange={handleChange}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="patient_type">区分</label>
           <select
-            value={patientType}
-            onChange={(e) => setPatientType(e.target.value)}
+            id="patient_type"
+            value={formData.patient_type}
+            onChange={handleChange}
           >
             <option value="ri">ri</option>
             <option value="rt">rt</option>
           </select>
         </div>
 
+        <MyInput
+          id="height"
+          label="身長 (cm)"
+          type="text"
+          placeholder="170.5"
+          value={formData.height}
+          onChange={handleChange}
+        />
+
+        <MyInput
+          id="weight"
+          label="体重 (kg)"
+          type="text"
+          placeholder="50.5"
+          value={formData.weight}
+          onChange={handleChange}
+        />
+
         <button type="submit">登録する</button>
       </form>
 
-      {saveMessage && <p>{saveMessage}</p>}
+      {saveMessage === "success" && lastRegistered && (
+        <p>
+          <span>
+            <ruby>
+              {lastRegistered.last_name_kanji}
+              <rt>{toKatakana(lastRegistered.last_name_kana)}</rt>
+            </ruby>{" "}
+            <ruby>
+              {lastRegistered.first_name_kanji}
+              <rt>{toKatakana(lastRegistered.first_name_kana)}</rt>
+            </ruby>
+          </span>{" "}
+          様を登録しました
+        </p>
+      )}
 
       {message && (
         <div

@@ -6,6 +6,8 @@ export interface Patient {
   first_name_kanji: string;
   last_name_kana: string;
   first_name_kana: string;
+  height: string;
+  weight: string;
 }
 
 export interface ValidationResult {

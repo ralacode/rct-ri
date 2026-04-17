@@ -29,6 +29,10 @@ fn init_db() -> Result<()> {
         [],
     )?;
 
+    // 身長・体重カラムの後付け追加（すでに存在する場合は無視される）
+    let _ = conn.execute("ALTER TABLE patients ADD COLUMN height REAL", []);
+    let _ = conn.execute("ALTER TABLE patients ADD COLUMN weight REAL", []);
+
     Ok(())
 }
 
@@ -39,6 +43,8 @@ fn insert_patient(
     first_name_kanji: &str,
     last_name_kana: &str,
     first_name_kana: &str,
+    height: Option<f64>,
+    weight: Option<f64>,
 ) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -51,8 +57,17 @@ fn insert_patient(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        [&normalized_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana],
+        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        [
+            &normalized_id, 
+            patient_type, 
+            last_name_kanji, 
+            first_name_kanji, 
+            last_name_kana, 
+            first_name_kana,
+            &height.map(|n| n.to_string()).unwrap_or_default(), // 文字列バインドの簡易化
+            &weight.map(|n| n.to_string()).unwrap_or_default(),
+        ],
     );
 
     match result {
@@ -152,7 +167,7 @@ fn search_patients(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patie
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana FROM patients");
+    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight FROM patients");
 
     let keyword = keyword.unwrap_or_default();
     if !keyword.is_empty() {
@@ -173,6 +188,8 @@ fn search_patients(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patie
             first_name_kanji: row.get(4)?,
             last_name_kana: row.get(5)?,
             first_name_kana: row.get(6)?,
+            height: row.get(7)?,
+            weight: row.get(8)?,
         })
     };
 
@@ -200,6 +217,8 @@ struct Patient {
     first_name_kanji: String,
     last_name_kana: String,
     first_name_kana: String,
+    height: Option<f64>, // NULL許容のためOption
+    weight: Option<f64>,
 }
 
 #[tauri::command]
@@ -210,6 +229,8 @@ fn add_patient(
     first_name_kanji: String,
     last_name_kana: String,
     first_name_kana: String,
+    height: Option<f64>,
+    weight: Option<f64>,
 ) -> Result<(), String> {
     insert_patient(
         &patient_id,
@@ -218,6 +239,8 @@ fn add_patient(
         &first_name_kanji,
         &last_name_kana,
         &first_name_kana,
+        height,
+        weight,
     )
 }
 

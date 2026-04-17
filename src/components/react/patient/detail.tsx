@@ -61,29 +61,60 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   if (error) return <div>{error}</div>;
   if (!patient) return <div>読み込み中...</div>;
 
+  const {
+    patient_id,
+    patient_type,
+    last_name_kanji,
+    last_name_kana,
+    first_name_kanji,
+    first_name_kana,
+    height,
+    weight,
+  } = patient;
+
+  const formatValue = (val: number | string | null | undefined) => {
+    if (val === null || val === undefined || val === "") return null;
+    const num = typeof val === "string" ? parseFloat(val) : val;
+    return isNaN(num) ? null : num.toFixed(1);
+  };
+
   return (
     <div>
       <h2>患者詳細情報</h2>
 
       <div className="detail-info-group">
         <p className="detail-item">
-          患者ID: <span className="detail-value">{patient.patient_id}</span>
+          患者ID: <span className="detail-value">{patient_id}</span>
         </p>
         <p className="detail-item">
-          区分: <span className="detail-value">{patient.patient_type}</span>
+          区分: <span className="detail-value">{patient_type}</span>
         </p>
         {/* ルビ（ふりがな）付きの氏名表示 */}
         <div className="detail-item name-display">
           氏名:
           <span className="detail-value">
             <ruby className="name-ruby">
-              {patient.last_name_kanji}
-              <rt className="name-rt">{toKatakana(patient.last_name_kana)}</rt>
+              {last_name_kanji}
+              <rt className="name-rt">{toKatakana(last_name_kana)}</rt>
             </ruby>{" "}
             <ruby className="name-ruby">
-              {patient.first_name_kanji}
-              <rt className="name-rt">{toKatakana(patient.first_name_kana)}</rt>
+              {first_name_kanji}
+              <rt className="name-rt">{toKatakana(first_name_kana)}</rt>
             </ruby>
+          </span>
+        </div>
+
+        <div className="detail-item">
+          身長：
+          <span className="detail-value">
+            {formatValue(height) ? `${formatValue(height)} cm` : "未登録"}
+          </span>
+        </div>
+
+        <div className="detail-item">
+          体重：
+          <span className="detail-value">
+            {formatValue(weight) ? `${formatValue(weight)} kg` : "未登録"}
           </span>
         </div>
       </div>
