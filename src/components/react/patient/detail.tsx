@@ -71,6 +71,7 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
     height,
     weight,
     birth_date,
+    gender,
   } = patient;
 
   const formatValue = (val: number | string | null | undefined) => {
@@ -116,6 +117,10 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
               ? `${calculateAge(birth_date)}歳`
               : "---"}
           </span>
+        </div>
+
+        <div className="detail-item">
+          性別：<span className="detail-value">{gender}</span>
         </div>
 
         <div className="detail-item">

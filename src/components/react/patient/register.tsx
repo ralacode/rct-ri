@@ -20,6 +20,7 @@ export const PatientRegisterForm = () => {
     birth_date: "",
     height: "",
     weight: "",
+    gender: "男",
   });
 
   const [message, setMessage] = useState("");
@@ -31,8 +32,10 @@ export const PatientRegisterForm = () => {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    const { id, value, name } = e.target;
+    // ラジオボタンの場合は name 属性をキーにする
+    const key = id || name;
+    setFormData((prev) => ({ ...prev, [key]: value }));
     setMessage("");
     setSaveMessage("");
     setLastRegistered(null);
@@ -150,6 +153,7 @@ export const PatientRegisterForm = () => {
         lastNameKana: formData.last_name_kana,
         firstNameKana: formData.first_name_kana,
         birthDate: rawDate,
+        gender: formData.gender,
         height: formData.height ? parseFloat(formData.height) : null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
       });
@@ -166,6 +170,7 @@ export const PatientRegisterForm = () => {
         last_name_kana: "",
         first_name_kana: "",
         birth_date: "",
+        gender: "男",
         height: "",
         weight: "",
       });
@@ -235,6 +240,32 @@ export const PatientRegisterForm = () => {
             <option value="ri">ri</option>
             <option value="rt">rt</option>
           </select>
+        </div>
+
+        <div className="gender-field">
+          <label>性別</label>
+          <div className="gender-options">
+            <label>
+              <input
+                type="radio"
+                name="gender"
+                value="男"
+                checked={formData.gender === "男"}
+                onChange={handleChange}
+              />
+              男
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="gender"
+                value="女"
+                checked={formData.gender === "女"}
+                onChange={handleChange}
+              />
+              女
+            </label>
+          </div>
         </div>
 
         <MyInput

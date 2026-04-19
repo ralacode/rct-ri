@@ -7,8 +7,9 @@ export interface Patient {
   last_name_kana: string;
   first_name_kana: string;
   birth_date: string;
-  height: string;
-  weight: string;
+  height?: string;
+  weight?: string;
+  gender: "男" | "女";
 }
 
 export interface ValidationResult {
