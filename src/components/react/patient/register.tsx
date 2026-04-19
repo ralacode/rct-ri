@@ -72,6 +72,20 @@ export const PatientRegisterForm = () => {
     setFormData((prev) => ({ ...prev, birth_date: formatted }));
   };
 
+  const isFutureDate = (dateStr: string): boolean => {
+    if (!dateStr) return false;
+
+    // スペースを除去して Date オブジェクトを作成
+    const inputDate = new Date(dateStr.replace(/\s+/g, ""));
+    if (isNaN(inputDate.getTime())) return false;
+
+    const today = new Date();
+    // 時刻を 00:00:00 にリセットして日付のみで比較
+    today.setHours(0, 0, 0, 0);
+
+    return inputDate > today;
+  };
+
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setMessage("");
@@ -119,6 +133,12 @@ export const PatientRegisterForm = () => {
     const fnaRes = validateHiragana(formData.first_name_kana);
     if (!fnaRes.isValid)
       return setMessage(`名前（かな）: ${fnaRes.errorMessage}`);
+
+    if (isFutureDate(formData.birth_date)) {
+      setMessage("生年月日に未来の日付は入力できません。");
+      setIsError(true);
+      return;
+    }
 
     try {
       // 2. Rustコマンド呼び出し

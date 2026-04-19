@@ -92,3 +92,32 @@ export const toKatakana = (str: string) => {
     return String.fromCharCode(match.charCodeAt(0) + 0x60);
   });
 };
+
+export const calculateAge = (birthDateStr: string): number | null => {
+  if (!birthDateStr) return null;
+
+  const birthDate = new Date(birthDateStr.replace(/\s+/g, ""));
+  if (isNaN(birthDate.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+
+  return age;
+};
+
+/**
+ * 生年月日(YYYY/MM/DD)を表示用(YYYY年MM月DD日)に変換する
+ */
+export const formatBirthDate = (birthDateStr: string): string => {
+  if (!birthDateStr) return "未登録";
+  const date = birthDateStr.replace(/\s+/g, ""); // スペース除去
+  const parts = date.split("/");
+  if (parts.length !== 3) return birthDateStr;
+
+  return `${parts[0]}年${parts[1]}月${parts[2]}日`;
+};

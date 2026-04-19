@@ -1,8 +1,8 @@
-// src/components/react/detail.tsx
+// src/components/react/patient/detail.tsx
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
-import { toKatakana } from "@lib/utils";
+import { calculateAge, formatBirthDate, toKatakana } from "@lib/utils";
 
 interface Props {
   patientId: string | undefined;
@@ -70,6 +70,7 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
     first_name_kana,
     height,
     weight,
+    birth_date,
   } = patient;
 
   const formatValue = (val: number | string | null | undefined) => {
@@ -101,6 +102,19 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
               {first_name_kanji}
               <rt className="name-rt">{toKatakana(first_name_kana)}</rt>
             </ruby>
+          </span>
+        </div>
+
+        <div className="detail-item">
+          生年月日：
+          <span className="detail-value">{formatBirthDate(birth_date)}</span>
+        </div>
+        <div className="detail-item">
+          年齢：
+          <span className="detail-value">
+            {calculateAge(birth_date) !== null
+              ? `${calculateAge(birth_date)}歳`
+              : "---"}
           </span>
         </div>
 
