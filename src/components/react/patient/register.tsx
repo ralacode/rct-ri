@@ -1,4 +1,4 @@
-// src/components/PatientRegisterForm.tsx
+// src/components/react/patient/register.tsx
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
@@ -17,6 +17,7 @@ export const PatientRegisterForm = () => {
     first_name_kanji: "",
     last_name_kana: "",
     first_name_kana: "",
+    birth_date: "",
     height: "",
     weight: "",
   });
@@ -37,12 +38,66 @@ export const PatientRegisterForm = () => {
     setLastRegistered(null);
   };
 
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+
+    // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
+    if (inputValue.length < formData.birth_date.length) {
+      setFormData((prev) => ({ ...prev, birth_date: inputValue }));
+      return;
+    }
+
+    // 1. 数字以外を除去
+    let value = inputValue.replace(/\D/g, "");
+    let formatted = "";
+
+    // 2. 入力された数値の長さに応じて「 / 」を動的に挿入
+    if (value.length > 0) {
+      formatted = value.substring(0, 4);
+
+      if (value.length >= 4) {
+        formatted += " / ";
+        if (value.length > 4) {
+          formatted += value.substring(4, 6);
+        }
+        if (value.length >= 6) {
+          formatted += " / ";
+          if (value.length > 6) {
+            formatted += value.substring(6, 8);
+          }
+        }
+      }
+    }
+
+    setFormData((prev) => ({ ...prev, birth_date: formatted }));
+  };
+
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setMessage("");
     setSaveMessage("");
     setIsError(false);
     setLastRegistered(null);
+
+    // 生年月日のバリデーション（スペースを許容する正規表現に変更）
+    const birthDatePattern = /^\d{4} \/ \d{2} \/ \d{2}$/;
+    if (!birthDatePattern.test(formData.birth_date)) {
+      return setMessage("生年月日は YYYY / MM / DD 形式で入力してください");
+    }
+
+    // 日付として妥当かチェック
+    // スペースを除去してから分割する
+    const rawDate = formData.birth_date.replace(/\s+/g, "");
+    const [y, m, d] = rawDate.split("/").map(Number);
+
+    const date = new Date(y, m - 1, d);
+    if (
+      date.getFullYear() !== y ||
+      date.getMonth() !== m - 1 ||
+      date.getDate() !== d
+    ) {
+      return setMessage("有効な日付を入力してください");
+    }
 
     // 1. バリデーション実行
     // utils.ts の戻り値が { isValid, errorMessage } なので、.isValid をチェックする
@@ -74,6 +129,7 @@ export const PatientRegisterForm = () => {
         firstNameKanji: formData.first_name_kanji,
         lastNameKana: formData.last_name_kana,
         firstNameKana: formData.first_name_kana,
+        birthDate: rawDate,
         height: formData.height ? parseFloat(formData.height) : null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
       });
@@ -89,6 +145,7 @@ export const PatientRegisterForm = () => {
         first_name_kanji: "",
         last_name_kana: "",
         first_name_kana: "",
+        birth_date: "",
         height: "",
         weight: "",
       });
@@ -159,6 +216,16 @@ export const PatientRegisterForm = () => {
             <option value="rt">rt</option>
           </select>
         </div>
+
+        <MyInput
+          id="birth_date"
+          label="生年月日"
+          placeholder="1989 / 09 / 11"
+          required
+          value={formData.birth_date}
+          onChange={handleBirthDateChange}
+          maxLength={14} // "YYYY / MM / DD" は最大14文字
+        />
 
         <MyInput
           id="height"

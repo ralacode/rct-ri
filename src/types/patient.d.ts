@@ -6,6 +6,7 @@ export interface Patient {
   first_name_kanji: string;
   last_name_kana: string;
   first_name_kana: string;
+  birth_date: string;
   height: string;
   weight: string;
 }
