@@ -2,7 +2,12 @@
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
-import { calculateAge, formatBirthDate, toKatakana } from "@lib/utils";
+import {
+  calculateAge,
+  formatDateString,
+  formatDateTimeWithDay,
+  toKatakana,
+} from "@lib/utils";
 
 interface Props {
   patientId: string | undefined;
@@ -72,6 +77,7 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
     weight,
     birth_date,
     gender,
+    created_at,
   } = patient;
 
   const formatValue = (val: number | string | null | undefined) => {
@@ -108,7 +114,13 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
 
         <div className="detail-item">
           生年月日：
-          <span className="detail-value">{formatBirthDate(birth_date)}</span>
+          <span className="detail-value">{formatDateString(birth_date)}</span>
+        </div>
+        <div className="detail-item">
+          登録日：
+          <span className="detail-value">
+            {formatDateTimeWithDay(created_at)}
+          </span>
         </div>
         <div className="detail-item">
           年齢：

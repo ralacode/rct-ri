@@ -10,6 +10,7 @@ export interface Patient {
   height?: string;
   weight?: string;
   gender: "男" | "女";
+  created_at: string;
 }
 
 export interface ValidationResult {

@@ -3,11 +3,20 @@ import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
   toKatakana,
+  validateDateString,
   validateHiragana,
   validateKanjiName,
   validatePatientId,
 } from "@lib/utils";
 import { MyInput } from "@components/react/my-input";
+
+const getTodayFormatted = () => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y} / ${m} / ${d}`;
+};
 
 export const PatientRegisterForm = () => {
   const [formData, setFormData] = useState({
@@ -21,13 +30,23 @@ export const PatientRegisterForm = () => {
     height: "",
     weight: "",
     gender: "男",
+    created_at: getTodayFormatted(),
   });
 
   const [message, setMessage] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [isError, setIsError] = useState(false);
-
   const [lastRegistered, setLastRegistered] = useState<any>(null);
+
+  const formatDatePicker = (value: string, prevValue: string) => {
+    const numbers = value.replace(/\D/g, "");
+    if (value.length < prevValue.length) return value; // 削除時はそのまま
+
+    if (numbers.length <= 4) return numbers;
+    if (numbers.length <= 6)
+      return `${numbers.slice(0, 4)} / ${numbers.slice(4)}`;
+    return `${numbers.slice(0, 4)} / ${numbers.slice(4, 6)} / ${numbers.slice(6, 8)}`;
+  };
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
@@ -75,6 +94,43 @@ export const PatientRegisterForm = () => {
     setFormData((prev) => ({ ...prev, birth_date: formatted }));
   };
 
+  const handleRegistrationDateChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    // const formatted = formatDatePicker(e.target.value, formData.created_at);
+    const inputValue = e.target.value;
+
+    // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
+    if (inputValue.length < formData.created_at.length) {
+      setFormData((prev) => ({ ...prev, created_at: inputValue }));
+      return;
+    }
+
+    // 1. 数字以外を除去
+    let value = inputValue.replace(/\D/g, "");
+    let formatted = "";
+
+    // 2. 入力された数値の長さに応じて「 / 」を動的に挿入
+    if (value.length > 0) {
+      formatted = value.substring(0, 4);
+
+      if (value.length >= 4) {
+        formatted += " / ";
+        if (value.length > 4) {
+          formatted += value.substring(4, 6);
+        }
+        if (value.length >= 6) {
+          formatted += " / ";
+          if (value.length > 6) {
+            formatted += value.substring(6, 8);
+          }
+        }
+      }
+    }
+
+    setFormData((prev) => ({ ...prev, created_at: formatted }));
+  };
+
   const isFutureDate = (dateStr: string): boolean => {
     if (!dateStr) return false;
 
@@ -91,29 +147,64 @@ export const PatientRegisterForm = () => {
 
   const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
-    setMessage("");
+    setMessage("保存中...");
     setSaveMessage("");
     setIsError(false);
     setLastRegistered(null);
 
-    // 生年月日のバリデーション（スペースを許容する正規表現に変更）
-    const birthDatePattern = /^\d{4} \/ \d{2} \/ \d{2}$/;
-    if (!birthDatePattern.test(formData.birth_date)) {
-      return setMessage("生年月日は YYYY / MM / DD 形式で入力してください");
-    }
+    // 日付チェック用の設定
+    // const datePattern = /^\d{4} \/ \d{2} \/ \d{2}$/;
+    // const dateFields = [
+    //   { key: "birth_date", label: "生年月日" },
+    //   { key: "created_at", label: "登録日" },
+    // ] as const;
 
-    // 日付として妥当かチェック
-    // スペースを除去してから分割する
-    const rawDate = formData.birth_date.replace(/\s+/g, "");
-    const [y, m, d] = rawDate.split("/").map(Number);
+    // const today = new Date();
+    // today.setHours(0, 0, 0, 0);
 
-    const date = new Date(y, m - 1, d);
-    if (
-      date.getFullYear() !== y ||
-      date.getMonth() !== m - 1 ||
-      date.getDate() !== d
-    ) {
-      return setMessage("有効な日付を入力してください");
+    // for (const field of dateFields) {
+    //   const rawValue = formData[field.key];
+
+    //   // ① 形式チェック (YYYY / MM / DD)
+    //   if (!datePattern.test(rawValue)) {
+    //     setIsError(true);
+    //     return setMessage(
+    //       `${field.label}は YYYY / MM / DD 形式で入力してください`,
+    //     );
+    //   }
+
+    //   // ② 実在チェック (2月30日などの判定)
+    //   const cleanDateStr = rawValue.replace(/\s+/g, "");
+    //   const [y, m, d] = cleanDateStr.split("/").map(Number);
+    //   const dateObj = new Date(y, m - 1, d);
+
+    //   if (
+    //     dateObj.getFullYear() !== y ||
+    //     dateObj.getMonth() !== m - 1 ||
+    //     dateObj.getDate() !== d
+    //   ) {
+    //     setIsError(true);
+    //     return setMessage(`${field.label}の日付が変です`);
+    //   }
+
+    //   // ③ 未来日チェック
+    //   if (dateObj > today) {
+    //     setIsError(true);
+    //     return setMessage(`${field.label}に未来の日付は入力できません`);
+    //   }
+    // }
+
+    const dateFields = [
+      { key: "birth_date", label: "生年月日" },
+      { key: "created_at", label: "登録日" },
+    ] as const;
+
+    for (const field of dateFields) {
+      const error = validateDateString(formData[field.key], field.label);
+      if (error) {
+        setIsError(true);
+        return setMessage(error);
+      }
     }
 
     // 1. バリデーション実行
@@ -137,11 +228,8 @@ export const PatientRegisterForm = () => {
     if (!fnaRes.isValid)
       return setMessage(`名前（かな）: ${fnaRes.errorMessage}`);
 
-    if (isFutureDate(formData.birth_date)) {
-      setMessage("生年月日に未来の日付は入力できません。");
-      setIsError(true);
-      return;
-    }
+    const cleanBirthDate = formData.birth_date.replace(/\s+/g, "");
+    const cleanCreatedAt = formData.created_at.replace(/\s+/g, "");
 
     try {
       // 2. Rustコマンド呼び出し
@@ -152,14 +240,16 @@ export const PatientRegisterForm = () => {
         firstNameKanji: formData.first_name_kanji,
         lastNameKana: formData.last_name_kana,
         firstNameKana: formData.first_name_kana,
-        birthDate: rawDate,
+        birthDate: cleanBirthDate,
         gender: formData.gender,
         height: formData.height ? parseFloat(formData.height) : null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
+        created_at: cleanCreatedAt,
       });
 
       setLastRegistered({ ...formData });
       setSaveMessage("success");
+      setMessage("");
 
       // 登録成功時にフォームをリセット
       setFormData({
@@ -173,10 +263,12 @@ export const PatientRegisterForm = () => {
         gender: "男",
         height: "",
         weight: "",
+        created_at: getTodayFormatted(),
       });
     } catch (err) {
       setIsError(true);
-      setMessage(String(err));
+      setMessage(`エラー: ${err}`);
+      setSaveMessage("error");
     }
   };
 
@@ -294,6 +386,16 @@ export const PatientRegisterForm = () => {
           placeholder="50.5"
           value={formData.weight}
           onChange={handleChange}
+        />
+
+        <MyInput
+          id="created_at"
+          label="登録日"
+          placeholder={getTodayFormatted()}
+          required
+          value={formData.created_at}
+          onChange={handleRegistrationDateChange}
+          maxLength={14}
         />
 
         <button type="submit">登録する</button>

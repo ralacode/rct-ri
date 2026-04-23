@@ -110,14 +110,86 @@ export const calculateAge = (birthDateStr: string): number | null => {
   return age;
 };
 
-/**
- * 生年月日(YYYY/MM/DD)を表示用(YYYY年MM月DD日)に変換する
- */
-export const formatBirthDate = (birthDateStr: string): string => {
-  if (!birthDateStr) return "未登録";
-  const date = birthDateStr.replace(/\s+/g, ""); // スペース除去
-  const parts = date.split("/");
-  if (parts.length !== 3) return birthDateStr;
+// (YYYY年MM月DD日)に変換する
+export const formatDateString = (dateStr: string): string => {
+  if (!dateStr) return "未登録";
 
-  return `${parts[0]}年${parts[1]}月${parts[2]}日`;
+  // 数字だけを抽出する (例: "2024-03-25 10:30:00" -> ["2024", "03", "25", "10", "30", "00"])
+  const nums = dateStr.match(/\d+/g);
+
+  // 年・月・日の3つ以上数字があれば整形する
+  if (!nums || nums.length < 3) return dateStr;
+
+  const y = nums[0];
+  const m = nums[1].padStart(2, "0"); // 1桁の場合に備えて0埋め
+  const d = nums[2].padStart(2, "0");
+
+  return `${y}年${m}月${d}日`;
+};
+
+// (YYYY年MM月DD日（曜）)に変換する
+export const formatDateTimeWithDay = (dateStr: string): string => {
+  if (!dateStr) return "未登録";
+
+  // 数字だけを抽出 (2024/03/25 でも 2024-03-25 10:00:00 でも対応)
+  const nums = dateStr.match(/\d+/g);
+  if (!nums || nums.length < 3) return dateStr;
+
+  const y = parseInt(nums[0]);
+  const m = parseInt(nums[1]);
+  const d = parseInt(nums[2]);
+
+  // Dateオブジェクトを作成（月は0から始まるので -1 する）
+  const dateObj = new Date(y, m - 1, d);
+
+  // 曜日配列
+  const dayOfWeeks = ["日", "月", "火", "水", "木", "金", "土"];
+  const dayName = dayOfWeeks[dateObj.getDay()];
+
+  // 0埋め整形
+  const mm = String(m).padStart(2, "0");
+  const dd = String(d).padStart(2, "0");
+
+  return `${y}年${mm}月${dd}日（${dayName}）`;
+};
+
+/**
+ * 日付（YYYY / MM / DD）の形式・妥当性・未来日チェックをまとめて行う
+ * エラーがある場合はエラーメッセージ、正常な場合は null を返す
+ */
+export const validateDateString = (
+  dateStr: string,
+  label: string,
+  allowFuture: boolean = false,
+): string | null => {
+  const datePattern = /^\d{4} \/ \d{2} \/ \d{2}$/;
+
+  // 1. 形式チェック
+  if (!datePattern.test(dateStr)) {
+    return `${label}は YYYY / MM / DD 形式で入力してください`;
+  }
+
+  // 2. 実在チェック
+  const cleanDateStr = dateStr.replace(/\s+/g, "");
+  const [y, m, d] = cleanDateStr.split("/").map(Number);
+  const dateObj = new Date(y, m - 1, d);
+
+  if (
+    dateObj.getFullYear() !== y ||
+    dateObj.getMonth() !== m - 1 ||
+    dateObj.getDate() !== d
+  ) {
+    return `${label}がおかしいです`;
+  }
+
+  // 3. 未来日チェック
+  if (!allowFuture) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (dateObj > today) {
+      return `${label}に未来の日付は入力できません`;
+    }
+  }
+
+  return null;
 };

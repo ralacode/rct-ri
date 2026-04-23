@@ -15,6 +15,7 @@ fn add_patient(
     weight: Option<f64>,
     birth_date: String,
     gender: String,
+    created_at: Option<String>,
 ) -> Result<(), String> {
     let fields = PatientFields {
         patient_id,
@@ -27,6 +28,7 @@ fn add_patient(
         weight,
         birth_date,
         gender,
+        created_at,
     };
     patient::model::insert(&fields)
 }
@@ -50,6 +52,7 @@ fn edit_patient(
     first_name_kanji: String,
     last_name_kana: String,
     first_name_kana: String,
+    created_at: String,
 ) -> Result<(), String> {
     patient::model::update(
         id,
@@ -59,6 +62,7 @@ fn edit_patient(
         &first_name_kanji,
         &last_name_kana,
         &first_name_kana,
+        &created_at,
     )
 }
 

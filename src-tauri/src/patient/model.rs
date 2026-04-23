@@ -17,6 +17,7 @@ pub struct Patient {
     pub weight: Option<f64>,
     pub birth_date: String,
     pub gender: String,
+    pub created_at: String,
 }
 
 pub struct PatientFields {
@@ -30,6 +31,7 @@ pub struct PatientFields {
     pub weight: Option<f64>,
     pub birth_date: String,
     pub gender: String,
+    pub created_at: Option<String>,
 }
 
 pub fn normalize_and_validate(input: &str) -> Result<String, String> {
@@ -52,20 +54,31 @@ pub fn insert(
     let normalized_id = normalize_and_validate(&p.patient_id)?;
     if p.birth_date.trim().is_empty() { return Err("生年月日は必須です".into()); }
 
+    // 登録日時が指定されていない場合は現在の日本時間を取得
+    // (外部クレートを使わずシンプルにするため、SQLiteの datetime('now', 'localtime') を利用する手法も取れますが、
+    // ここではRust側から値を渡す形にします。空ならNULLを渡してDBのDEFAULTを動かすか、以下のように値をセットします)
+    let final_created_at = p.created_at.clone().unwrap_or_else(|| {
+        // Rust側で生成する場合（簡易版）
+        chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+    });
+    // 注意: chronoクレートを使用する場合は Cargo.toml に chrono = "0.4" の追加が必要です。
+    // もしクレートを追加したくない場合は、SQL側で COALESCE(?11, CURRENT_TIMESTAMP) を使う方法もあります。
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     let result = tx.execute(
-        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         [
             &normalized_id,
-						&p.patient_type,
-						&p.last_name_kanji,
-						&p.first_name_kanji, 
+            &p.patient_type,
+            &p.last_name_kanji,
+            &p.first_name_kanji, 
             &p.last_name_kana,
-						&p.first_name_kana,
-						&p.birth_date,
-						&p.gender,
+            &p.first_name_kana,
+            &p.birth_date,
+            &p.gender,
             &p.height.map(|n| n.to_string()).unwrap_or_default(),
             &p.weight.map(|n| n.to_string()).unwrap_or_default(),
+            &final_created_at, // 追加
         ],
     );
 
@@ -101,6 +114,7 @@ pub fn update(
     first_name_kanji: &str,
     last_name_kana: &str,
     first_name_kana: &str,
+    created_at: &str,
 ) -> Result<(), String> {
   	let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -113,7 +127,7 @@ pub fn update(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6 WHERE id = ?7",
+        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, created_at = ?7 WHERE id = ?8",
         [
             &normalized_id,
             patient_type,
@@ -121,6 +135,7 @@ pub fn update(
             first_name_kanji,
             last_name_kana,
             first_name_kana,
+            created_at, // 追加
             &id.to_string(),
         ],
     );
@@ -143,7 +158,7 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender FROM patients");
+    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender, created_at FROM patients");
 
     let keyword = keyword.unwrap_or_default();
     if !keyword.is_empty() {
@@ -168,6 +183,7 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
             weight: row.get(8)?,
             birth_date: row.get(9)?,
             gender: row.get(10)?,
+            created_at: row.get(11)?,
         })
     };
 
