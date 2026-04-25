@@ -33,6 +33,7 @@ pub fn init_db() -> Result<()> {
     conn.execute("PRAGMA foreign_keys = ON;", [])?;
 
     create_patients_table(&conn)?;
+    create_exam_orders_table(&conn)?;
 
     Ok(())
 }
@@ -52,6 +53,21 @@ fn create_patients_table(conn: &Connection) -> Result<()> {
             height REAL,
             weight REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )",
+        [],
+    )?;
+    Ok(())
+}
+
+// 検査オーダー用テーブル
+fn create_exam_orders_table(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS exam_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patient_db_id INTEGER NOT NULL,
+            exam_date TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
         )",
         [],
     )?;

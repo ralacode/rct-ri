@@ -8,6 +8,7 @@ import {
   formatDateTimeWithDay,
   toKatakana,
 } from "@lib/utils";
+import type { ExamOrder } from "@/types/exam_order";
 
 interface Props {
   patientId: string | undefined;
@@ -15,37 +16,89 @@ interface Props {
 
 export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [orders, setOrders] = useState<ExamOrder[]>([]);
+  const [newExamDate, setNewExamDate] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
+  // useEffect(() => {
+  //   const fetchPatientData = async () => {
+  //     if (!patientId) return;
+
+  //     try {
+  //       // search_patients_cmd を呼び出し、キーワードに患者IDを渡す
+  //       // この関数は Vec<Patient> (配列) を返します
+  //       const results = await invoke<Patient[]>("search_patients_cmd", {
+  //         keyword: patientId,
+  //         sortDesc: false,
+  //       });
+
+  //       if (results.length > 0) {
+  //         // 該当する患者が見つかった場合、最初の1件をセット
+  //         setPatient(results[0]);
+  //         setError(null);
+  //       } else {
+  //         setError("該当する患者が見つかりませんでした。");
+  //       }
+  //     } catch (err) {
+  //       console.error("データ取得エラー:", err);
+  //       setError("データの取得に失敗しました。");
+  //     }
+  //   };
+
+  //   fetchPatientData();
+  // }, [patientId]);
+
   useEffect(() => {
-    const fetchPatientData = async () => {
-      if (!patientId) return;
-
-      try {
-        // search_patients_cmd を呼び出し、キーワードに患者IDを渡す
-        // この関数は Vec<Patient> (配列) を返します
-        const results = await invoke<Patient[]>("search_patients_cmd", {
-          keyword: patientId,
-          sortDesc: false,
-        });
-
-        if (results.length > 0) {
-          // 該当する患者が見つかった場合、最初の1件をセット
-          setPatient(results[0]);
-          setError(null);
-        } else {
-          setError("該当する患者が見つかりませんでした。");
-        }
-      } catch (err) {
-        console.error("データ取得エラー:", err);
-        setError("データの取得に失敗しました。");
-      }
-    };
-
-    fetchPatientData();
+    fetchData();
   }, [patientId]);
+
+  // データ取得を一括で行う関数
+  const fetchData = async () => {
+    if (!patientId) return;
+
+    try {
+      // 1. 患者情報の取得
+      const results = await invoke<Patient[]>("search_patients_cmd", {
+        keyword: patientId,
+        sortDesc: false,
+      });
+
+      if (results.length > 0) {
+        const p = results[0];
+        setPatient(p);
+        setError(null);
+
+        // 2. その患者に紐づく検査オーダーを取得
+        const orderResults = await invoke<ExamOrder[]>("get_exam_orders", {
+          patientDbId: p.id,
+        });
+        setOrders(orderResults);
+      } else {
+        setError("該当する患者が見つかりませんでした。");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("データの読み込みに失敗しました。");
+    }
+  };
+
+  // 検査オーダー追加処理
+  const handleAddOrder = async () => {
+    if (!patient || !newExamDate) return;
+
+    try {
+      await invoke("add_exam_order", {
+        patientDbId: patient.id,
+        examDate: newExamDate,
+      });
+      setNewExamDate(""); // 入力欄をクリア
+      fetchData(); // リロードして一覧を更新
+    } catch (err) {
+      alert("検査登録に失敗しました: " + err);
+    }
+  };
 
   // 実際の削除実行
   const executeDelete = async () => {
@@ -88,18 +141,12 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
 
   return (
     <div>
-      <h2>患者詳細情報</h2>
-
+      {/* 患者基本情報セクション */}
       <div className="detail-info-group">
-        <p className="detail-item">
-          患者ID: <span className="detail-value">{patient_id}</span>
-        </p>
-        <p className="detail-item">
-          区分: <span className="detail-value">{patient_type}</span>
-        </p>
+        <p>{patient_id}</p>
+
         {/* ルビ（ふりがな）付きの氏名表示 */}
         <div className="detail-item name-display">
-          氏名:
           <span className="detail-value">
             <ruby className="name-ruby">
               {last_name_kanji}
@@ -116,12 +163,14 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
           生年月日：
           <span className="detail-value">{formatDateString(birth_date)}</span>
         </div>
+
         <div className="detail-item">
           登録日：
           <span className="detail-value">
             {formatDateTimeWithDay(created_at)}
           </span>
         </div>
+
         <div className="detail-item">
           年齢：
           <span className="detail-value">
@@ -150,6 +199,7 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
         </div>
       </div>
 
+      {/* 患者削除ボタン */}
       <div className="action-area">
         {!showConfirm ? (
           <button
@@ -175,6 +225,39 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
             >
               いいえ
             </button>
+          </div>
+        )}
+      </div>
+
+      {/* 検査登録フォーム */}
+      <div>
+        <h3>新規検査登録</h3>
+
+        <div>
+          <input
+            type="date"
+            value={newExamDate}
+            onChange={(e) => setNewExamDate(e.target.value)}
+            className="exam-date-input"
+          />
+          <button onClick={handleAddOrder}>登録する</button>
+        </div>
+      </div>
+
+      {/* 検査履歴一覧 */}
+      <div>
+        <h3>検査一覧</h3>
+
+        {orders.length === 0 ? (
+          <p className="text-gray-500">登録された検査はありません。</p>
+        ) : (
+          <div>
+            {orders.map((order) => (
+              <div key={order.id}>
+                <p>検査日：{formatDateTimeWithDay(order.exam_date)}</p>
+                <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
+              </div>
+            ))}
           </div>
         )}
       </div>

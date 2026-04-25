@@ -1,6 +1,8 @@
 mod db;
+mod exam_order;
 mod patient;
 
+use crate::exam_order::model::ExamOrder;
 use crate::patient::model::{Patient, PatientFields};
 
 #[tauri::command]
@@ -71,6 +73,16 @@ fn search_patients_cmd(keyword: Option<String>, sort_desc: bool) -> Result<Vec<P
     patient::model::search(keyword, sort_desc)
 }
 
+#[tauri::command]
+fn add_exam_order(patient_db_id: i32, exam_date: String) -> Result<(), String> {
+    exam_order::model::insert_order(patient_db_id, &exam_date)
+}
+
+#[tauri::command]
+fn get_exam_orders(patient_db_id: i32) -> Result<Vec<ExamOrder>, String> {
+    exam_order::model::get_orders_by_patient(patient_db_id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -91,7 +103,9 @@ pub fn run() {
             get_patients,
             remove_patient,
             edit_patient,
-            search_patients_cmd
+            search_patients_cmd,
+            add_exam_order,
+            get_exam_orders
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
