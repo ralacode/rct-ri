@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
 import {
   calculateAge,
+  examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
   toKatakana,
@@ -18,6 +19,7 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
   const [newExamDate, setNewExamDate] = useState("");
+  const [newExamTime, setNewExamTime] = useState("8:30");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -51,50 +53,59 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   // }, [patientId]);
 
   useEffect(() => {
-    fetchData();
+    fetchPatientData();
+    fetchOrders();
   }, [patientId]);
 
-  // データ取得を一括で行う関数
-  const fetchData = async () => {
+  const fetchPatientData = async () => {
     if (!patientId) return;
-
     try {
-      // 1. 患者情報の取得
       const results = await invoke<Patient[]>("search_patients_cmd", {
         keyword: patientId,
         sortDesc: false,
       });
-
       if (results.length > 0) {
-        const p = results[0];
-        setPatient(p);
-        setError(null);
-
-        // 2. その患者に紐づく検査オーダーを取得
-        const orderResults = await invoke<ExamOrder[]>("get_exam_orders", {
-          patientDbId: p.id,
-        });
-        setOrders(orderResults);
-      } else {
-        setError("該当する患者が見つかりませんでした。");
+        setPatient(results[0]);
       }
     } catch (err) {
-      console.error(err);
-      setError("データの読み込みに失敗しました。");
+      console.error("患者データ取得失敗:", err);
+      setError("患者情報の取得に失敗しました。");
+    }
+  };
+
+  const fetchOrders = async () => {
+    if (!patientId) return;
+    try {
+      // まずDB上の内部IDを取得する必要があるため、patient state経由で取得
+      // (実際の実装では patient.id が確定してから呼ぶなどの考慮が必要)
+      const results = await invoke<Patient[]>("search_patients_cmd", {
+        keyword: patientId,
+        sortDesc: false,
+      });
+      if (results.length > 0) {
+        const orderList = await invoke<ExamOrder[]>("get_exam_orders", {
+          patientDbId: results[0].id,
+        });
+        setOrders(orderList);
+      }
+    } catch (err) {
+      console.error("検査履歴取得失敗:", err);
     }
   };
 
   // 検査オーダー追加処理
   const handleAddOrder = async () => {
-    if (!patient || !newExamDate) return;
+    if (!patient || !newExamDate || !newExamTime) return;
 
     try {
       await invoke("add_exam_order", {
         patientDbId: patient.id,
         examDate: newExamDate,
+        examTime: newExamTime,
       });
-      setNewExamDate(""); // 入力欄をクリア
-      fetchData(); // リロードして一覧を更新
+      setNewExamDate("");
+      setNewExamTime("8:30"); // 登録後にリセット
+      fetchOrders(); // 一覧を再取得
     } catch (err) {
       alert("検査登録に失敗しました: " + err);
     }
@@ -240,6 +251,19 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
             onChange={(e) => setNewExamDate(e.target.value)}
             className="exam-date-input"
           />
+
+          <select
+            value={newExamTime}
+            onChange={(e) => setNewExamTime(e.target.value)}
+            className="exam-time-select"
+          >
+            {examTimeSlots.map((time) => (
+              <option key={time} value={time}>
+                {time}
+              </option>
+            ))}
+          </select>
+
           <button onClick={handleAddOrder}>登録する</button>
         </div>
       </div>
@@ -255,6 +279,10 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
             {orders.map((order) => (
               <div key={order.id}>
                 <p>検査日：{formatDateTimeWithDay(order.exam_date)}</p>
+                <p>
+                  <span className="exam-label">予約時間：</span>
+                  {order.exam_time}
+                </p>
                 <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
               </div>
             ))}

@@ -150,7 +150,16 @@ export const formatDateTimeWithDay = (dateStr: string): string => {
   const mm = String(m).padStart(2, "0");
   const dd = String(d).padStart(2, "0");
 
-  return `${y}年${mm}月${dd}日（${dayName}）`;
+  let result = `${y}年${mm}月${dd}日（${dayName}）`;
+
+  // もし時間（時・分）が含まれていれば追加する
+  if (nums.length >= 5) {
+    const hh = nums[3].padStart(2, "0");
+    const min = nums[4].padStart(2, "0");
+    result += ` ${hh}:${min}`;
+  }
+
+  return result;
 };
 
 /**
@@ -193,3 +202,23 @@ export const validateDateString = (
 
   return null;
 };
+
+// 予約時間枠
+export const examTimeSlots = [
+  "8:30",
+  "9:00",
+  "9:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+];

@@ -66,6 +66,7 @@ fn create_exam_orders_table(conn: &Connection) -> Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_db_id INTEGER NOT NULL,
             exam_date TEXT NOT NULL,
+            exam_time TEXT NOT NULL DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
         )",

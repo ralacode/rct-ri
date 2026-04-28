@@ -1,3 +1,5 @@
+// src-tauri/src/lib.rs
+
 mod db;
 mod exam_order;
 mod patient;
@@ -74,8 +76,8 @@ fn search_patients_cmd(keyword: Option<String>, sort_desc: bool) -> Result<Vec<P
 }
 
 #[tauri::command]
-fn add_exam_order(patient_db_id: i32, exam_date: String) -> Result<(), String> {
-    exam_order::model::insert_order(patient_db_id, &exam_date)
+fn add_exam_order(patient_db_id: i32, exam_date: String, exam_time: String) -> Result<(), String> {
+    exam_order::model::insert_order(patient_db_id, &exam_date, &exam_time)
 }
 
 #[tauri::command]
