@@ -35,6 +35,12 @@ pub fn init_db() -> Result<()> {
     create_patients_table(&conn)?;
     create_exam_orders_table(&conn)?;
 
+    // カラム追加のマイグレーション（すでに存在する場合は無視される）
+    let _ = conn.execute(
+        "ALTER TABLE exam_orders ADD COLUMN requesting_department TEXT NOT NULL DEFAULT ''",
+        [],
+    );
+
     Ok(())
 }
 
@@ -67,6 +73,7 @@ fn create_exam_orders_table(conn: &Connection) -> Result<()> {
             patient_db_id INTEGER NOT NULL,
             exam_date TEXT NOT NULL,
             exam_time TEXT NOT NULL DEFAULT '',
+            requesting_department TEXT NOT NULL DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
         )",

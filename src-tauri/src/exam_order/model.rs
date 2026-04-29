@@ -11,11 +11,17 @@ pub struct ExamOrder {
     pub patient_db_id: i32,
     pub exam_date: String,
     pub exam_time: String,
+    pub requesting_department: String,
     pub created_at: String,
 }
 
 // 検査オーダーの登録
-pub fn insert_order(patient_db_id: i32, exam_date: &str, exam_time: &str) -> Result<(), String> {
+pub fn insert_order(
+    patient_db_id: i32,
+    exam_date: &str,
+    exam_time: &str,
+    requesting_department: &str,
+) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -26,12 +32,13 @@ pub fn insert_order(patient_db_id: i32, exam_date: &str, exam_time: &str) -> Res
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
     tx.execute(
-        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, created_at) VALUES (?1, ?2, ?3, ?4)",
+        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, requesting_department, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         [
             patient_db_id.to_string(),
             exam_date.to_string(),
             exam_time.to_string(),
-            now, // ここで日本時間を渡す
+            requesting_department.to_string(),
+            now,
         ],
     )
     .map_err(|e| e.to_string())?;
@@ -46,7 +53,7 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
-        .prepare("SELECT id, patient_db_id, exam_date, exam_time, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
+        .prepare("SELECT id, patient_db_id, exam_date, exam_time, requesting_department, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
         .map_err(|e| e.to_string())?;
 
     let order_iter = stmt
@@ -56,7 +63,8 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
                 patient_db_id: row.get(1)?,
                 exam_date: row.get(2)?,
                 exam_time: row.get(3)?,
-                created_at: row.get(4)?,
+                requesting_department: row.get(4)?,
+                created_at: row.get(5)?,
             })
         })
         .map_err(|e| e.to_string())?;

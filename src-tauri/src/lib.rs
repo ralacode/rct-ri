@@ -76,8 +76,18 @@ fn search_patients_cmd(keyword: Option<String>, sort_desc: bool) -> Result<Vec<P
 }
 
 #[tauri::command]
-fn add_exam_order(patient_db_id: i32, exam_date: String, exam_time: String) -> Result<(), String> {
-    exam_order::model::insert_order(patient_db_id, &exam_date, &exam_time)
+fn add_exam_order(
+    patient_db_id: i32,
+    exam_date: String,
+    exam_time: String,
+    requesting_department: String,
+) -> Result<(), String> {
+    exam_order::model::insert_order(
+        patient_db_id,
+        &exam_date,
+        &exam_time,
+        &requesting_department,
+    )
 }
 
 #[tauri::command]

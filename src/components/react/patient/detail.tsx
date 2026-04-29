@@ -4,18 +4,21 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
 import {
   calculateAge,
+  DEPARTMENTS,
   examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
   toKatakana,
 } from "@lib/utils";
 import type { ExamOrder } from "@/types/exam_order";
+import { DatalistInput } from "../datalist-input";
 
 export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
   const [newExamDate, setNewExamDate] = useState("");
   const [newExamTime, setNewExamTime] = useState("8:30");
+  const [dept, setDept] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -75,16 +78,27 @@ export const PatientDetail: React.FC = () => {
   }, []);
 
   const handleAddOrder = async () => {
-    if (!patient || !newExamDate) return;
+    if (!patient) return;
+    if (!newExamDate || !dept) {
+      alert("検査日と依頼科を選択してください。");
+      return;
+    }
+
     try {
       // Rust側は 'add_exam_order' で、引数は 'patientDbId' (数値)
       await invoke("add_exam_order", {
         patientDbId: patient.id,
         examDate: newExamDate,
         examTime: newExamTime,
+        requestingDepartment: dept,
       });
-      loadAllData(patient.patient_id); // 再読み込み
+
       setNewExamDate("");
+      setNewExamTime("8:30");
+      setDept("");
+
+      const id = getPatientIdFromUrl();
+      if (id) loadAllData(id);
     } catch (err) {
       alert("検査登録に失敗しました。");
     }
@@ -224,24 +238,54 @@ export const PatientDetail: React.FC = () => {
         <h3>新規検査登録</h3>
 
         <div>
-          <input
-            type="date"
-            value={newExamDate}
-            onChange={(e) => setNewExamDate(e.target.value)}
-            className="exam-date-input"
+          <div>
+            <input
+              type="date"
+              value={newExamDate}
+              onChange={(e) => setNewExamDate(e.target.value)}
+              className="exam-date-input"
+            />
+
+            <select
+              value={newExamTime}
+              onChange={(e) => setNewExamTime(e.target.value)}
+              className="exam-time-select"
+            >
+              {examTimeSlots.map((time) => (
+                <option key={time} value={time}>
+                  {time}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <DatalistInput
+            id="requesting_department"
+            label="依頼科："
+            list="requesting_department_list"
+            placeholder="依頼科を入力..."
+            value={dept}
+            onChange={(e) => setDept(e.target.value)}
+            options={DEPARTMENTS}
           />
 
-          <select
-            value={newExamTime}
-            onChange={(e) => setNewExamTime(e.target.value)}
-            className="exam-time-select"
-          >
-            {examTimeSlots.map((time) => (
-              <option key={time} value={time}>
-                {time}
-              </option>
-            ))}
-          </select>
+          {/* <div>
+            <label htmlFor="requesting_department">依頼科検索:</label>
+            <input
+              id="requesting_department"
+              name="requesting_department"
+              type="text"
+              list="requesting_department_list"
+              placeholder="依頼科を入力..."
+              value={dept}
+              onChange={(e) => setDept(e.target.value)}
+            />
+            <datalist id="requesting_department_list">
+              {DEPARTMENTS.map((option) => (
+                <option key={option} value={option} />
+              ))}
+            </datalist>
+          </div> */}
 
           <button onClick={handleAddOrder}>登録する</button>
         </div>
@@ -254,15 +298,16 @@ export const PatientDetail: React.FC = () => {
         {orders.length === 0 ? (
           <p className="text-gray-500">登録された検査はありません。</p>
         ) : (
-          <div>
+          <div style={{ display: "grid", gap: "16px", justifyItems: "start" }}>
             {orders.map((order) => (
-              <div key={order.id}>
+              <div key={order.id} style={{ border: "solid 1px #ddd" }}>
                 <p>検査日：{formatDateTimeWithDay(order.exam_date)}</p>
                 <p>
                   <span className="exam-label">予約時間：</span>
                   {order.exam_time}
                 </p>
                 <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
+                <p>依頼科：{order.requesting_department}</p>
               </div>
             ))}
           </div>
