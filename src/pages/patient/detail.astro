@@ -1,0 +1,11 @@
+---
+// src/pages/patient/detail.astro
+import Layout from "@layouts/layout.astro";
+import { PatientDetail } from "@components/react/patient/detail";
+
+// 静的モードでは、Astro.params ではなく URLクエリを React 側で処理します
+---
+
+<Layout>
+  <PatientDetail client:only="react" />
+</Layout>

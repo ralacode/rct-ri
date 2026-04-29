@@ -1,5 +1,5 @@
 ---
-// src/pages/patient/[patient_id]/index.astro
+// src/pages/patient/[patient_id].astro
 
 import Layout from "@layouts/layout.astro";
 import { PatientDetail } from "@components/react/patient/detail";
@@ -7,7 +7,7 @@ import { PatientDetail } from "@components/react/patient/detail";
 export function getStaticPaths() {
   // 開発中やビルド時は空、もしくはサンプルのIDを返します。
   // Tauriの実際の動作には影響しません（client:loadでReact側が動くため）。
-  return [{ params: { patient_id: "default" } }];
+  return [{ params: { patient_id: "index" } }];
 }
 
 const { patient_id } = Astro.params;

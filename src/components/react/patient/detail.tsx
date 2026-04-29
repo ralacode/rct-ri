@@ -11,11 +11,7 @@ import {
 } from "@lib/utils";
 import type { ExamOrder } from "@/types/exam_order";
 
-interface Props {
-  patientId: string | undefined;
-}
-
-export const PatientDetail: React.FC<Props> = ({ patientId }) => {
+export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
   const [newExamDate, setNewExamDate] = useState("");
@@ -24,90 +20,73 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  // useEffect(() => {
-  //   const fetchPatientData = async () => {
-  //     if (!patientId) return;
+  // 1. URLのクエリパラメータからIDを取得する関数
+  const getPatientIdFromUrl = () => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return params.get("id");
+    }
+    return null;
+  };
 
-  //     try {
-  //       // search_patients_cmd を呼び出し、キーワードに患者IDを渡す
-  //       // この関数は Vec<Patient> (配列) を返します
-  //       const results = await invoke<Patient[]>("search_patients_cmd", {
-  //         keyword: patientId,
-  //         sortDesc: false,
-  //       });
+  // 2. データロード処理（患者情報 + 検査履歴）
+  const loadAllData = async (patientIdStr: string) => {
+    try {
+      // 1. 患者情報の取得
+      // Rust側の引数名は 'keyword'。第二引数の 'sortDesc' も必須です。
+      const patients = await invoke<Patient[]>("search_patients_cmd", {
+        keyword: patientIdStr,
+        sortDesc: false,
+      });
 
-  //       if (results.length > 0) {
-  //         // 該当する患者が見つかった場合、最初の1件をセット
-  //         setPatient(results[0]);
-  //         setError(null);
-  //       } else {
-  //         setError("該当する患者が見つかりませんでした。");
-  //       }
-  //     } catch (err) {
-  //       console.error("データ取得エラー:", err);
-  //       setError("データの取得に失敗しました。");
-  //     }
-  //   };
+      if (patients && patients.length > 0) {
+        const p = patients[0];
+        setPatient(p);
 
-  //   fetchPatientData();
-  // }, [patientId]);
+        // 2. 検査履歴の取得
+        // Rust側のコマンド名は 'get_exam_orders'
+        // 引数名は 'patientDbId' で、型は数値(i32)が必要です。
+        try {
+          const orderResults = await invoke<ExamOrder[]>("get_exam_orders", {
+            patientDbId: p.id,
+          });
+          setOrders(orderResults || []);
+        } catch (e) {
+          console.error("検査履歴の取得失敗:", e);
+        }
+      } else {
+        setError(`患者ID: ${patientIdStr} が見つかりませんでした。`);
+      }
+    } catch (err) {
+      console.error("Invoke Error:", err);
+      setError(
+        "データベース接続エラーが発生しました。詳細はコンソールを確認してください。",
+      );
+    }
+  };
 
   useEffect(() => {
-    fetchPatientData();
-    fetchOrders();
-  }, [patientId]);
-
-  const fetchPatientData = async () => {
-    if (!patientId) return;
-    try {
-      const results = await invoke<Patient[]>("search_patients_cmd", {
-        keyword: patientId,
-        sortDesc: false,
-      });
-      if (results.length > 0) {
-        setPatient(results[0]);
-      }
-    } catch (err) {
-      console.error("患者データ取得失敗:", err);
-      setError("患者情報の取得に失敗しました。");
+    const id = getPatientIdFromUrl();
+    if (id) {
+      loadAllData(id);
+    } else {
+      setError("患者IDが指定されていません。");
     }
-  };
+  }, []);
 
-  const fetchOrders = async () => {
-    if (!patientId) return;
-    try {
-      // まずDB上の内部IDを取得する必要があるため、patient state経由で取得
-      // (実際の実装では patient.id が確定してから呼ぶなどの考慮が必要)
-      const results = await invoke<Patient[]>("search_patients_cmd", {
-        keyword: patientId,
-        sortDesc: false,
-      });
-      if (results.length > 0) {
-        const orderList = await invoke<ExamOrder[]>("get_exam_orders", {
-          patientDbId: results[0].id,
-        });
-        setOrders(orderList);
-      }
-    } catch (err) {
-      console.error("検査履歴取得失敗:", err);
-    }
-  };
-
-  // 検査オーダー追加処理
   const handleAddOrder = async () => {
-    if (!patient || !newExamDate || !newExamTime) return;
-
+    if (!patient || !newExamDate) return;
     try {
+      // Rust側は 'add_exam_order' で、引数は 'patientDbId' (数値)
       await invoke("add_exam_order", {
         patientDbId: patient.id,
         examDate: newExamDate,
         examTime: newExamTime,
       });
+      loadAllData(patient.patient_id); // 再読み込み
       setNewExamDate("");
-      setNewExamTime("8:30"); // 登録後にリセット
-      fetchOrders(); // 一覧を再取得
     } catch (err) {
-      alert("検査登録に失敗しました: " + err);
+      alert("検査登録に失敗しました。");
     }
   };
 
@@ -288,6 +267,10 @@ export const PatientDetail: React.FC<Props> = ({ patientId }) => {
             ))}
           </div>
         )}
+      </div>
+
+      <div>
+        <a href="/patient/list/">患者一覧</a>
       </div>
     </div>
   );
