@@ -8,6 +8,7 @@ import {
   examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
+  PHYSICIAN,
   toKatakana,
 } from "@lib/utils";
 import type { ExamOrder } from "@/types/exam_order";
@@ -19,6 +20,7 @@ export const PatientDetail: React.FC = () => {
   const [newExamDate, setNewExamDate] = useState("");
   const [newExamTime, setNewExamTime] = useState("8:30");
   const [dept, setDept] = useState("");
+  const [pys, setPys] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -79,7 +81,7 @@ export const PatientDetail: React.FC = () => {
 
   const handleAddOrder = async () => {
     if (!patient) return;
-    if (!newExamDate || !dept) {
+    if (!newExamDate || !dept || !pys) {
       alert("検査日と依頼科を選択してください。");
       return;
     }
@@ -91,11 +93,13 @@ export const PatientDetail: React.FC = () => {
         examDate: newExamDate,
         examTime: newExamTime,
         requestingDepartment: dept,
+        requestingPhysician: pys,
       });
 
       setNewExamDate("");
       setNewExamTime("8:30");
       setDept("");
+      setPys("");
 
       const id = getPatientIdFromUrl();
       if (id) loadAllData(id);
@@ -269,23 +273,15 @@ export const PatientDetail: React.FC = () => {
             options={DEPARTMENTS}
           />
 
-          {/* <div>
-            <label htmlFor="requesting_department">依頼科検索:</label>
-            <input
-              id="requesting_department"
-              name="requesting_department"
-              type="text"
-              list="requesting_department_list"
-              placeholder="依頼科を入力..."
-              value={dept}
-              onChange={(e) => setDept(e.target.value)}
-            />
-            <datalist id="requesting_department_list">
-              {DEPARTMENTS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div> */}
+          <DatalistInput
+            id="requesting_physician"
+            label="依頼医："
+            list="requesting_physician_list"
+            placeholder="依頼医を入力..."
+            value={pys}
+            onChange={(e) => setPys(e.target.value)}
+            options={PHYSICIAN}
+          />
 
           <button onClick={handleAddOrder}>登録する</button>
         </div>
@@ -308,6 +304,7 @@ export const PatientDetail: React.FC = () => {
                 </p>
                 <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
                 <p>依頼科：{order.requesting_department}</p>
+                <p>依頼医：{order.requesting_physician}</p>
               </div>
             ))}
           </div>

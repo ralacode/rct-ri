@@ -81,12 +81,14 @@ fn add_exam_order(
     exam_date: String,
     exam_time: String,
     requesting_department: String,
+    requesting_physician: String,
 ) -> Result<(), String> {
     exam_order::model::insert_order(
         patient_db_id,
         &exam_date,
         &exam_time,
         &requesting_department,
+        &requesting_physician,
     )
 }
 

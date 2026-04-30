@@ -253,3 +253,5 @@ export const DEPARTMENTS = [
   "眼科",
   "その他",
 ];
+
+export const PHYSICIAN = ["澤田　孝峰", "和田", "その他"];

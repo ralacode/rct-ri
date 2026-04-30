@@ -12,6 +12,7 @@ pub struct ExamOrder {
     pub exam_date: String,
     pub exam_time: String,
     pub requesting_department: String,
+    pub requesting_physician: String,
     pub created_at: String,
 }
 
@@ -21,6 +22,7 @@ pub fn insert_order(
     exam_date: &str,
     exam_time: &str,
     requesting_department: &str,
+    requesting_physician: &str,
 ) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -32,12 +34,13 @@ pub fn insert_order(
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
     tx.execute(
-        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, requesting_department, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, requesting_department, requesting_physician, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         [
             patient_db_id.to_string(),
             exam_date.to_string(),
             exam_time.to_string(),
             requesting_department.to_string(),
+            requesting_physician.to_string(), // 追加
             now,
         ],
     )
@@ -53,7 +56,7 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
-        .prepare("SELECT id, patient_db_id, exam_date, exam_time, requesting_department, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
+        .prepare("SELECT id, patient_db_id, exam_date, exam_time, requesting_department, requesting_physician, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
         .map_err(|e| e.to_string())?;
 
     let order_iter = stmt
@@ -64,7 +67,8 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
                 exam_date: row.get(2)?,
                 exam_time: row.get(3)?,
                 requesting_department: row.get(4)?,
-                created_at: row.get(5)?,
+                requesting_physician: row.get(5)?, // 追加
+                created_at: row.get(6)?,
             })
         })
         .map_err(|e| e.to_string())?;
