@@ -7,8 +7,8 @@ export interface Patient {
   last_name_kana: string;
   first_name_kana: string;
   birth_date: string;
-  height?: string;
-  weight?: string;
+  height: number | null;
+  weight: number | null;
   gender: "男" | "女";
   created_at: string;
 }
