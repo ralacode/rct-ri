@@ -46,6 +46,11 @@ pub fn init_db() -> Result<()> {
         [],
     );
 
+    let _ = conn.execute(
+        "ALTER TABLE exam_orders ADD COLUMN exam_item TEXT NOT NULL DEFAULT ''",
+        [],
+    );
+
     Ok(())
 }
 
@@ -78,6 +83,7 @@ fn create_exam_orders_table(conn: &Connection) -> Result<()> {
             patient_db_id INTEGER NOT NULL,
             exam_date TEXT NOT NULL,
             exam_time TEXT NOT NULL DEFAULT '',
+            exam_item TEXT NOT NULL DEFAULT '',
             requesting_department TEXT NOT NULL DEFAULT '',
             requesting_physician TEXT NOT NULL DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,

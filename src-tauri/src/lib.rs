@@ -80,6 +80,7 @@ fn add_exam_order(
     patient_db_id: i32,
     exam_date: String,
     exam_time: String,
+    exam_item: String,
     requesting_department: String,
     requesting_physician: String,
 ) -> Result<(), String> {
@@ -87,6 +88,7 @@ fn add_exam_order(
         patient_db_id,
         &exam_date,
         &exam_time,
+        &exam_item,
         &requesting_department,
         &requesting_physician,
     )

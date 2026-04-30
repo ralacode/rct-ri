@@ -11,6 +11,7 @@ pub struct ExamOrder {
     pub patient_db_id: i32,
     pub exam_date: String,
     pub exam_time: String,
+    pub exam_item: String,
     pub requesting_department: String,
     pub requesting_physician: String,
     pub created_at: String,
@@ -21,6 +22,7 @@ pub fn insert_order(
     patient_db_id: i32,
     exam_date: &str,
     exam_time: &str,
+    exam_item: &str,
     requesting_department: &str,
     requesting_physician: &str,
 ) -> Result<(), String> {
@@ -34,11 +36,12 @@ pub fn insert_order(
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
     tx.execute(
-        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, requesting_department, requesting_physician, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         [
             patient_db_id.to_string(),
             exam_date.to_string(),
             exam_time.to_string(),
+            exam_item.to_string(),
             requesting_department.to_string(),
             requesting_physician.to_string(), // 追加
             now,
@@ -56,7 +59,7 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
-        .prepare("SELECT id, patient_db_id, exam_date, exam_time, requesting_department, requesting_physician, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
+        .prepare("SELECT id, patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
         .map_err(|e| e.to_string())?;
 
     let order_iter = stmt
@@ -66,9 +69,10 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
                 patient_db_id: row.get(1)?,
                 exam_date: row.get(2)?,
                 exam_time: row.get(3)?,
-                requesting_department: row.get(4)?,
-                requesting_physician: row.get(5)?, // 追加
-                created_at: row.get(6)?,
+                exam_item: row.get(4)?,
+                requesting_department: row.get(5)?,
+                requesting_physician: row.get(6)?,
+                created_at: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;

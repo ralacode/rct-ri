@@ -226,7 +226,7 @@ export const examTimeSlots = [
 export const DEPARTMENTS = [
   "乳腺内分泌外科",
   "呼吸器科",
-  "泌尿器科",
+  "ひ尿器科",
   "婦人科",
   "血液・腫瘍内科",
   "耳鼻咽喉科",
@@ -254,4 +254,19 @@ export const DEPARTMENTS = [
   "その他",
 ];
 
-export const PHYSICIAN = ["澤田　孝峰", "和田", "その他"];
+export const PHYSICIAN = ["澤田　孝峰", "竹下　卓志", "和田", "その他"];
+
+export const EXAM_ITEMS = [
+  "脳DATシンチ",
+  "骨シンチ",
+  "センチネルリンパ節シンチ",
+  "心筋シンチ I123-MIBG",
+  "心筋シンチ Tl 運動負荷",
+  "腎レノグラム ラシックス負荷",
+  "腎形態シンチ DMSA",
+  "脳血流シンチIMP 負荷無採血無",
+  "ガリウムシンチ",
+  "甲状腺シンチ",
+  "肺血流シンチ",
+  "腎シンチ",
+];

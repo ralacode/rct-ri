@@ -5,6 +5,7 @@ import type { Patient } from "@/types/patient";
 import {
   calculateAge,
   DEPARTMENTS,
+  EXAM_ITEMS,
   examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
@@ -21,6 +22,7 @@ export const PatientDetail: React.FC = () => {
   const [newExamTime, setNewExamTime] = useState("8:30");
   const [dept, setDept] = useState("");
   const [pys, setPys] = useState("");
+  const [examItem, setExamItem] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -81,8 +83,9 @@ export const PatientDetail: React.FC = () => {
 
   const handleAddOrder = async () => {
     if (!patient) return;
-    if (!newExamDate || !dept || !pys) {
-      alert("検査日と依頼科を選択してください。");
+
+    if (!newExamDate || !newExamTime || !examItem || !dept || !pys) {
+      alert("検査日、予約時間、検査項目、依頼科、依頼医を入力してください。");
       return;
     }
 
@@ -92,12 +95,14 @@ export const PatientDetail: React.FC = () => {
         patientDbId: patient.id,
         examDate: newExamDate,
         examTime: newExamTime,
+        examItem: examItem,
         requestingDepartment: dept,
         requestingPhysician: pys,
       });
 
       setNewExamDate("");
       setNewExamTime("8:30");
+      setExamItem("");
       setDept("");
       setPys("");
 
@@ -283,6 +288,16 @@ export const PatientDetail: React.FC = () => {
             options={PHYSICIAN}
           />
 
+          <DatalistInput
+            id="exam_item"
+            label="検査項目："
+            list="exam_item_list"
+            placeholder="検査項目を入力..."
+            value={examItem}
+            onChange={(e) => setExamItem(e.target.value)}
+            options={EXAM_ITEMS}
+          />
+
           <button onClick={handleAddOrder}>登録する</button>
         </div>
       </div>
@@ -305,6 +320,7 @@ export const PatientDetail: React.FC = () => {
                 <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
                 <p>依頼科：{order.requesting_department}</p>
                 <p>依頼医：{order.requesting_physician}</p>
+                <p>検査項目：{order.exam_item}</p>
               </div>
             ))}
           </div>
