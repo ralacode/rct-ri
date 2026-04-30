@@ -1,12 +1,13 @@
-// src/components/PatientList.tsx
+// src/components/react/patient/list.tsx
 import React, { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import type { Patient } from "@/types/patient";
 
-interface Patient {
-  id: number;
-  patient_id: string;
-  patient_type: string;
-}
+// interface Patient {
+//   id: number;
+//   patient_id: string;
+//   patient_type: string;
+// }
 
 export const PatientList = () => {
   const [patients, setPatients] = useState<Patient[]>([]);

@@ -65,9 +65,10 @@ pub fn insert(
     // もしクレートを追加したくない場合は、SQL側で COALESCE(?11, CURRENT_TIMESTAMP) を使う方法もあります。
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
+
     let result = tx.execute(
         "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-        [
+        rusqlite::params![
             &normalized_id,
             &p.patient_type,
             &p.last_name_kanji,
@@ -76,9 +77,9 @@ pub fn insert(
             &p.first_name_kana,
             &p.birth_date,
             &p.gender,
-            &p.height.map(|n| n.to_string()).unwrap_or_default(),
-            &p.weight.map(|n| n.to_string()).unwrap_or_default(),
-            &final_created_at, // 追加
+            p.height, // そのまま渡せるようになります
+            p.weight, // そのまま渡せるようになります
+            &final_created_at,
         ],
     );
 
