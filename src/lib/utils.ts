@@ -127,7 +127,7 @@ export const formatDateString = (dateStr: string): string => {
   return `${y}年${m}月${d}日`;
 };
 
-// (YYYY年MM月DD日（曜）)に変換する
+// (YYYY年MM月DD日（曜）)に変換する（時間もあれば含む）
 export const formatDateTimeWithDay = (dateStr: string): string => {
   if (!dateStr) return "未登録";
 
@@ -254,7 +254,13 @@ export const DEPARTMENTS = [
   "その他",
 ];
 
-export const PHYSICIAN = ["澤田　孝峰", "竹下　卓志", "和田", "その他"];
+export const PHYSICIAN = [
+  "澤田 孝峰",
+  "竹下 卓志",
+  "和田 邦泰",
+  "里地 葉",
+  "その他",
+];
 
 export const EXAM_ITEMS = [
   "脳DATシンチ",
@@ -270,3 +276,20 @@ export const EXAM_ITEMS = [
   "肺血流シンチ",
   "腎シンチ",
 ];
+
+// 本日の日付を取得する関数
+export const getTodayLocalString = (): string => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
+
+// 本日の日時を取得
+export const getCurrentDateTimeLocalString = (): string => {
+  const now = new Date();
+  const date = getTodayLocalString(); // 上記関数を再利用
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const seconds = String(now.getSeconds()).padStart(2, "0");
+
+  return `${date} ${hours}:${minutes}:${seconds}`;
+};
