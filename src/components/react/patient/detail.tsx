@@ -19,7 +19,7 @@ export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
   const [newExamDate, setNewExamDate] = useState("");
-  const [newExamTime, setNewExamTime] = useState("8:30");
+  const [newExamTime, setNewExamTime] = useState("08:30");
   const [dept, setDept] = useState("");
   const [pys, setPys] = useState("");
   const [examItem, setExamItem] = useState("");
@@ -101,7 +101,7 @@ export const PatientDetail: React.FC = () => {
       });
 
       setNewExamDate("");
-      setNewExamTime("8:30");
+      setNewExamTime("08:30");
       setExamItem("");
       setDept("");
       setPys("");

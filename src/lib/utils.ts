@@ -205,9 +205,9 @@ export const validateDateString = (
 
 // 予約時間枠
 export const examTimeSlots = [
-  "8:30",
-  "9:00",
-  "9:30",
+  "08:30",
+  "09:00",
+  "09:30",
   "10:00",
   "10:30",
   "11:00",

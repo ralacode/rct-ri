@@ -130,7 +130,7 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
              FROM exam_orders o
              JOIN patients p ON o.patient_db_id = p.id
              WHERE o.exam_date = ?1
-             ORDER BY o.exam_time DESC",
+             ORDER BY o.exam_time ASC",
         )
         .map_err(|e| e.to_string())?;
 
