@@ -6,6 +6,8 @@ mod patient;
 
 use crate::exam_order::model::{ExamOrder, ExamOrderWithPatient};
 use crate::patient::model::{Patient, PatientFields};
+use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[tauri::command]
 fn add_patient(
@@ -117,6 +119,54 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            let window = app.get_webview_window("main").unwrap();
+
+            let _ = window.set_size(PhysicalSize::new(1024, 768));
+            let _ = window.set_position(PhysicalPosition::new(0, 0));
+
+            window.show()?;
+
+            app.handle().plugin(
+                tauri_plugin_global_shortcut::Builder::new()
+                    .with_handler(move |_app, shortcut, event| {
+                        if event.state() != ShortcutState::Pressed {
+                            return;
+                        }
+
+                        match shortcut {
+                            s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit1) => {
+                                let _ = window.set_size(PhysicalSize::new(390, 844));
+                                let _ = window.set_position(PhysicalPosition::new(0, 0));
+                            }
+
+                            s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2) => {
+                                let _ = window.set_size(PhysicalSize::new(1024, 768));
+                                let _ = window.set_position(PhysicalPosition::new(0, 0));
+                            }
+
+                            s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit3) => {
+                                let _ = window.set_size(PhysicalSize::new(768, 1024));
+                                let _ = window.set_position(PhysicalPosition::new(0, 0));
+                            }
+
+                            s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit4) => {
+                                let _ = window.maximize();
+                            }
+
+                            _ => {}
+                        }
+                    })
+                    .build(),
+            )?;
+
+            let shortcut = app.global_shortcut();
+
+            shortcut.register(Shortcut::new(Some(Modifiers::CONTROL), Code::Digit1))?;
+            shortcut.register(Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2))?;
+            shortcut.register(Shortcut::new(Some(Modifiers::CONTROL), Code::Digit3))?;
+            shortcut.register(Shortcut::new(Some(Modifiers::CONTROL), Code::Digit4))?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
