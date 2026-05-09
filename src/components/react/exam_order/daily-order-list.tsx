@@ -11,6 +11,7 @@ import {
   toKatakana,
 } from "@lib/utils";
 import styles from "@styles/daily-order-list.module.css";
+import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -48,8 +49,6 @@ const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
 export const DailyOrderList: React.FC = () => {
   const [targetDate, setTargetDate] = useState(getTodayLocalString());
   const [orders, setOrders] = useState<ExamOrderWithPatient[]>([]);
-  const [deletingOrderId, setDeletingOrderId] = useState<number | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   // input要素にアクセスするためのref
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -100,30 +99,6 @@ export const DailyOrderList: React.FC = () => {
   // 印刷処理
   const handlePrint = () => {
     window.print();
-  };
-
-  const handleDeleteOrder = async (orderId: number) => {
-    // setIsDeleting(true);
-    // try {
-    //   await invoke("delete_exam_order_cmd", { id: orderId });
-    //   setDeletingOrderId(null);
-    //   fetchOrders(targetDate); // 一覧を再取得
-    // } catch (e) {
-    //   console.error(e);
-    //   alert("削除に失敗しました。");
-    // } finally {
-    //   setIsDeleting(false);
-    // }
-
-    await deleteOrder(
-      orderId,
-      () => fetchOrders(targetDate), // 成功時に実行する関数を渡す
-      () => setIsDeleting(true),
-      () => {
-        setIsDeleting(false);
-        setDeletingOrderId(null);
-      },
-    );
   };
 
   return (
@@ -326,29 +301,10 @@ export const DailyOrderList: React.FC = () => {
                   </p>
                   <p>依頼医：{order.requesting_physician}</p>
 
-                  <div>
-                    {deletingOrderId !== order.id ? (
-                      <button onClick={() => setDeletingOrderId(order.id)}>
-                        オーダー削除
-                      </button>
-                    ) : (
-                      <div>
-                        <p>本当に削除しますか？</p>
-                        <button
-                          onClick={() => handleDeleteOrder(order.id)}
-                          disabled={isDeleting}
-                        >
-                          はい
-                        </button>
-                        <button
-                          onClick={() => setDeletingOrderId(null)}
-                          disabled={isDeleting}
-                        >
-                          いいえ
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <DeleteOrderButton
+                    orderId={order.id}
+                    onSuccess={() => fetchOrders(targetDate)}
+                  />
                 </div>
               </li>
             ))}

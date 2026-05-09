@@ -15,6 +15,7 @@ import {
 } from "@lib/utils";
 import type { ExamOrder } from "@/types/exam_order";
 import { DatalistInput } from "../datalist-input";
+import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
 
 export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -27,7 +28,6 @@ export const PatientDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [deletingOrderId, setDeletingOrderId] = useState<number | null>(null);
 
   // 1. URLのクエリパラメータからIDを取得する関数
   const getPatientIdFromUrl = () => {
@@ -131,38 +131,9 @@ export const PatientDetail: React.FC = () => {
     }
   };
 
-  // 検査オーダー削除処理
-  const handleDeleteOrder = async (orderId: number) => {
-    // setIsDeleting(true);
-
-    // try {
-    //   await invoke("delete_exam_order_cmd", { id: orderId });
-
-    //   setDeletingOrderId(null); // 確認画面を閉じる
-
-    //   const id = getPatientIdFromUrl();
-    //   if (id) loadAllData(id);
-    // } catch (e) {
-    //   console.error(e);
-    //   alert("削除に失敗しました。");
-    // } finally {
-    //   setIsDeleting(false);
-    // }
-
-    const successfetchData = () => {
-      const id = getPatientIdFromUrl();
-      if (id) loadAllData(id);
-    };
-
-    await deleteOrder(
-      orderId,
-      () => successfetchData(), // 成功時に実行する関数を渡す
-      () => setIsDeleting(true),
-      () => {
-        setIsDeleting(false);
-        setDeletingOrderId(null);
-      },
-    );
+  const successfetchData = () => {
+    const id = getPatientIdFromUrl();
+    if (id) loadAllData(id);
   };
 
   if (error) return <div>{error}</div>;
@@ -358,28 +329,10 @@ export const PatientDetail: React.FC = () => {
                 <p>依頼医：{order.requesting_physician}</p>
                 <p>検査項目：{order.exam_item}</p>
 
-                {/* 削除ボタンの追加 */}
-                {deletingOrderId !== order.id ? (
-                  <button onClick={() => setDeletingOrderId(order.id)}>
-                    オーダー削除
-                  </button>
-                ) : (
-                  <div className="delete-confirmation">
-                    <p className="confirm-text">本当に削除しますか？</p>
-                    <button
-                      onClick={() => handleDeleteOrder(order.id)}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? "削除中..." : "はい"}
-                    </button>
-                    <button
-                      onClick={() => setDeletingOrderId(null)}
-                      disabled={isDeleting}
-                    >
-                      いいえ
-                    </button>
-                  </div>
-                )}
+                <DeleteOrderButton
+                  orderId={order.id}
+                  onSuccess={successfetchData}
+                />
               </div>
             ))}
           </div>
