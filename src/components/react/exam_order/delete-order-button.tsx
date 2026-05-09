@@ -7,9 +7,14 @@ import styles from "@styles/delete-order-button.module.css";
 interface Props {
   orderId: number;
   onSuccess: () => Promise<void> | void;
+  className?: string;
 }
 
-export const DeleteOrderButton: React.FC<Props> = ({ orderId, onSuccess }) => {
+export const DeleteOrderButton: React.FC<Props> = ({
+  orderId,
+  onSuccess,
+  className,
+}) => {
   const [isConfirming, setIsConfirming] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -40,7 +45,7 @@ export const DeleteOrderButton: React.FC<Props> = ({ orderId, onSuccess }) => {
   // }
 
   return (
-    <div className={styles.container}>
+    <div className={`${styles.container} ${className}`}>
       {!isConfirming ? (
         <MyButton
           onClick={() => setIsConfirming(true)}

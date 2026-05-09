@@ -5,13 +5,107 @@
   gap: var(--body);
 }
 
-.report_title,
-.use_date {
+.report_title_area {
   display: none;
 }
 
 .for_print {
   display: none;
+}
+
+.print_button_message {
+  @media (width >= 768px) {
+    display: none;
+  }
+}
+
+.print_button {
+  display: none;
+
+  @media (width >= 768px) {
+    display: revert;
+  }
+}
+
+.order_list_section {
+  display: grid;
+  gap: var(--space-line);
+}
+
+.order_list {
+  display: grid;
+  gap: var(--space-line);
+}
+
+.order_item_inner {
+  border: var(--my-border);
+  box-shadow: var(--box-shadow);
+  border-radius: var(--body);
+  padding: var(--body);
+  display: grid;
+  gap: var(--body);
+  grid-template-areas:
+    "time ."
+    "order order"
+    "name year"
+    ". body"
+    ". physician"
+    "button button";
+  grid-template-columns: minmax(0, auto) minmax(0, auto);
+  grid-template-rows: repeat(6, minmax(0, auto));
+
+  @media (width >= 768px) {
+    gap: revert;
+    grid-template-areas:
+      "time . order order order order"
+      ". . . . . ."
+      "name . year . body physician"
+      ". . . . . ."
+      "button button button button button button";
+    grid-template-columns:
+      auto var(--heading1) auto var(--heading1)
+      auto minmax(0, 1fr);
+    grid-template-rows: auto var(--body) auto var(--body) auto;
+  }
+}
+
+.order_time {
+  grid-area: time;
+}
+
+.order_patient {
+  grid-area: name;
+}
+
+.order_year {
+  grid-area: year;
+  justify-self: end;
+  align-self: center;
+}
+
+.order_name {
+  grid-area: order;
+  font-weight: bold;
+  font-size: var(--heading4);
+
+  @media (width >= 768px) {
+    font-size: var(--heading3);
+  }
+}
+
+.order_body {
+  grid-area: body;
+  justify-self: end;
+}
+
+.order_physician {
+  grid-area: physician;
+  justify-self: end;
+}
+
+.delete_button {
+  grid-area: button;
+  justify-self: end;
 }
 
 @media print {
@@ -40,15 +134,13 @@
     box-sizing: border-box;
   }
 
-  .report_title {
+  .report_title_area {
     display: block;
-    font-size: var(--heading3);
     color: black;
   }
 
-  .use_date {
-    display: block;
-    color: black;
+  .report_title {
+    font-size: var(--heading3);
   }
 
   .order_list {
@@ -157,15 +249,15 @@
 
   .body_info_area {
     grid-column: 4;
+
+    p {
+      font-size: var(--small);
+    }
   }
 
   .body_info {
     display: grid;
     grid-template-columns: auto auto;
     justify-items: end;
-
-    p {
-      font-size: calc(var(--body) * 0.8);
-    }
   }
 }

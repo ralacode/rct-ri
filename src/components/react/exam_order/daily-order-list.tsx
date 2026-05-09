@@ -12,6 +12,7 @@ import {
 } from "@lib/utils";
 import styles from "@styles/daily-order-list.module.css";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
+import { MyButton } from "../my-button";
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -103,7 +104,7 @@ export const DailyOrderList: React.FC = () => {
 
   return (
     <div className={styles.container}>
-      <div>
+      <div className={styles.report_title_area}>
         <h1 className={styles.report_title}>
           熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿
         </h1>
@@ -131,26 +132,26 @@ export const DailyOrderList: React.FC = () => {
           style={{ display: "none" }}
         />
 
-        {/* 明示的なカレンダー起動ボタン */}
-        <button onClick={handleOpenCalendar} className="calendar-button">
-          日付を選択
-        </button>
+        <p className={styles.print_button_message}>
+          使用記録簿を印刷する場合は「Ctrl + 2」を押してください
+        </p>
 
-        <button onClick={handlePrint} className="print-button">
+        <MyButton onClick={handlePrint} className={styles.print_button}>
           使用記録簿を印刷
-        </button>
+        </MyButton>
       </div>
 
-      <div className="order-list-section">
-        <h3 className={`${styles.no_print_area}`}>
-          {formatDateTimeWithDay(targetDate)} の検査一覧
-        </h3>
+      <div className={styles.order_list_section}>
+        <div className={styles.no_print_area}>
+          <h3>{formatDateTimeWithDay(targetDate)}</h3>
+          <MyButton onClick={handleOpenCalendar}>日付を選択</MyButton>
+        </div>
         {orders.length === 0 ? (
           <p className="no-data">該当するオーダーはありません。</p>
         ) : (
           <ul className={styles.order_list}>
             {orders.map((order) => (
-              <li key={order.id} className="order-item">
+              <li key={order.id} className={styles.order_item}>
                 <div className={`${styles.for_print}`}>
                   <div className={`${styles.order_content_row_1}`}>
                     <div className={`${styles.order_content_item}`}>
@@ -161,13 +162,13 @@ export const DailyOrderList: React.FC = () => {
                     <div className={`${styles.order_content_item}`}>
                       <p>氏名</p>
                       <p>
-                        <ruby className="name-ruby">
+                        <ruby>
                           {order.last_name_kanji}
                           <rt className="name-rt">
                             {toKatakana(order.last_name_kana)}
                           </rt>
                         </ruby>{" "}
-                        <ruby className="name-ruby">
+                        <ruby>
                           {order.first_name_kanji}
                           <rt className="name-rt">
                             {toKatakana(order.first_name_kana)}
@@ -275,35 +276,48 @@ export const DailyOrderList: React.FC = () => {
                   </div>
                 </div>
 
-                <div className={`${styles.no_print_area}`}>
-                  <p className="order-time">{order.exam_time}</p>
-                  <p>{order.patient_id}</p>
-                  <p className="order-patient">
-                    <ruby className="name-ruby">
-                      {order.last_name_kanji}
-                      <rt className="name-rt">
-                        {toKatakana(order.last_name_kana)}
-                      </rt>
-                    </ruby>{" "}
-                    <ruby className="name-ruby">
-                      {order.first_name_kanji}
-                      <rt className="name-rt">
-                        {toKatakana(order.first_name_kana)}
-                      </rt>
-                    </ruby>
+                <div
+                  className={`${styles.no_print_area} ${styles.order_item_inner}`}
+                >
+                  <p className={styles.order_time}>{order.exam_time}</p>
+                  <div className={styles.order_patient}>
+                    <p>{order.patient_id}</p>
+                    <p>
+                      <ruby>
+                        {order.last_name_kanji}
+                        <rt className="name-rt">
+                          {toKatakana(order.last_name_kana)}
+                        </rt>
+                      </ruby>{" "}
+                      <ruby>
+                        {order.first_name_kanji}
+                        <rt className="name-rt">
+                          {toKatakana(order.first_name_kana)}
+                        </rt>
+                      </ruby>
+                    </p>
+                  </div>
+                  <p className={styles.order_year}>
+                    {calculateAge(order.birth_date)}歳
                   </p>
-                  <p>{calculateAge(order.birth_date)}歳</p>
-                  <p>身長：{order.height ? `${order.height} cm` : "未登録"}</p>
-                  <p>体重：{order.weight ? `${order.weight} kg` : "未登録"}</p>
-                  <p className="order-name">{order.exam_item}</p>
-                  <p className="order-dept">
-                    依頼科：{order.requesting_department}
-                  </p>
-                  <p>依頼医：{order.requesting_physician}</p>
+                  <div className={styles.order_body}>
+                    <p>
+                      身長：{order.height ? `${order.height} cm` : "未登録"}
+                    </p>
+                    <p>
+                      体重：{order.weight ? `${order.weight} kg` : "未登録"}
+                    </p>
+                  </div>
+                  <p className={styles.order_name}>{order.exam_item}</p>
+                  <div className={styles.order_physician}>
+                    <p>{order.requesting_department}</p>
+                    <p>{order.requesting_physician}</p>
+                  </div>
 
                   <DeleteOrderButton
                     orderId={order.id}
                     onSuccess={() => fetchOrders(targetDate)}
+                    className={styles.delete_button}
                   />
                 </div>
               </li>
