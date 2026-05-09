@@ -1,6 +1,7 @@
 // src/lib/utils.ts
 import type { ValidationResult } from "@/types/patient";
 import { siteMeta } from "@lib/constants";
+import { invoke } from "@tauri-apps/api/core";
 
 /**
  * ページタイトルを整形する (例: ページ名 | サイト名)
@@ -293,3 +294,28 @@ export const getCurrentDateTimeLocalString = (): string => {
 
   return `${date} ${hours}:${minutes}:${seconds}`;
 };
+
+/**
+ * 検査オーダーを削除する共通関数
+ * @param orderId 削除対象のID
+ * @param onSuccess 削除成功時に実行したい処理（再取得など）
+ * @param onStart 削除開始時に実行したい処理（LoadingフラグONなど）
+ * @param onFinish 削除終了時に実行したい処理（LoadingフラグOFFなど）
+ */
+export async function deleteOrder(
+  orderId: number,
+  onSuccess: () => Promise<void> | void,
+  onStart?: () => void,
+  onFinish?: () => void,
+) {
+  if (onStart) onStart();
+  try {
+    await invoke("delete_exam_order_cmd", { id: orderId });
+    await onSuccess(); // ここで fetchData や fetchOrders が呼ばれる
+  } catch (e) {
+    console.error("削除エラー:", e);
+    alert("削除に失敗しました。");
+  } finally {
+    if (onFinish) onFinish();
+  }
+}

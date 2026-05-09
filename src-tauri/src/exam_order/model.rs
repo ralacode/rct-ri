@@ -163,3 +163,17 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
     }
     Ok(orders)
 }
+
+// 検査オーダーの削除
+pub fn delete_order(id: i32) -> Result<(), String> {
+    let db_path = get_db_path();
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    tx.execute("DELETE FROM exam_orders WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}

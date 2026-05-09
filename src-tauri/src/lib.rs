@@ -106,6 +106,11 @@ fn get_daily_exam_orders(date: String) -> Result<Vec<ExamOrderWithPatient>, Stri
     exam_order::model::get_orders_by_date(&date)
 }
 
+#[tauri::command]
+fn delete_exam_order_cmd(id: i32) -> Result<(), String> {
+    exam_order::model::delete_order(id)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -177,7 +182,8 @@ pub fn run() {
             search_patients_cmd,
             add_exam_order,
             get_exam_orders,
-            get_daily_exam_orders
+            get_daily_exam_orders,
+            delete_exam_order_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
