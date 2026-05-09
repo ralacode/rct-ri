@@ -14,11 +14,12 @@
     "windows": [
       {
         "title": "RC Tools",
-        "width": 1024,
-        "height": 768,
-        "minWidth": 380,
-        "minHeight": 834,
-        "visible": false,
+        "width": 800,
+        "height": 600,
+        "x": 0,
+        "y": 0,
+        "minWidth": 300,
+        "minHeight": 560,
         "resizable": true
       }
     ],

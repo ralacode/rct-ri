@@ -6,7 +6,7 @@ mod patient;
 
 use crate::exam_order::model::{ExamOrder, ExamOrderWithPatient};
 use crate::patient::model::{Patient, PatientFields};
-use tauri::{Manager, PhysicalPosition, PhysicalSize};
+use tauri::{LogicalSize, Manager, PhysicalPosition};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[tauri::command]
@@ -127,10 +127,10 @@ pub fn run() {
 
             let window = app.get_webview_window("main").unwrap();
 
-            let _ = window.set_size(PhysicalSize::new(1024, 768));
-            let _ = window.set_position(PhysicalPosition::new(0, 0));
+            // let _ = window.set_size(LogicalSize::new(800, 600));
+            // let _ = window.set_position(PhysicalPosition::new(0, 0));
 
-            window.show()?;
+            // window.show()?;
 
             app.handle().plugin(
                 tauri_plugin_global_shortcut::Builder::new()
@@ -141,18 +141,18 @@ pub fn run() {
 
                         match shortcut {
                             s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit1) => {
-                                let _ = window.set_size(PhysicalSize::new(390, 844));
+                                let _ = window.set_size(LogicalSize::new(320, 568));
                                 let _ = window.set_position(PhysicalPosition::new(0, 0));
                             }
 
                             s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit2) => {
-                                let _ = window.set_size(PhysicalSize::new(1024, 768));
+                                let _ = window.set_size(LogicalSize::new(800, 600));
                                 let _ = window.set_position(PhysicalPosition::new(0, 0));
                             }
 
                             s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit3) => {
-                                let _ = window.set_size(PhysicalSize::new(768, 1024));
-                                let _ = window.set_position(PhysicalPosition::new(0, 0));
+                                let _ = window.set_size(LogicalSize::new(800, 600));
+                                let _ = window.center();
                             }
 
                             s if s == &Shortcut::new(Some(Modifiers::CONTROL), Code::Digit4) => {
