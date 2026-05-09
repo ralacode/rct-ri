@@ -1,0 +1,28 @@
+.container {
+  display: grid;
+  gap: var(--half);
+  grid-template-rows: var(--space-line) var(--space-line);
+}
+
+.delete_order_button {
+  justify-self: start;
+  background-color: red;
+  color: white;
+}
+
+.button_area {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--body);
+
+  @media (width >= 768px) {
+    grid-auto-flow: column;
+    grid-template-columns: revert;
+    justify-content: start;
+  }
+}
+
+.confirm_delete {
+  background-color: red;
+  color: white;
+}

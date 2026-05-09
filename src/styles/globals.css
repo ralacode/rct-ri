@@ -12,6 +12,7 @@
   --heading3: calc(var(--body) * 1.4);
   --space-line: calc(var(--body) * 1.8);
   --small: calc(var(--body) * 0.8);
+  --half: calc(var(--body) / 2);
 }
 
 body {

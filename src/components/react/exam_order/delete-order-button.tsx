@@ -1,6 +1,8 @@
 // src/components/react/exam_order/DeleteOrderButton.tsx
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { MyButton } from "@components/react/my-button";
+import styles from "@styles/delete-order-button.module.css";
 
 interface Props {
   orderId: number;
@@ -25,23 +27,49 @@ export const DeleteOrderButton: React.FC<Props> = ({ orderId, onSuccess }) => {
     }
   };
 
-  if (!isConfirming) {
-    return (
-      <button onClick={() => setIsConfirming(true)} type="button">
-        オーダー削除
-      </button>
-    );
-  }
+  // if (!isConfirming) {
+  //   return (
+  //     <MyButton
+  //       onClick={() => setIsConfirming(true)}
+  //       type="button"
+  //       className={styles.delete_order_button}
+  //     >
+  //       オーダー削除
+  //     </MyButton>
+  //   );
+  // }
 
   return (
-    <div>
-      <p>本当に削除しますか？</p>
-      <button onClick={handleDelete} disabled={isDeleting}>
-        {isDeleting ? "削除中..." : "削除する"}
-      </button>
-      <button onClick={() => setIsConfirming(false)} disabled={isDeleting}>
-        キャンセル
-      </button>
+    <div className={styles.container}>
+      {!isConfirming ? (
+        <MyButton
+          onClick={() => setIsConfirming(true)}
+          type="button"
+          className={styles.delete_order_button}
+        >
+          オーダー削除
+        </MyButton>
+      ) : (
+        <>
+          <p>本当に削除しますか？</p>
+          <div className={styles.button_area}>
+            <MyButton
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className={styles.confirm_delete}
+            >
+              {isDeleting ? "削除中..." : "削除する"}
+            </MyButton>
+            <MyButton
+              onClick={() => setIsConfirming(false)}
+              disabled={isDeleting}
+              className={styles.cancel_button}
+            >
+              キャンセル
+            </MyButton>
+          </div>
+        </>
+      )}
     </div>
   );
 };

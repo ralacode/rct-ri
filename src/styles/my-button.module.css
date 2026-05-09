@@ -1,0 +1,13 @@
+.my_button {
+  font-family: var(--font-family);
+  font-size: inherit;
+  color: inherit;
+  border-radius: 10000px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    opacity: 0.7;
+  }
+}
