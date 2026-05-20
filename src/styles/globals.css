@@ -7,6 +7,7 @@
     Arial, sans-serif;
   --box-shadow: 0 0 16px 6px rgba(98, 151, 177, 0.39);
   --my-border: solid 1px #ddd;
+  --black-border: solid 1px black;
 
   --body: clamp(1rem, 0.9504rem + 0.2116vw, 1.125rem); /* 16px - 18px */
   --heading1: calc(var(--body) * 1.8);

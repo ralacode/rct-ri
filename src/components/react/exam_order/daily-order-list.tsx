@@ -8,11 +8,13 @@ import {
   deleteOrder,
   formatDateTimeWithDay,
   getTodayLocalString,
+  NEEDS_PROCEDURE_ITEMS,
   toKatakana,
 } from "@lib/utils";
 import styles from "@styles/daily-order-list.module.css";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
 import { MyButton } from "../my-button";
+import { PatientName } from "@components/react/patient-name";
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -97,23 +99,48 @@ export const DailyOrderList: React.FC = () => {
     setTargetDate(value);
   };
 
-  // 印刷処理
-  const handlePrint = () => {
-    window.print();
+  // 使用記録簿印刷
+  const handlePrint = (mode: "summary" | "procedure") => {
+    // bodyにモードを刻む
+    document.body.setAttribute("data-print-mode", mode);
+
+    // 属性が反映されるのを僅かに待ってから印刷（念のため）
+    setTimeout(() => {
+      window.print();
+      // 印刷ダイアログが閉じた後、属性をクリアしておくと安全
+      document.body.removeAttribute("data-print-mode");
+    }, 50);
+  };
+
+  // 標識手順書印刷
+  const handlePrintIndividual = (mode: "procedure", orderId: number) => {
+    // 1. まず全ての印刷対象外クラスをリセット
+    const pages = document.querySelectorAll(`.${styles.procedure_page}`);
+    pages.forEach((page) => page.classList.remove(styles.no_print));
+
+    // 2. 対象のID以外に非表示クラスを付与
+    pages.forEach((page) => {
+      // idは `print-target-${order.id}` としているので、それと比較
+      if (page.id !== `print-target-${orderId}`) {
+        page.classList.add(styles.no_print);
+      }
+    });
+
+    // 3. bodyにモードをセット
+    document.body.setAttribute("data-print-mode", mode);
+
+    // 4. 少し待機して印刷を実行
+    setTimeout(() => {
+      window.print();
+
+      // 5. 印刷ダイアログを閉じた後の後片付け
+      document.body.removeAttribute("data-print-mode");
+      pages.forEach((page) => page.classList.remove(styles.no_print));
+    }, 100); // 念のため100msに伸ばしています
   };
 
   return (
     <div className={styles.container}>
-      <div className={styles.report_title_area}>
-        <h1 className={styles.report_title}>
-          熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿
-        </h1>
-
-        <p className={styles.use_date}>
-          使用日：{formatDateTimeWithDay(targetDate)}
-        </p>
-      </div>
-
       <div className={styles.no_print_area}>
         <label htmlFor="date-select" style={{ display: "none" }}>
           表示日:
@@ -136,12 +163,15 @@ export const DailyOrderList: React.FC = () => {
           使用記録簿を印刷する場合は「Ctrl + 2」を押してください
         </p>
 
-        <MyButton onClick={handlePrint} className={styles.print_button}>
+        <MyButton
+          onClick={() => handlePrint("summary")}
+          className={styles.print_button}
+        >
           使用記録簿を印刷
         </MyButton>
       </div>
 
-      <div className={styles.order_list_section}>
+      <div className={`${styles.order_list_section} ${styles.no_print_area}`}>
         <div className={styles.no_print_area}>
           <h3>{formatDateTimeWithDay(targetDate)}</h3>
           <MyButton onClick={handleOpenCalendar}>日付を選択</MyButton>
@@ -152,130 +182,6 @@ export const DailyOrderList: React.FC = () => {
           <ul className={styles.order_list}>
             {orders.map((order) => (
               <li key={order.id} className={styles.order_item}>
-                <div className={`${styles.for_print}`}>
-                  <div className={`${styles.order_content_row_1}`}>
-                    <div className={`${styles.order_content_item}`}>
-                      <p>予約時間</p>
-                      <p>{order.exam_time}</p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>氏名</p>
-                      <p>
-                        <ruby>
-                          {order.last_name_kanji}
-                          <rt className="name-rt">
-                            {toKatakana(order.last_name_kana)}
-                          </rt>
-                        </ruby>{" "}
-                        <ruby>
-                          {order.first_name_kanji}
-                          <rt className="name-rt">
-                            {toKatakana(order.first_name_kana)}
-                          </rt>
-                        </ruby>
-                      </p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>ID</p>
-                      <p>{order.patient_id}</p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>性別</p>
-                      <p>{order.gender}</p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>年齢</p>
-                      <p>{calculateAge(order.birth_date)}歳</p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>依頼科</p>
-                      <p>{order.requesting_department}</p>
-                    </div>
-
-                    <div className={`${styles.order_content_item}`}>
-                      <p>依頼医</p>
-                      <p>{order.requesting_physician}</p>
-                    </div>
-                  </div>
-
-                  <div className={`${styles.order_content_row_2}`}>
-                    <div
-                      className={`${styles.exam_item_area} ${styles.order_content_item}`}
-                    >
-                      <p>検査項目</p>
-
-                      <div>
-                        <p className={styles.exam_item}>
-                          {EXAM_ITEM_DISPLAY_MAP[order.exam_item] ||
-                            order.exam_item}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`${styles.drug_label} ${styles.order_content_item}`}
-                    >
-                      <p>放射性医薬品ラベル</p>
-                    </div>
-
-                    <div
-                      className={`${styles.record_area} ${styles.order_content_item}`}
-                    >
-                      <div className={`${styles.record_area_user}`}>
-                        <p>使用者</p>
-                        <p></p>
-                      </div>
-
-                      <div className={`${styles.record_area_time}`}>
-                        <p>投与時刻</p>
-                        <p></p>
-                      </div>
-
-                      <div
-                        className={`${styles.activity_volume} ${styles.administered}`}
-                      >
-                        <div>
-                          <p>投与量</p>
-                        </div>
-                        <div className={styles.volume_values}>
-                          <p> MBq</p>
-                          <p> mL</p>
-                        </div>
-                      </div>
-
-                      <div
-                        className={`${styles.activity_volume} ${styles.residual}`}
-                      >
-                        <div>
-                          <p>残量</p>
-                        </div>
-                        <div className={styles.volume_values}>
-                          <p> MBq</p>
-                          <p> mL</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`${styles.body_info_area} ${styles.order_content_item}`}
-                    >
-                      <div className={styles.body_info}>
-                        <p>{order.height} cm</p>
-                        <p>{order.weight} kg</p>
-                      </div>
-
-                      <div>
-                        <p>備考)</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 <div
                   className={`${styles.no_print_area} ${styles.order_item_inner}`}
                 >
@@ -283,18 +189,12 @@ export const DailyOrderList: React.FC = () => {
                   <div className={styles.order_patient}>
                     <p>{order.patient_id}</p>
                     <p>
-                      <ruby>
-                        {order.last_name_kanji}
-                        <rt className="name-rt">
-                          {toKatakana(order.last_name_kana)}
-                        </rt>
-                      </ruby>{" "}
-                      <ruby>
-                        {order.first_name_kanji}
-                        <rt className="name-rt">
-                          {toKatakana(order.first_name_kana)}
-                        </rt>
-                      </ruby>
+                      <PatientName
+                        last_name_kanji={order.last_name_kanji}
+                        last_name_kana={toKatakana(order.last_name_kana)}
+                        first_name_kanji={order.first_name_kanji}
+                        first_name_kana={toKatakana(order.first_name_kana)}
+                      />
                     </p>
                   </div>
                   <p className={styles.order_year}>
@@ -314,6 +214,23 @@ export const DailyOrderList: React.FC = () => {
                     <p>{order.requesting_physician}</p>
                   </div>
 
+                  {NEEDS_PROCEDURE_ITEMS.includes(order.exam_item) && (
+                    <>
+                      <p className={styles.procedure_print_message}>
+                        「標識手順書」を印刷するには「Ctrl + 2」を押してください
+                      </p>
+
+                      <MyButton
+                        onClick={() =>
+                          handlePrintIndividual("procedure", order.id)
+                        }
+                        className={styles.individual_print_button}
+                      >
+                        標識手順書を印刷
+                      </MyButton>
+                    </>
+                  )}
+
                   <DeleteOrderButton
                     orderId={order.id}
                     onSuccess={() => fetchOrders(targetDate)}
@@ -324,6 +241,212 @@ export const DailyOrderList: React.FC = () => {
             ))}
           </ul>
         )}
+      </div>
+
+      <div className={`${styles.for_print}`}>
+        <div className={styles.report_title_area}>
+          <h1 className={styles.report_title}>
+            熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿
+          </h1>
+
+          <p className={styles.use_date}>
+            使用日：{formatDateTimeWithDay(targetDate)}
+          </p>
+        </div>
+
+        <ul className={styles.order_list}>
+          {orders.map((order) => {
+            return (
+              <li className={styles.order_item}>
+                <div className={`${styles.order_content_row_1}`}>
+                  <div className={`${styles.order_content_item}`}>
+                    <p>予約時間</p>
+                    <p>{order.exam_time}</p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>氏名</p>
+                    <p>
+                      <ruby>
+                        {order.last_name_kanji}
+                        <rt className="name-rt">
+                          {toKatakana(order.last_name_kana)}
+                        </rt>
+                      </ruby>{" "}
+                      <ruby>
+                        {order.first_name_kanji}
+                        <rt className="name-rt">
+                          {toKatakana(order.first_name_kana)}
+                        </rt>
+                      </ruby>
+                    </p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>ID</p>
+                    <p>{order.patient_id}</p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>性別</p>
+                    <p>{order.gender}</p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>年齢</p>
+                    <p>{calculateAge(order.birth_date)}歳</p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>依頼科</p>
+                    <p>{order.requesting_department}</p>
+                  </div>
+
+                  <div className={`${styles.order_content_item}`}>
+                    <p>依頼医</p>
+                    <p>{order.requesting_physician}</p>
+                  </div>
+                </div>
+
+                <div className={`${styles.order_content_row_2}`}>
+                  <div
+                    className={`${styles.exam_item_area} ${styles.order_content_item}`}
+                  >
+                    <p>検査項目</p>
+
+                    <div>
+                      <p className={styles.exam_item}>
+                        {EXAM_ITEM_DISPLAY_MAP[order.exam_item] ||
+                          order.exam_item}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`${styles.drug_label} ${styles.order_content_item}`}
+                  >
+                    <p>放射性医薬品ラベル</p>
+                  </div>
+
+                  <div
+                    className={`${styles.record_area} ${styles.order_content_item}`}
+                  >
+                    <div className={`${styles.record_area_user}`}>
+                      <p>使用者</p>
+                      <p></p>
+                    </div>
+
+                    <div className={`${styles.record_area_time}`}>
+                      <p>投与時刻</p>
+                      <p></p>
+                    </div>
+
+                    <div
+                      className={`${styles.activity_volume} ${styles.administered}`}
+                    >
+                      <div>
+                        <p>投与量</p>
+                      </div>
+                      <div className={styles.volume_values}>
+                        <p> MBq</p>
+                        <p> mL</p>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`${styles.activity_volume} ${styles.residual}`}
+                    >
+                      <div>
+                        <p>残量</p>
+                      </div>
+                      <div className={styles.volume_values}>
+                        <p> MBq</p>
+                        <p> mL</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    className={`${styles.body_info_area} ${styles.order_content_item}`}
+                  >
+                    <div className={styles.body_info}>
+                      <p>{order.height} cm</p>
+                      <p>{order.weight} kg</p>
+                    </div>
+
+                    <div>
+                      <p>備考)</p>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className={styles.procedure_for_print}>
+        {orders.map((order) => (
+          <div
+            key={`proc-${order.id}`}
+            className={styles.procedure_page}
+            id={`print-target-${order.id}`}
+          >
+            {order.exam_item === "センチネルリンパ節シンチ" ? (
+              <h1>テクネフチン酸キットの調整手順と記録</h1>
+            ) : (
+              <h1>標識手順書</h1>
+            )}
+
+            <p className={styles.p_date}>
+              調整日：{formatDateTimeWithDay(targetDate)}
+            </p>
+
+            <div className={styles.p_patient_info}>
+              <div>
+                <p>{order.patient_id}</p>
+                <p>
+                  <PatientName
+                    last_name_kanji={order.last_name_kanji}
+                    last_name_kana={toKatakana(order.last_name_kana)}
+                    first_name_kanji={order.first_name_kanji}
+                    first_name_kana={toKatakana(order.first_name_kana)}
+                  />
+                </p>
+              </div>
+
+              <div style={{ display: "grid", alignContent: "space-between" }}>
+                <p>{order.exam_item}</p>
+
+                <div className={styles.p_patient_year}>
+                  <p>{calculateAge(order.birth_date)} 歳</p>
+                  <p>{order.gender}性</p>
+                  {order.weight ? (
+                    <p>{order.weight} kg</p>
+                  ) : (
+                    <div className={styles.white_space_weight}>
+                      <span style={{ borderBottom: "solid 2px black" }}></span>
+                      <span>kg</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div>
+                <h2>【ジェネレータから溶出】</h2>
+                <p>ジェネレータ情報は「ジェネレータ溶出記録」参照</p>
+                <ul>
+                  <li>
+                    <p>□ 溶出通番</p>
+                    <div></div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

@@ -5,12 +5,13 @@
   gap: var(--body);
 }
 
-.report_title_area {
+.for_print,
+.procedure_for_print {
   display: none;
 }
 
-.for_print {
-  display: none;
+.no_print {
+  display: none !important;
 }
 
 .print_button_message {
@@ -50,9 +51,10 @@
     "name year"
     ". body"
     ". physician"
+    "p_button p_button"
     "button button";
   grid-template-columns: minmax(0, auto) minmax(0, auto);
-  grid-template-rows: repeat(6, minmax(0, auto));
+  grid-template-rows: repeat(7, minmax(0, auto));
 
   @media (width >= 768px) {
     gap: revert;
@@ -61,11 +63,13 @@
       ". . . . . ."
       "name . year . body physician"
       ". . . . . ."
+      ". . . . . p_button"
+      ". . . . . ."
       "button button button button button button";
     grid-template-columns:
       auto var(--heading1) auto var(--heading1)
       auto minmax(0, 1fr);
-    grid-template-rows: auto var(--body) auto var(--body) auto;
+    grid-template-rows: auto var(--body) auto var(--body) auto var(--body) auto;
   }
 }
 
@@ -108,17 +112,32 @@
   justify-self: end;
 }
 
+.procedure_print_message {
+  grid-area: p_button;
+
+  @media (width >= 768px) {
+    display: none;
+  }
+}
+
+.individual_print_button {
+  grid-area: p_button;
+  display: none;
+  justify-self: end;
+
+  @media (width >= 768px) {
+    display: revert;
+  }
+}
+
 @media print {
   :global(header),
   .no_print_area {
     display: none !important;
   }
 
-  .for_print {
-    border-top: 1px solid black;
-    border-left: 1px solid black;
-    display: block;
-    color: black;
+  .no_print {
+    display: none !important;
   }
 
   @page {
@@ -126,7 +145,7 @@
     margin: 0;
   }
 
-  .container {
+  body[data-print-mode="summary"] .container {
     /* 紙の端から適切な余白を確保 */
     padding-block: 10mm;
     padding-inline: 20mm 10mm;
@@ -134,130 +153,184 @@
     box-sizing: border-box;
   }
 
-  .report_title_area {
-    display: block;
-    color: black;
+  body[data-print-mode="procedure"] .container {
+    /* 紙の端から適切な余白を確保 */
+    padding-block: 10mm;
+    padding-inline: 20mm 10mm;
+    width: 100%;
+    box-sizing: border-box;
   }
 
-  .report_title {
-    font-size: var(--heading3);
-  }
-
-  .order_list {
+  /* body[data-print-mode="summary"]  */
+  /* Emulate css printで表示を確認する場合は「body[data-print-mode="summary"]」をいったん消す。 */
+  body[data-print-mode="summary"] .for_print {
     display: grid;
     gap: var(--body);
-  }
+    color: black;
 
-  .order_content_row_1 {
-    display: grid;
-    grid-auto-flow: column;
+    .report_title_area {
+      display: block;
+      color: black;
+    }
 
-    > div {
-      > p:first-of-type {
+    .report_title {
+      font-size: var(--heading3);
+    }
+
+    .order_list {
+      display: grid;
+      gap: var(--body);
+    }
+
+    .order_item {
+      border-top: var(--black-border);
+      border-left: var(--black-border);
+    }
+
+    .order_content_row_1 {
+      display: grid;
+      grid-auto-flow: column;
+
+      > div {
+        > p:first-of-type {
+          border-bottom: solid 1px black;
+        }
+      }
+
+      .order_content_item {
+        display: grid;
         border-bottom: solid 1px black;
+        border-right: solid 1px black;
+
+        > p {
+          padding-inline: calc(var(--body) / 2);
+        }
+
+        > p:nth-of-type(2) {
+          padding-top: calc(var(--body) / 2);
+        }
       }
     }
 
-    .order_content_item {
+    .order_content_row_2 {
       display: grid;
-      border-bottom: solid 1px black;
-      border-right: solid 1px black;
+      grid-template-columns: 100px 1fr 160px 140px;
+    }
+
+    .exam_item_area > *,
+    .drug_label,
+    .record_area_user p,
+    .record_area_time p,
+    .activity_volume > div,
+    .body_info_area {
+      border-bottom: var(--black-border);
+      border-right: var(--black-border);
+    }
+
+    .exam_item_area {
+      grid-column: 1;
+      display: grid;
+      grid-template-rows: auto 1fr;
 
       > p {
-        padding-inline: calc(var(--body) / 2);
-      }
-
-      > p:nth-of-type(2) {
-        padding-top: calc(var(--body) / 2);
-      }
-    }
-  }
-
-  .order_content_row_2 {
-    display: grid;
-    grid-template-columns: 100px 1fr 160px 140px;
-  }
-
-  .exam_item_area > *,
-  .drug_label,
-  .record_area_user p,
-  .record_area_time p,
-  .activity_volume > div,
-  .body_info_area {
-    border-bottom: solid 1px black;
-    border-right: solid 1px black;
-  }
-
-  .exam_item_area {
-    grid-column: 1;
-    display: grid;
-    grid-template-rows: auto 1fr;
-
-    > p {
-      font-size: var(--body);
-    }
-
-    > div {
-      display: grid;
-      align-items: center;
-    }
-  }
-
-  .exam_item {
-    font-size: calc(var(--body) * 0.8);
-  }
-
-  .drug_label {
-    grid-column: 2;
-    font-size: var(--small);
-  }
-
-  .record_area {
-    grid-column: 3;
-
-    > * {
-      display: grid;
-      grid-template-columns: calc(var(--body) * 4 + 10px) auto;
-      align-content: center;
-    }
-
-    > div {
-      > p:nth-of-type(2) {
-        text-align: center;
-      }
-
-      > *:first-of-type {
         font-size: var(--body);
       }
-    }
-  }
 
-  .activity_volume {
-    > div:first-of-type {
-      display: grid;
-      align-items: center;
+      > div {
+        display: grid;
+        align-items: center;
+      }
     }
 
-    > div:nth-of-type(2) {
-      text-align: right;
+    .exam_item {
+      font-size: calc(var(--body) * 0.8);
     }
-  }
 
-  .volume_values {
-    font-size: var(--small);
-  }
-
-  .body_info_area {
-    grid-column: 4;
-
-    p {
+    .drug_label {
+      grid-column: 2;
       font-size: var(--small);
     }
+
+    .record_area {
+      grid-column: 3;
+
+      > * {
+        display: grid;
+        grid-template-columns: calc(var(--body) * 4 + 10px) auto;
+        align-content: center;
+      }
+
+      > div {
+        > p:nth-of-type(2) {
+          text-align: center;
+        }
+
+        > *:first-of-type {
+          font-size: var(--body);
+        }
+      }
+    }
+
+    .activity_volume {
+      > div:first-of-type {
+        display: grid;
+        align-items: center;
+      }
+
+      > div:nth-of-type(2) {
+        text-align: right;
+      }
+    }
+
+    .volume_values {
+      font-size: var(--small);
+    }
+
+    .body_info_area {
+      grid-column: 4;
+
+      p {
+        font-size: var(--small);
+      }
+    }
+
+    .body_info {
+      display: grid;
+      grid-template-columns: auto auto;
+      justify-items: end;
+    }
   }
 
-  .body_info {
-    display: grid;
-    grid-template-columns: auto auto;
-    justify-items: end;
+  body[data-print-mode="procedure"] .procedure_for_print {
+    display: block !important;
+
+    .procedure_page {
+      page-break-after: always;
+      display: grid;
+      gap: var(--body);
+    }
+
+    .p_date {
+      justify-self: end;
+    }
+
+    .p_patient_info {
+      display: grid;
+      grid-auto-flow: column;
+      font-size: var(--heading3);
+    }
+
+    .p_patient_year {
+      display: grid;
+      grid-auto-flow: column;
+      gap: var(--body);
+      justify-content: start;
+    }
+
+    .white_space_weight {
+      display: grid;
+      gap: var(--half);
+      grid-template-columns: calc(var(--body) * 3) auto;
+    }
   }
 }
