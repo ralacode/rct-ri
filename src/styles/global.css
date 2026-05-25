@@ -1,0 +1,34 @@
+@import "tailwindcss";
+
+:root {
+  --text: #555555;
+
+  --font-family:
+    "Yu Gothic Medium", "Yu Gothic", "YuGothic", "Hiragino Kaku Gothic ProN",
+    "Hiragino Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  --box-shadow: 0 0 16px 6px rgba(98, 151, 177, 0.39);
+  --my-border: solid 1px #ddd;
+  --black-border: solid 1px black;
+
+  --body: clamp(1rem, 0.9504rem + 0.2116vw, 1.125rem); /* 16px - 18px */
+  --heading1: calc(var(--body) * 1.8);
+  --heading2: calc(var(--body) * 1.6);
+  --heading3: calc(var(--body) * 1.4);
+  --heading4: calc(var(--body) * 1.2);
+  --space-line: calc(var(--body) * 1.8);
+  --small: calc(var(--body) * 0.8);
+  --half: calc(var(--body) / 2);
+}
+
+body {
+  font-family: var(--font-family);
+  color: var(--text);
+}
+
+@media print {
+  body {
+    -webkit-print-color-adjust: exact; /* Safari / Chrome 用 */
+    print-color-adjust: exact; /* 標準仕様（Firefox等） */
+  }
+}

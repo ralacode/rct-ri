@@ -130,6 +130,11 @@
   }
 }
 
+.dummy {
+  display: grid;
+  grid-template-columns: repeat(3, calc(16px * 6));
+}
+
 @media print {
   :global(header),
   .no_print_area {
@@ -306,12 +311,6 @@
 
     .procedure_page {
       page-break-after: always;
-      display: grid;
-      gap: var(--body);
-    }
-
-    .p_date {
-      justify-self: end;
     }
 
     .p_patient_info {

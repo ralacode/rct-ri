@@ -4,6 +4,8 @@ import path from "node:path";
 
 import react from "@astrojs/react";
 
+import tailwindcss from "@tailwindcss/vite";
+
 // https://astro.build/config
 export default defineConfig({
   vite: {
@@ -16,6 +18,8 @@ export default defineConfig({
         "@styles": path.resolve("./src/styles"),
       },
     },
+
+    plugins: [tailwindcss()],
   },
   output: "static",
   integrations: [react()],
