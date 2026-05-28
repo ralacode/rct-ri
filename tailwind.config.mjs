@@ -7,6 +7,9 @@ export default {
         // 既存の --font-family 変数を Tailwind の 'font-patient' クラスとして登録
         patient: ["var(--font-family)"],
       },
+      color: {
+        my_gray: ["var(--text)"],
+      },
       boxShadow: {
         // 既存の --box-shadow 変数を Tailwind の 'shadow-patient' クラスとして登録
         patient: "var(--box-shadow)",

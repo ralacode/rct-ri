@@ -1,5 +1,6 @@
 import * as React from "react";
 import styles from "@styles/my-input.module.css";
+import { cn } from "@lib/utils";
 
 // interface Props {
 //   className?: string;
@@ -37,19 +38,47 @@ export const MyInput = ({
   ...rest
 }: Props) => {
   return (
-    <div className={`${styles.formField} ${className}`}>
-      <label className={`${styles.fieldLabel} ${labelClassName}`} htmlFor={id}>
+    <div className={cn("grid gap-1", className)}>
+      <label
+        htmlFor={id}
+        className={cn(
+          // ラベルのデフォルトスタイル
+          // 小さめ、太字、少し薄い黒
+          "block text-sm font-medium text-gray-700/90",
+          labelClassName,
+        )}
+      >
         {label}
+        {required && <span className="ml-1 text-destructive">*</span>}
       </label>
       <input
-        className={`${styles.fieldControl} ${inputClassName}`}
         type={type}
         id={id}
         name={id}
-        placeholder={placeholder}
+        // cn関数を使い、inputのデフォルトスタイルを設定
+        className={cn(
+          // --- ベース ---
+          "rounded-4xl border transition-colors",
+          // --- サイズ・余白 ---
+          "px-4 py-2 w-full",
+          // --- 色・枠線（ライトモード） ---
+          "border-gray-500 bg-white text-my_gray placeholder:text-gray-400",
+          // --- フォーカス時のスタイル ---
+          "focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none",
+          // --- ホバー時のスタイル ---
+          "hover:border-gray-400",
+          // --- 無効化（Disabled）時のスタイル ---
+          "disabled:cursor-not-allowed disabled:bg-gray-100 disabled:opacity-70",
+          // --- バリデーションエラー（aria-invalid）時のスタイル ---
+          "aria-invalid:border-destructive aria-invalid:focus:ring-destructive/20",
+          // 外部からのクラスで上書き可能にする
+          inputClassName,
+        )}
         required={required}
         value={value}
+        autoComplete="off"
         onChange={onChange}
+        placeholder={placeholder}
         {...rest}
       />
     </div>

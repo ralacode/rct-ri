@@ -2,6 +2,12 @@
 import type { ValidationResult } from "@/types/patient";
 import { siteMeta } from "@lib/constants";
 import { invoke } from "@tauri-apps/api/core";
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 /**
  * ページタイトルを整形する (例: ページ名 | サイト名)

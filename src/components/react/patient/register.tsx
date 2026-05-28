@@ -9,6 +9,8 @@ import {
   validatePatientId,
 } from "@lib/utils";
 import { MyInput } from "@components/react/my-input";
+import { Input } from "@/components/ui/input";
+import { MyButton } from "../my-button";
 
 const getTodayFormatted = () => {
   const now = new Date();
@@ -273,8 +275,8 @@ export const PatientRegisterForm = () => {
   };
 
   return (
-    <div>
-      <form onSubmit={handleSubmit}>
+    <div className="max-w-md">
+      <form onSubmit={handleSubmit} className="grid gap-4">
         <MyInput
           id="patient_id"
           label="患者ID"
@@ -284,7 +286,7 @@ export const PatientRegisterForm = () => {
           onChange={handleChange}
         />
 
-        <div>
+        <div className="grid grid-flow-col gap-2 justify-start">
           <MyInput
             id="last_name_kanji"
             label="姓（漢字）"
@@ -303,7 +305,7 @@ export const PatientRegisterForm = () => {
           />
         </div>
 
-        <div>
+        <div className="grid grid-flow-col gap-2 justify-start">
           <MyInput
             id="last_name_kana"
             label="姓（ふりがな）"
@@ -322,7 +324,7 @@ export const PatientRegisterForm = () => {
           />
         </div>
 
-        <div>
+        <div className="hidden">
           <label htmlFor="patient_type">区分</label>
           <select
             id="patient_type"
@@ -334,9 +336,9 @@ export const PatientRegisterForm = () => {
           </select>
         </div>
 
-        <div className="gender-field">
+        <div className="gender-field grid gap-1">
           <label>性別</label>
-          <div className="gender-options">
+          {/* <div className="gender-options">
             <label>
               <input
                 type="radio"
@@ -354,6 +356,53 @@ export const PatientRegisterForm = () => {
                 value="女"
                 checked={formData.gender === "女"}
                 onChange={handleChange}
+              />
+              女
+            </label>
+          </div> */}
+
+          {/* ボタンの並び（横並びで隙間を空ける） */}
+          <div className="flex gap-3">
+            {/* 「男」ボタン */}
+            <label
+              className={`
+                flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
+                ${
+                  formData.gender === "男"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-500/20" // 選択時に明るい緑色系
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
+                }
+              `}
+            >
+              <input
+                type="radio"
+                name="gender"
+                value="男"
+                checked={formData.gender === "男"}
+                onChange={handleChange}
+                className="sr-only"
+              />
+              男
+            </label>
+
+            {/* 「女」ボタン */}
+            <label
+              className={`
+                flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
+                ${
+                  formData.gender === "女"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-500/20" // 選択時に明るい緑色系
+                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
+                }
+              `}
+            >
+              <input
+                type="radio"
+                name="gender"
+                value="女"
+                checked={formData.gender === "女"}
+                onChange={handleChange}
+                className="sr-only"
               />
               女
             </label>
@@ -398,7 +447,9 @@ export const PatientRegisterForm = () => {
           maxLength={14}
         />
 
-        <button type="submit">登録する</button>
+        <MyButton type="submit" className="justify-self-center">
+          登録する
+        </MyButton>
       </form>
 
       {saveMessage === "success" && lastRegistered && (
