@@ -16,6 +16,7 @@
   "dependencies": {
     "@astrojs/react": "^5.0.4",
     "@fontsource-variable/geist": "^5.2.9",
+    "@lucide/astro": "^1.17.0",
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.10.1",
     "astro": "^6.1.9",

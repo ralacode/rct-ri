@@ -1,0 +1,11 @@
+---
+interface Props {
+  icon: any; // Lucideのアイコンコンポーネントを受け取る
+  class?: string; // 外から追加・変更したいTailwindクラスを受け取る
+}
+
+const { icon: IconComponent, class: className, ...props } = Astro.props;
+---
+
+<!-- src/components/my-icon.astro -->
+<IconComponent class:list={[{ className }]} {...props} />

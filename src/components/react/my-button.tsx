@@ -39,7 +39,7 @@ export const MyButton: React.FC<Props> = ({
         disabled={disabled}
         size="lg"
         className={cn(
-          "bg-green-500 text-white hover:opacity-70 rounded-full cursor-pointer border-none px-4 transition-all duration-500 ease-out",
+          "bg-green-500 text-white hover:opacity-70 rounded-full cursor-pointer border-none px-4 transition-all duration-500 ease-out active:scale-100 active:translate-y-0",
           className,
         )}
       >

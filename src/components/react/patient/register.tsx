@@ -275,7 +275,7 @@ export const PatientRegisterForm = () => {
   };
 
   return (
-    <div className="max-w-md">
+    <div className="mx-auto max-w-md">
       <form onSubmit={handleSubmit} className="grid gap-4">
         <MyInput
           id="patient_id"
@@ -447,7 +447,7 @@ export const PatientRegisterForm = () => {
           maxLength={14}
         />
 
-        <MyButton type="submit" className="justify-self-center">
+        <MyButton type="submit" className="mt-4">
           登録する
         </MyButton>
       </form>

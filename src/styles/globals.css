@@ -48,3 +48,13 @@ ul {
   padding: 0;
   list-style: none;
 }
+
+.dashbord-dummy {
+  display: grid;
+  grid-template-areas:
+    "side header"
+    "side main";
+  grid-template-columns: 280px auto;
+  grid-template-rows: auto 1fr;
+  height: 100svh;
+}

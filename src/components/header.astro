@@ -1,9 +1,43 @@
 ---
+import { siteMeta } from "@lib/constants";
+import { Button } from "@components/ui/button";
+import { Menu } from "@lucide/astro";
+import { cn } from "@/lib/utils";
 
+interface Props {
+  className?: string;
+}
+
+const { className } = Astro.props;
 ---
 
-<header>
-  <a href="/exam_order/daily-list/">検査一覧</a>
-  <a href="/patient/register/">患者登録</a>
-  <a href="/patient/list/">患者一覧</a>
+<header
+  class:list={[
+    "grid grid-cols-[auto_1fr] grid-flow-col gap-2 justify-start items-center p-4",
+    className,
+  ]}
+>
+  <Button
+    id="menu-toggle"
+    className={cn(
+      "bg-transparent text-inherit rounded-full cursor-pointer",
+      "hover:bg-gray-200",
+    )}
+  >
+    <Menu />
+  </Button>
+
+  <div
+    class:list={["group-[.is-toggled]:hidden", "md:group-[.is-toggled]:block"]}
+  >
+    <a href="/">{siteMeta.siteTitle}</a>
+  </div>
 </header>
+
+<script>
+  const menuButton = document.getElementById("menu-toggle");
+
+  menuButton?.addEventListener("click", () => {
+    document.querySelector(".dashboard")?.classList.toggle("is-toggled");
+  });
+</script>

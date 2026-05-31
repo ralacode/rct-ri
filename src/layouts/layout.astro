@@ -1,6 +1,7 @@
 ---
 // src/layouts/layout.astro
 
+import MenuVertical from "@/components/menu-vertical.astro";
 import Header from "@components/header.astro";
 import Meta from "@components/meta.astro";
 import { siteMeta } from "@lib/constants";
@@ -22,12 +23,35 @@ const title = getPageTitle(pageTitle);
     <Meta title={title} />
   </head>
   <body>
-    <div class="global_grid">
-      <Header />
+    <div
+      class:list={[
+        "dashboard group grid h-screen overflow-x-hidden grid-cols-[0%_auto] grid-rows-[auto_1fr] [grid-template-areas:'side_header''side_main'] transition-[grid-template-columns] duration-300 [&.is-toggled]:grid-cols-[220px_auto]",
+        "md:grid-cols-[280px_auto] md:overflow-x-auto md:[&.is-toggled]:grid-cols-[0px_auto]",
+      ]}
+    >
+      <Header className="[grid-area:header]" />
 
-      <main class="main">
+      <main
+        class:list={[
+          "main [grid-area:main] overflow-y-auto px-2 pb-2 overflow-x-hidden",
+          "group-[.is-toggled]:hidden",
+          "md:group-[.is-toggled]:block md:px-6 md:pb-6",
+          "print:bg-white print:col-span-full print:p-0",
+        ]}
+      >
         <slot />
       </main>
+
+      <aside
+        class:list={[
+          "side grid grid-cols-[minmax(max-content,auto)] py-4 bg-gray-700 text-white [grid-area:side] overflow-y-auto",
+          "group-[.is-toggled]:px-4 group-[.is-toggled]:overflow-x-hidden",
+          "md:px-4 md:group-[.is-toggled]:px-0",
+          "print:hidden",
+        ]}
+      >
+        <MenuVertical />
+      </aside>
     </div>
   </body>
 </html>

@@ -1,0 +1,49 @@
+---
+import { ClipboardList, ContactRound, Contact } from "@lucide/astro";
+import MyIcon from "@components/my-icon.astro";
+
+interface Props {
+  className?: string;
+}
+
+const { className } = Astro.props;
+
+const { pathname } = Astro.url;
+
+const menuItems = [
+  { name: "検査一覧", href: "/exam_order/daily-list/", icon: ClipboardList },
+  { name: "患者登録", href: "/patient/register/", icon: ContactRound },
+  { name: "患者一覧", href: "/patient/list/", icon: Contact },
+];
+---
+
+<ul class:list={["grid gap-4 content-start", { className }]}>
+  {
+    menuItems.map((item) => {
+      const isCurrent =
+        pathname === item.href ||
+        (item.href !== "/" && pathname.startsWith(item.href));
+
+      return (
+        <li class="text-white">
+          <a
+            href={item.href}
+            class:list={[
+              "px-2 py-3 rounded-md",
+              "grid grid-cols-[auto,1fr] grid-flow-col gap-4 justify-start items-center",
+              {
+                // カレント（選択中）のスタイル
+                "bg-gray-600": isCurrent,
+                // 通常時のスタイル
+                "hover:bg-gray-600": !isCurrent,
+              },
+            ]}
+          >
+            <MyIcon icon={item.icon} />
+            <span>{item.name}</span>
+          </a>
+        </li>
+      );
+    })
+  }
+</ul>

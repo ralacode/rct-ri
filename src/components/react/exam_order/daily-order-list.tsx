@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ExamOrderWithPatient } from "@/types/exam_order";
 import {
   calculateAge,
+  cn,
   deleteOrder,
   formatDateTimeWithDay,
   getTodayLocalString,
@@ -160,7 +161,7 @@ export const DailyOrderList: React.FC = () => {
           style={{ display: "none" }}
         />
 
-        <p className={styles.print_button_message}>
+        <p className={cn("md:hidden")}>
           使用記録簿を印刷する場合は「Ctrl + 2」を押してください
         </p>
 
@@ -184,12 +185,21 @@ export const DailyOrderList: React.FC = () => {
             {orders.map((order) => (
               <li key={order.id} className={styles.order_item}>
                 <div
-                  className={`${styles.no_print_area} ${styles.order_item_inner}`}
+                  className={cn(
+                    "md:items-center",
+                    styles.no_print_area,
+                    styles.order_item_inner,
+                  )}
                 >
                   <p className={styles.order_time}>{order.exam_time}</p>
-                  <div className={styles.order_patient}>
+                  <div
+                    className={cn(
+                      "[grid-area:name]",
+                      "lg:grid gap-4 grid-flow-col justify-start items-center",
+                    )}
+                  >
                     <p>{order.patient_id}</p>
-                    <p>
+                    <p className={cn("lg:text-2xl")}>
                       <PatientName
                         last_name_kanji={order.last_name_kanji}
                         last_name_kana={toKatakana(order.last_name_kana)}
@@ -210,7 +220,12 @@ export const DailyOrderList: React.FC = () => {
                     </p>
                   </div>
                   <p className={styles.order_name}>{order.exam_item}</p>
-                  <div className={styles.order_physician}>
+                  <div
+                    className={cn(
+                      "[grid-area:physician] justify-self-end",
+                      styles.order_physician,
+                    )}
+                  >
                     <p>{order.requesting_department}</p>
                     <p>{order.requesting_physician}</p>
                   </div>

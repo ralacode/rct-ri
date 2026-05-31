@@ -14,12 +14,6 @@
   display: none !important;
 }
 
-.print_button_message {
-  @media (width >= 768px) {
-    display: none;
-  }
-}
-
 .print_button {
   display: none;
 
@@ -50,7 +44,7 @@
     "order order"
     "name year"
     ". body"
-    ". physician"
+    "physician physician"
     "p_button p_button"
     "button button";
   grid-template-columns: minmax(0, auto) minmax(0, auto);
@@ -99,11 +93,6 @@
 
 .order_body {
   grid-area: body;
-  justify-self: end;
-}
-
-.order_physician {
-  grid-area: physician;
   justify-self: end;
 }
 
