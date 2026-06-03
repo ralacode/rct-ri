@@ -261,14 +261,6 @@ export const DEPARTMENTS = [
   "その他",
 ];
 
-export const PHYSICIAN = [
-  "澤田 孝峰",
-  "竹下 卓志",
-  "和田 邦泰",
-  "里地 葉",
-  "その他",
-];
-
 export const EXAM_ITEMS = [
   "脳DATシンチ",
   "骨シンチ",

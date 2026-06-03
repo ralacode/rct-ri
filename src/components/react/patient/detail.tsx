@@ -4,15 +4,14 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
 import {
   calculateAge,
-  deleteOrder,
   DEPARTMENTS,
   EXAM_ITEMS,
   examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
-  PHYSICIAN,
   toKatakana,
 } from "@lib/utils";
+import { PHYSICIAN } from "@/lib/secret-utils";
 import type { ExamOrder } from "@/types/exam_order";
 import { DatalistInput } from "../datalist-input";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
