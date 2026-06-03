@@ -17,6 +17,7 @@ import { DeleteOrderButton } from "@components/react/exam_order/delete-order-but
 import { MyButton } from "@components/react/my-button";
 import { PatientName } from "@components/react/patient-name";
 import { ProcedurePage } from "@components/react/exam_order/procedure_page/procedure-page";
+import { ChevronLeft } from "lucide-react";
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -142,7 +143,9 @@ export const DailyOrderList: React.FC = () => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={cn("relative print:h-[297mm]", styles.container)}>
+      <ChevronLeft className="hidden absolute left-0 top-1/2  print:block" />
+
       <div className={styles.no_print_area}>
         <label htmlFor="date-select" style={{ display: "none" }}>
           表示日:
@@ -259,7 +262,7 @@ export const DailyOrderList: React.FC = () => {
         )}
       </div>
 
-      <div className={`${styles.for_print}`}>
+      <div className={cn("grid gap-4 content-start", styles.for_print)}>
         <div className={styles.report_title_area}>
           <h1 className={styles.report_title}>
             熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿

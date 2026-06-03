@@ -314,11 +314,5 @@
       gap: var(--body);
       justify-content: start;
     }
-
-    .white_space_weight {
-      display: grid;
-      gap: var(--half);
-      grid-template-columns: calc(var(--body) * 3) auto;
-    }
   }
 }

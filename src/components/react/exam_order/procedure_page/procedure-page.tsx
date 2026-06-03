@@ -1,6 +1,11 @@
 import React from "react";
 import type { ExamOrderWithPatient } from "@/types/exam_order";
-import { calculateAge, formatDateTimeWithDay, toKatakana } from "@lib/utils";
+import {
+  calculateAge,
+  cn,
+  formatDateTimeWithDay,
+  toKatakana,
+} from "@lib/utils";
 import styles from "@styles/daily-order-list.module.css";
 import { PatientName } from "@components/react/patient-name";
 import { CheckItem } from "@components/react/exam_order/procedure_page/check-item";
@@ -10,6 +15,9 @@ import { FinishTime } from "./finish-time";
 
 interface ProcedureConfig {
   kit_name: string;
+  base_target_amount: string;
+  return_time?: string;
+  leave?: string;
 }
 
 interface ProcedurePageProps {
@@ -20,10 +28,20 @@ interface ProcedurePageProps {
 const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
   センチネルリンパ節シンチ: {
     kit_name: "テクネフチン酸キット",
+    base_target_amount: "18.5～111 MBq / 2～8 mL",
+    leave: "標識後静置不要",
   },
-  // 今後「骨シンチ」を追加する場合は、ここに全く同じ形式でデータを追加するだけで自動的に対応できます
   骨シンチ: {
-    kit_name: "骨シンチ用キット",
+    kit_name: "クリアボーンキット",
+    base_target_amount: "555～740 MBq / 3～9 mL",
+    return_time: "5分",
+    leave: "標識後静置（室温放置　10分）",
+  },
+  "腎レノグラム ラシックス負荷": {
+    kit_name: "テクネDTPAキット",
+    base_target_amount: "74 ～ 555 MBq / 2 ～ 9 mL",
+    return_time: "5分",
+    leave: "標識後静置（室温放置　2～5分）",
   },
 };
 
@@ -38,7 +56,7 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
 
   return (
     <div
-      className={`${styles.procedure_page} grid gap-2`}
+      className={cn("grid gap-2", styles.procedure_page)}
       id={`print-target-${order.id}`}
     >
       {/* ヘッダータイトル */}
@@ -64,14 +82,18 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
         </div>
         <div className="grid content-between">
           <p>{order.exam_item}</p>
-          <div className={styles.p_patient_year}>
+          <div className={cn("grid grid-flow-col gap-4 justify-start")}>
             <p>{calculateAge(order.birth_date)} 歳</p>
             <p>{order.gender}性</p>
             {order.weight ? (
               <p>{order.weight} kg</p>
             ) : (
-              <div className={styles.white_space_weight}>
-                <span style={{ borderBottom: "solid 2px black" }}></span>
+              <div
+                className={cn(
+                  "grid grid-cols-[3rem_auto] gap-2 grid-flow-col justify-start",
+                )}
+              >
+                <span className="border-b-2 border-black"></span>
                 <span>kg</span>
               </div>
             )}
@@ -113,9 +135,9 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
           </div>
         </div>
 
-        <div className="bg-gray-200 pl-4 pr-4 pb-4">
+        <div className="bg-gray-200 px-3 pb-3">
           <h3 className="text-lg">【テクネチウム注射液】</h3>
-          <div className="border border-black bg-white pt-2 pl-4 pr-10 pb-4 grid content-between">
+          <div className="border border-black bg-white pt-2 pl-3 pr-10 pb-3 grid content-between">
             <p className="text-sm">テクネシンチまたはテクネゾール</p>
             <p>製造番号：</p>
             <p>放射能　：</p>
@@ -128,7 +150,10 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
       <div>
         <div className="grid grid-flow-col justify-start items-end">
           <h2>【希釈・濃度調整】</h2>
-          <p>（手順書や添付文書に基づいた目標量　18.5～111 MBq / 2～8 mL）</p>
+
+          <p>
+            （手順書や添付文書に基づいた目標量　{config.base_target_amount}）
+          </p>
         </div>
         <ul className="grid gap-1 pl-4">
           <li>
@@ -163,8 +188,16 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
         <div>
           <h2>【標識】</h2>
           <ul className="grid gap-1 pl-4">
-            <li>
-              <CheckItem>常温戻し時刻 (　　　：　　　)</CheckItem>
+            <li
+              className={cn(
+                config.return_time && "grid grid-flow-col justify-start",
+              )}
+            >
+              <CheckItem>常温戻し時刻 (　　：　　)</CheckItem>
+
+              {config.return_time && (
+                <p className="text-sm">（戻し時間 {config.return_time}）</p>
+              )}
             </li>
             <li>
               <CheckItem>キットバイアルゴム栓の消毒</CheckItem>
@@ -188,16 +221,21 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             <li>
               <FinishTime>標識終了時刻</FinishTime>
             </li>
-            <li>
-              <CheckItem>標識後静置不要 ・・・(b)</CheckItem>
-            </li>
+            {config.leave && (
+              <li>
+                <CheckItem>{config.leave} ・・・(b)</CheckItem>
+              </li>
+            )}
           </ul>
         </div>
 
-        <div className="border border-black pl-4 pr-8 pb-8 pt-8 grid gap-2 col-2">
+        <div className="border border-black px-4 py-8 grid gap-2 col-2">
           <h3 className="text-lg">キットバイアル情報</h3>
           <ul>
-            <li>製品名　：{config.kit_name}</li>
+            <li>
+              製品名　：{order.exam_item === "骨シンチ" && "テクネ"}
+              {config.kit_name}
+            </li>
             <li>製造番号：</li>
             <li>有効期限：</li>
           </ul>
@@ -224,6 +262,11 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
           <li>
             <FinishTime>分注終了時刻</FinishTime>
           </li>
+          {order.exam_item === "骨シンチ" && (
+            <li className="border-b border-black justify-self-start pl-4 pr-4">
+              調製後は6時間以内に使用すること
+            </li>
+          )}
         </ul>
       </div>
 
@@ -242,9 +285,11 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             <li>
               <FinishTime>調製終了時刻</FinishTime>
             </li>
-            <li className="border-b border-black justify-self-start pl-4 pr-4">
-              標識後できるだけ早く投与
-            </li>
+            {order.exam_item === "センチネルリンパ節シンチ" && (
+              <li className="border-b border-black justify-self-start pl-4 pr-4">
+                標識後できるだけ早く投与
+              </li>
+            )}
           </ul>
         </div>
 
