@@ -37,6 +37,11 @@ pub fn init_db() -> Result<()> {
 
     // カラム追加のマイグレーション（すでに存在する場合は無視される）
     let _ = conn.execute(
+        "ALTER TABLE patients ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''",
+        [],
+    );
+
+    let _ = conn.execute(
         "ALTER TABLE exam_orders ADD COLUMN requesting_department TEXT NOT NULL DEFAULT ''",
         [],
     );
@@ -68,7 +73,8 @@ fn create_patients_table(conn: &Connection) -> Result<()> {
             gender TEXT NOT NULL DEFAULT '',
             height REAL,
             weight REAL,
-            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT NOT NULL DEFAULT ''
         )",
         [],
     )?;

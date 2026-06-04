@@ -18,6 +18,7 @@ pub struct Patient {
     pub birth_date: String,
     pub gender: String,
     pub created_at: String,
+    pub updated_at: String,
 }
 
 pub struct PatientFields {
@@ -64,10 +65,13 @@ pub fn insert(
     // 注意: chronoクレートを使用する場合は Cargo.toml に chrono = "0.4" の追加が必要です。
     // もしクレートを追加したくない場合は、SQL側で COALESCE(?11, CURRENT_TIMESTAMP) を使う方法もあります。
 
+    // 新規登録時も現在の日本時間を更新日時の初期値として設定
+    let final_updated_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         rusqlite::params![
             &normalized_id,
             &p.patient_type,
@@ -80,6 +84,7 @@ pub fn insert(
             p.height, // そのまま渡せるようになります
             p.weight, // そのまま渡せるようになります
             &final_created_at,
+            &final_updated_at,
         ],
     );
 
@@ -125,10 +130,13 @@ pub fn update(
 
     let normalized_id = normalize_and_validate(patient_id)?;
 
+    // 更新処理時のシステム現在時刻を取得
+    let current_updated_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, created_at = ?7 WHERE id = ?8",
+        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, created_at = ?7, updated_at = ?8 WHERE id = ?9",
         [
             &normalized_id,
             patient_type,
@@ -137,6 +145,7 @@ pub fn update(
             last_name_kana,
             first_name_kana,
             created_at, // 追加
+            &current_updated_at,
             &id.to_string(),
         ],
     );
@@ -159,7 +168,7 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender, created_at FROM patients");
+    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender, created_at, updated_at FROM patients");
 
     let keyword = keyword.unwrap_or_default();
     if !keyword.is_empty() {
@@ -185,6 +194,7 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
             birth_date: row.get(9)?,
             gender: row.get(10)?,
             created_at: row.get(11)?,
+            updated_at: row.get(12)?,
         })
     };
 
