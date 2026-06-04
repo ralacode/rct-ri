@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Patient } from "@/types/patient";
 import {
   calculateAge,
+  cn,
   DEPARTMENTS,
   EXAM_ITEMS,
   examTimeSlots,
@@ -15,6 +16,9 @@ import { PHYSICIAN } from "@/lib/secret-utils";
 import type { ExamOrder } from "@/types/exam_order";
 import { DatalistInput } from "../datalist-input";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
+import { PatientName } from "../patient-name";
+import { Card } from "@components/react/card";
+import { MyButton } from "@components/react/my-button";
 
 export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -140,7 +144,6 @@ export const PatientDetail: React.FC = () => {
 
   const {
     patient_id,
-    patient_type,
     last_name_kanji,
     last_name_kana,
     first_name_kanji,
@@ -159,93 +162,102 @@ export const PatientDetail: React.FC = () => {
   };
 
   return (
-    <div>
+    <div className={cn("grid gap-4 content-start", "@container")}>
       {/* 患者基本情報セクション */}
-      <div className="detail-info-group">
-        <p>{patient_id}</p>
+      <div
+        className={cn("grid w-full", "@lg:max-w-md  @lg:justify-self-center")}
+      >
+        <h2 className="text-2xl">患者情報</h2>
 
-        {/* ルビ（ふりがな）付きの氏名表示 */}
-        <div className="detail-item name-display">
-          <span className="detail-value">
-            <ruby className="name-ruby">
-              {last_name_kanji}
-              <rt className="name-rt">{toKatakana(last_name_kana)}</rt>
-            </ruby>{" "}
-            <ruby className="name-ruby">
-              {first_name_kanji}
-              <rt className="name-rt">{toKatakana(first_name_kana)}</rt>
-            </ruby>
-          </span>
-        </div>
+        <Card>
+          <p>{patient_id}</p>
 
-        <div className="detail-item">
-          生年月日：
-          <span className="detail-value">{formatDateString(birth_date)}</span>
-        </div>
-
-        <div className="detail-item">
-          登録日：
-          <span className="detail-value">
-            {formatDateTimeWithDay(created_at)}
-          </span>
-        </div>
-
-        <div className="detail-item">
-          年齢：
-          <span className="detail-value">
-            {calculateAge(birth_date) !== null
-              ? `${calculateAge(birth_date)}歳`
-              : "---"}
-          </span>
-        </div>
-
-        <div className="detail-item">
-          性別：<span className="detail-value">{gender}</span>
-        </div>
-
-        <div className="detail-item">
-          身長：
-          <span className="detail-value">
-            {formatValue(height) ? `${formatValue(height)} cm` : "未登録"}
-          </span>
-        </div>
-
-        <div className="detail-item">
-          体重：
-          <span className="detail-value">
-            {formatValue(weight) ? `${formatValue(weight)} kg` : "未登録"}
-          </span>
-        </div>
-      </div>
-
-      {/* 患者削除ボタン */}
-      <div className="action-area">
-        {!showConfirm ? (
-          <button
-            onClick={() => setShowConfirm(true)}
-            className="delete-init-button"
-          >
-            この患者を削除する
-          </button>
-        ) : (
-          <div className="delete-confirmation">
-            <p className="confirm-text">本当に削除してもよろしいですか？</p>
-            <button
-              onClick={executeDelete}
-              disabled={isDeleting}
-              className="delete-confirm-button"
-            >
-              {isDeleting ? "削除中..." : "はい"}
-            </button>
-            <button
-              onClick={() => setShowConfirm(false)}
-              disabled={isDeleting}
-              className="delete-cancel-button"
-            >
-              いいえ
-            </button>
+          <div className={cn("text-xl")}>
+            <PatientName
+              last_name_kanji={last_name_kanji}
+              last_name_kana={toKatakana(last_name_kana)}
+              first_name_kanji={first_name_kanji}
+              first_name_kana={toKatakana(first_name_kana)}
+            />
           </div>
-        )}
+
+          {/* 生年月日 */}
+          <div>
+            生年月日：
+            <span className="detail-value">{formatDateString(birth_date)}</span>
+          </div>
+
+          {/* 年齢 */}
+          <div>
+            年齢：
+            <span className="detail-value">
+              {calculateAge(birth_date) !== null
+                ? `${calculateAge(birth_date)}歳`
+                : "---"}
+            </span>
+          </div>
+
+          {/* 性別 */}
+          <div>
+            性別：<span className="detail-value">{gender}</span>
+          </div>
+
+          {/* 身長・体重 */}
+          <div>
+            <div>
+              身長：
+              <span className="detail-value">
+                {formatValue(height) ? `${formatValue(height)} cm` : "未登録"}
+              </span>
+            </div>
+
+            <div>
+              体重：
+              <span className="detail-value">
+                {formatValue(weight) ? `${formatValue(weight)} kg` : "未登録"}
+              </span>
+            </div>
+          </div>
+
+          {/* 登録日 */}
+          <div>
+            登録日：
+            <span className="detail-value">
+              {formatDateTimeWithDay(created_at)}
+            </span>
+          </div>
+
+          {/* 患者削除ボタン */}
+          <div className="mt-2 justify-self-end">
+            {!showConfirm ? (
+              <MyButton
+                className="bg-red-500"
+                onClick={() => setShowConfirm(true)}
+              >
+                この患者を削除する
+              </MyButton>
+            ) : (
+              <div className="delete-confirmation">
+                <p className="confirm-text">本当に削除してもよろしいですか？</p>
+                <div className={cn("grid grid-flow-col justify-start gap-2")}>
+                  <MyButton
+                    onClick={executeDelete}
+                    disabled={isDeleting}
+                    className={cn("bg-red-500")}
+                  >
+                    {isDeleting ? "削除中..." : "はい"}
+                  </MyButton>
+                  <MyButton
+                    onClick={() => setShowConfirm(false)}
+                    disabled={isDeleting}
+                  >
+                    いいえ
+                  </MyButton>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
       </div>
 
       {/* 検査登録フォーム */}
@@ -336,10 +348,6 @@ export const PatientDetail: React.FC = () => {
             ))}
           </div>
         )}
-      </div>
-
-      <div>
-        <a href="/patient/list/">患者一覧</a>
       </div>
     </div>
   );
