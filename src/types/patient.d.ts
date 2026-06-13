@@ -9,8 +9,9 @@ export interface Patient {
   birth_date: string;
   height: number | null;
   weight: number | null;
-  gender: "男" | "女";
+  gender: "男" | "女" | "";
   created_at: string;
+  updated_at: string;
 }
 
 export interface ValidationResult {

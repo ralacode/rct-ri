@@ -338,28 +338,6 @@ export const PatientRegisterForm = () => {
 
         <div className="gender-field grid gap-1">
           <label>性別</label>
-          {/* <div className="gender-options">
-            <label>
-              <input
-                type="radio"
-                name="gender"
-                value="男"
-                checked={formData.gender === "男"}
-                onChange={handleChange}
-              />
-              男
-            </label>
-            <label>
-              <input
-                type="radio"
-                name="gender"
-                value="女"
-                checked={formData.gender === "女"}
-                onChange={handleChange}
-              />
-              女
-            </label>
-          </div> */}
 
           {/* ボタンの並び（横並びで隙間を空ける） */}
           <div className="flex gap-3">

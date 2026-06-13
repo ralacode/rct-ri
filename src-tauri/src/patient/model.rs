@@ -120,6 +120,10 @@ pub fn update(
     first_name_kanji: &str,
     last_name_kana: &str,
     first_name_kana: &str,
+    birth_date: &str,
+    gender: &str,
+    height: Option<f64>,
+    weight: Option<f64>,
     created_at: &str,
 ) -> Result<(), String> {
   	let db_path = get_db_path();
@@ -136,17 +140,21 @@ pub fn update(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, created_at = ?7, updated_at = ?8 WHERE id = ?9",
-        [
+        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, birth_date = ?7, gender = ?8, height = ?9, weight = ?10, created_at = ?11, updated_at = ?12 WHERE id = ?13",
+        rusqlite::params![
             &normalized_id,
             patient_type,
             last_name_kanji,
             first_name_kanji,
             last_name_kana,
             first_name_kana,
+            birth_date,
+            gender,
+            height,
+            weight,
             created_at, // 追加
             &current_updated_at,
-            &id.to_string(),
+            &id,
         ],
     );
 

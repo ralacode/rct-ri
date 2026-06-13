@@ -40,11 +40,6 @@ export const PatientList = () => {
           <p>{p.patient_type}</p>
         </div>
       ))}
-      {patients.length === 0 && (
-        <div>
-          <p>患者が登録されていません。</p>
-        </div>
-      )}
     </>
   );
 };

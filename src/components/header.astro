@@ -13,14 +13,14 @@ const { className } = Astro.props;
 
 <header
   class:list={[
-    "grid grid-cols-[auto_1fr] grid-flow-col gap-2 justify-start items-center p-4",
+    "grid grid-cols-[auto_1fr] grid-flow-col gap-2 justify-start items-center px-2 py-4",
     className,
   ]}
 >
   <Button
     id="menu-toggle"
     className={cn(
-      "bg-transparent text-inherit rounded-full cursor-pointer",
+      "bg-transparent text-inherit rounded-full cursor-pointer py-6 px-4",
       "hover:bg-gray-200",
     )}
   >
@@ -28,7 +28,11 @@ const { className } = Astro.props;
   </Button>
 
   <div
-    class:list={["group-[.is-toggled]:hidden", "md:group-[.is-toggled]:block"]}
+    class:list={[
+      "font-bold text-lg",
+      "group-[.is-toggled]:hidden",
+      "md:group-[.is-toggled]:block",
+    ]}
   >
     <a href="/">{siteMeta.siteTitle}</a>
   </div>

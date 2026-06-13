@@ -58,6 +58,10 @@ fn edit_patient(
     first_name_kanji: String,
     last_name_kana: String,
     first_name_kana: String,
+    birth_date: String,
+    gender: String,
+    height: Option<f64>,
+    weight: Option<f64>,
     created_at: String,
 ) -> Result<(), String> {
     patient::model::update(
@@ -68,6 +72,10 @@ fn edit_patient(
         &first_name_kanji,
         &last_name_kana,
         &first_name_kana,
+        &birth_date,
+        &gender,
+        height,
+        weight,
         &created_at,
     )
 }

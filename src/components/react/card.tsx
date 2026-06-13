@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { cn } from "@lib/utils";
 
 interface Props {
@@ -8,7 +8,9 @@ interface Props {
 
 export const Card: React.FC<Props> = ({ children, className }) => {
   return (
-    <div className={cn("p-4 shadow-(--box-shadow) rounded-md", className)}>
+    <div
+      className={cn("w-full p-4 shadow-(--box-shadow) rounded-md", className)}
+    >
       {children}
     </div>
   );

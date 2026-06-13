@@ -179,6 +179,8 @@
     .order_item {
       border-top: var(--black-border);
       border-left: var(--black-border);
+      /* break-inside: avoid;
+      page-break-inside: avoid; */
     }
 
     .order_content_row_1 {

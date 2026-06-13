@@ -11,6 +11,9 @@ import {
   formatDateString,
   formatDateTimeWithDay,
   toKatakana,
+  validateHiragana,
+  validateKanjiName,
+  validatePatientId,
 } from "@lib/utils";
 import { PHYSICIAN } from "@/lib/secret-utils";
 import type { ExamOrder } from "@/types/exam_order";
@@ -19,6 +22,9 @@ import { DeleteOrderButton } from "@components/react/exam_order/delete-order-but
 import { PatientName } from "../patient-name";
 import { Card } from "@components/react/card";
 import { MyButton } from "@components/react/my-button";
+import { MyInput } from "../my-input";
+import { GenderSelect } from "../gender-select";
+import { FadeIn } from "@components/react/fade-in";
 
 export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -31,6 +37,24 @@ export const PatientDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // --- インライン編集用のStateを追加 ---
+  const [isEditing, setIsEditing] = useState(false);
+  const [editPatientId, setEditPatientId] = useState<string>("");
+  const [editPatientIdError, setEditPatientIdError] = useState<string | null>(
+    null,
+  );
+  const [editFirstNameKanji, setEditFirstNameKanji] = useState<string>("");
+  const [editLastNameKanji, setEditLastNameKanji] = useState<string>("");
+  const [editKanjiError, setEditKanjiError] = useState<string | null>(null);
+  const [editFirstNameKana, setEditFirstNameKana] = useState<string>("");
+  const [editLastNameKana, setEditLastNameKana] = useState<string>("");
+  const [editKanaError, setEditKanaError] = useState<string | null>(null);
+  const [editBirthDate, setEditBirthDate] = useState<string>("");
+  const [editGender, setEditGender] = useState<Patient["gender"]>("");
+  const [editHeight, setEditHeight] = useState<string>("");
+  const [editWeight, setEditWeight] = useState<string>("");
+  const [editError, setEditError] = useState<string | null>(null);
 
   // 1. URLのクエリパラメータからIDを取得する関数
   const getPatientIdFromUrl = () => {
@@ -54,6 +78,15 @@ export const PatientDetail: React.FC = () => {
       if (patients && patients.length > 0) {
         const p = patients[0];
         setPatient(p);
+
+        // setEditPatientId(p.patient_id);
+        // setEditFirstNameKanji(p.first_name_kanji);
+        // setEditLastNameKanji(p.last_name_kanji);
+        // setEditFirstNameKana(p.first_name_kana);
+        // setEditLastNameKana(p.last_name_kana);
+        // setEditBirthDate(p.birth_date.replaceAll("/", " / "));
+        // setEditHeight(p.height != null ? p.height.toString() : "");
+        // setEditWeight(p.weight != null ? p.weight.toString() : "");
 
         // 2. 検査履歴の取得
         // Rust側のコマンド名は 'get_exam_orders'
@@ -85,6 +118,165 @@ export const PatientDetail: React.FC = () => {
       setError("患者IDが指定されていません。");
     }
   }, []);
+
+  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+
+    // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
+    if (inputValue.length < editBirthDate.length) {
+      setEditBirthDate(inputValue);
+      return;
+    }
+
+    // 1. 数字以外を除去
+    let value = inputValue.replace(/\D/g, "");
+    let formatted = "";
+
+    // 2. 入力された数値の長さに応じて「 / 」を動的に挿入
+    if (value.length > 0) {
+      formatted = value.substring(0, 4);
+
+      if (value.length >= 4) {
+        formatted += " / ";
+        if (value.length > 4) {
+          formatted += value.substring(4, 6);
+        }
+        if (value.length >= 6) {
+          formatted += " / ";
+          if (value.length > 6) {
+            formatted += value.substring(6, 8);
+          }
+        }
+      }
+    }
+
+    setEditBirthDate(formatted);
+  };
+
+  const startEditing = () => {
+    if (patient) {
+      // 編集モードに入る瞬間に、スラッシュの両側にスペースを空けるフォーマットに変換してセット
+      setEditBirthDate(patient.birth_date.replaceAll("/", " / "));
+
+      // 他の項目も編集開始時に最新の patient の状態と同期させる
+      setEditPatientId(patient.patient_id);
+      setEditFirstNameKanji(patient.first_name_kanji);
+      setEditFirstNameKana(patient.first_name_kana);
+      setEditLastNameKanji(patient.last_name_kanji);
+      setEditLastNameKana(patient.last_name_kana);
+      setEditGender(patient.gender);
+      setEditHeight(patient.height != null ? patient.height.toString() : "");
+      setEditWeight(patient.weight != null ? patient.weight.toString() : "");
+    }
+    setEditError(null);
+    setIsEditing(true);
+  };
+
+  // --- 編集内容をバックエンドに保存する関数 ---
+  const handleSavePatient = async () => {
+    if (!patient) return;
+    setEditPatientIdError(null);
+    setEditKanjiError(null);
+    setEditKanaError(null);
+    setEditError(null);
+
+    const patientIdResult = validatePatientId(editPatientId);
+    if (!patientIdResult.isValid) {
+      setEditPatientIdError(
+        patientIdResult.errorMessage || "患者IDの入力が正しくありません。",
+      );
+
+      return;
+    }
+    const finalPatientId = patientIdResult.normalizedId;
+
+    const firstNameKanjiResult = validateKanjiName(editFirstNameKanji);
+    if (!firstNameKanjiResult.isValid) {
+      return setEditKanjiError(
+        firstNameKanjiResult.errorMessage ||
+          "患者名（漢字）の入力が正しくありません。",
+      );
+    }
+    const lastNameKanjiResult = validateKanjiName(editLastNameKanji);
+    if (!lastNameKanjiResult.isValid) {
+      return setEditKanjiError(
+        lastNameKanjiResult.errorMessage ||
+          "患者名（漢字）の入力が正しくありません。",
+      );
+    }
+
+    const firstNameKanaResult = validateHiragana(editFirstNameKana);
+    const kanaErrorMessage = "患者名（ふりがな）の入力が正しくありません。";
+    if (!firstNameKanaResult.isValid) {
+      return setEditKanaError(
+        firstNameKanaResult.errorMessage || kanaErrorMessage,
+      );
+    }
+    const lastNameKanaResult = validateHiragana(editLastNameKana);
+    if (!lastNameKanaResult.isValid) {
+      return setEditKanaError(
+        lastNameKanaResult.errorMessage || kanaErrorMessage,
+      );
+    }
+
+    // 数値への変換処理（空文字の場合は None として扱うため null にする）
+    const heightNum = editHeight.trim() !== "" ? parseFloat(editHeight) : null;
+    const weightNum = editWeight.trim() !== "" ? parseFloat(editWeight) : null;
+
+    if (
+      (editHeight.trim() !== "" && isNaN(heightNum!)) ||
+      (editWeight.trim() !== "" && isNaN(weightNum!))
+    ) {
+      setEditError("身長・体重には半角数字を入力してください。");
+      return;
+    }
+
+    try {
+      // lib.rs の edit_patient が要求するすべての引数を渡す
+      await invoke("edit_patient", {
+        id: patient.id,
+        patientId: finalPatientId,
+        patientType: patient.patient_type,
+        lastNameKanji: editLastNameKanji,
+        firstNameKanji: editFirstNameKanji,
+        lastNameKana: editLastNameKana,
+        firstNameKana: editFirstNameKana,
+        birthDate: editBirthDate,
+        gender: editGender,
+        height: heightNum,
+        weight: weightNum,
+        createdAt: patient.created_at, // 元の作成日時をそのまま維持
+      });
+
+      // ローカルの患者情報を更新して編集モードを閉じる
+      setPatient({
+        ...patient,
+        patient_id: finalPatientId,
+        last_name_kanji: editLastNameKanji,
+        first_name_kanji: editFirstNameKanji,
+        last_name_kana: editLastNameKana,
+        first_name_kana: editFirstNameKana,
+        birth_date: editBirthDate,
+        gender: editGender,
+        height: heightNum,
+        weight: weightNum,
+      });
+      setEditPatientId(finalPatientId);
+      setEditLastNameKanji(editLastNameKanji);
+      setEditFirstNameKanji(editFirstNameKanji);
+      setEditLastNameKana(editLastNameKana);
+      setEditFirstNameKana(editFirstNameKana);
+      setEditBirthDate(editBirthDate);
+      setIsEditing(false);
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth", // "smooth" でアニメーション付き、"auto" で一瞬で移動
+      });
+    } catch (err) {
+      setEditError(`更新に失敗しました: ${err}`);
+    }
+  };
 
   const handleAddOrder = async () => {
     if (!patient) return;
@@ -139,8 +331,14 @@ export const PatientDetail: React.FC = () => {
     if (id) loadAllData(id);
   };
 
+  const formatValue = (val: number | string | null | undefined) => {
+    if (val === null || val === undefined || val === "") return null;
+    const num = typeof val === "string" ? parseFloat(val) : val;
+    return isNaN(num) ? null : num.toFixed(1);
+  };
+
   if (error) return <div>{error}</div>;
-  if (!patient) return <div>読み込み中...</div>;
+  if (!patient) return;
 
   const {
     patient_id,
@@ -153,111 +351,329 @@ export const PatientDetail: React.FC = () => {
     birth_date,
     gender,
     created_at,
+    updated_at,
   } = patient;
-
-  const formatValue = (val: number | string | null | undefined) => {
-    if (val === null || val === undefined || val === "") return null;
-    const num = typeof val === "string" ? parseFloat(val) : val;
-    return isNaN(num) ? null : num.toFixed(1);
-  };
 
   return (
     <div className={cn("grid gap-4 content-start", "@container")}>
       {/* 患者基本情報セクション */}
       <div
-        className={cn("grid w-full", "@lg:max-w-md  @lg:justify-self-center")}
+        className={cn(
+          "grid w-full gap-2",
+          "@lg:max-w-lg  @lg:justify-self-center",
+        )}
       >
         <h2 className="text-2xl">患者情報</h2>
 
-        <Card>
-          <p>{patient_id}</p>
-
-          <div className={cn("text-xl")}>
-            <PatientName
-              last_name_kanji={last_name_kanji}
-              last_name_kana={toKatakana(last_name_kana)}
-              first_name_kanji={first_name_kanji}
-              first_name_kana={toKatakana(first_name_kana)}
-            />
-          </div>
-
-          {/* 生年月日 */}
-          <div>
-            生年月日：
-            <span className="detail-value">{formatDateString(birth_date)}</span>
-          </div>
-
-          {/* 年齢 */}
-          <div>
-            年齢：
-            <span className="detail-value">
-              {calculateAge(birth_date) !== null
-                ? `${calculateAge(birth_date)}歳`
-                : "---"}
-            </span>
-          </div>
-
-          {/* 性別 */}
-          <div>
-            性別：<span className="detail-value">{gender}</span>
-          </div>
-
-          {/* 身長・体重 */}
-          <div>
-            <div>
-              身長：
-              <span className="detail-value">
-                {formatValue(height) ? `${formatValue(height)} cm` : "未登録"}
-              </span>
-            </div>
-
-            <div>
-              体重：
-              <span className="detail-value">
-                {formatValue(weight) ? `${formatValue(weight)} kg` : "未登録"}
-              </span>
-            </div>
-          </div>
-
-          {/* 登録日 */}
-          <div>
-            登録日：
-            <span className="detail-value">
-              {formatDateTimeWithDay(created_at)}
-            </span>
-          </div>
-
-          {/* 患者削除ボタン */}
-          <div className="mt-2 justify-self-end">
-            {!showConfirm ? (
-              <MyButton
-                className="bg-red-500"
-                onClick={() => setShowConfirm(true)}
-              >
-                この患者を削除する
-              </MyButton>
+        <FadeIn>
+          <Card
+            className={cn(
+              "grid min-w-71.75 overflow-x-hidden",
+              isEditing && "gap-4",
+            )}
+          >
+            {isEditing ? (
+              <div className={cn("grid grid-rows-[auto_1rem]")}>
+                <MyInput
+                  id="patient_id"
+                  label="患者ID"
+                  type="text"
+                  value={editPatientId}
+                  onChange={(e) => {
+                    setEditPatientId(e.target.value);
+                    setEditPatientIdError(null);
+                  }}
+                  placeholder="患者IDを入力"
+                />
+                {editPatientIdError && (
+                  <p className={cn("text-red-700")}>{editPatientIdError}</p>
+                )}
+              </div>
             ) : (
-              <div className="delete-confirmation">
-                <p className="confirm-text">本当に削除してもよろしいですか？</p>
-                <div className={cn("grid grid-flow-col justify-start gap-2")}>
-                  <MyButton
-                    onClick={executeDelete}
-                    disabled={isDeleting}
-                    className={cn("bg-red-500")}
-                  >
-                    {isDeleting ? "削除中..." : "はい"}
-                  </MyButton>
-                  <MyButton
-                    onClick={() => setShowConfirm(false)}
-                    disabled={isDeleting}
-                  >
-                    いいえ
-                  </MyButton>
+              <p>{patient_id}</p>
+            )}
+
+            {/* 患者名 */}
+            {isEditing ? (
+              <div className={cn("grid gap-2 content-start")}>
+                <div className={cn("grid grid-rows-[auto_1rem]")}>
+                  <div className={cn("grid grid-flow-col gap-2 justify-start")}>
+                    <MyInput
+                      id="last_name_kanji"
+                      label="姓（漢字）"
+                      type="text"
+                      value={editLastNameKanji}
+                      placeholder="例: 山田"
+                      required
+                      onChange={(e) => {
+                        setEditLastNameKanji(e.target.value);
+                        setEditKanjiError(null);
+                      }}
+                    />
+                    <MyInput
+                      id="first_name_kanji"
+                      label="名（漢字）"
+                      type="text"
+                      value={editFirstNameKanji}
+                      placeholder="例: 太郎"
+                      required
+                      onChange={(e) => {
+                        setEditFirstNameKanji(e.target.value);
+                        setEditKanjiError(null);
+                      }}
+                    />
+                  </div>
+                  {editKanjiError && (
+                    <p className={cn("text-red-700")}>
+                      【漢字】{editKanjiError}
+                    </p>
+                  )}
+                </div>
+                <div className={cn("grid grid-rows-[auto_1rem]")}>
+                  <div className={cn("grid grid-flow-col gap-2 justify-start")}>
+                    <MyInput
+                      id="last_name_kana"
+                      label="姓（ふりがな）"
+                      type="text"
+                      value={editLastNameKana}
+                      placeholder="例: やまだ"
+                      required
+                      onChange={(e) => {
+                        setEditLastNameKana(e.target.value);
+                        setEditKanaError(null);
+                      }}
+                    />
+                    <MyInput
+                      id="first_name_kana"
+                      label="名（ふりがな）"
+                      type="text"
+                      value={editFirstNameKana}
+                      placeholder="例: たろう"
+                      required
+                      onChange={(e) => {
+                        setEditFirstNameKana(e.target.value);
+                        setEditKanaError(null);
+                      }}
+                    />
+                  </div>
+                  {editKanaError && (
+                    <p className={cn("text-red-700")}>
+                      【ふりがな】{editKanaError}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <PatientName
+                last_name_kanji={last_name_kanji}
+                last_name_kana={toKatakana(last_name_kana)}
+                first_name_kanji={first_name_kanji}
+                first_name_kana={toKatakana(first_name_kana)}
+                className={cn("text-xl")}
+              />
+            )}
+
+            {/* 生年月日 */}
+            {isEditing ? (
+              <MyInput
+                id="birth_date"
+                label="生年月日"
+                placeholder="1989 / 09 / 11"
+                required
+                value={editBirthDate}
+                onChange={handleBirthDateChange}
+                maxLength={14}
+              />
+            ) : (
+              <div>
+                生年月日：
+                <span className="detail-value">
+                  {formatDateString(birth_date)}
+                </span>
+              </div>
+            )}
+
+            {/* 年齢 */}
+            {!isEditing && (
+              <div>
+                年齢：
+                <span className="detail-value">
+                  {calculateAge(birth_date) !== null
+                    ? `${calculateAge(birth_date)}歳`
+                    : "---"}
+                </span>
+              </div>
+            )}
+
+            {/* 性別（SelectGenderコンポーネント作る予定） */}
+            {isEditing ? (
+              <GenderSelect
+                value={editGender}
+                onChange={(newValue) => setEditGender(newValue)}
+              />
+            ) : (
+              <div>
+                性別：<span className="detail-value">{gender}</span>
+              </div>
+            )}
+
+            {/* 身長・体重 */}
+            {isEditing ? (
+              <div className={cn("grid gap-2 grid-rows-[auto_auto_1rem]")}>
+                <div
+                  className={cn(
+                    "grid grid-flow-col justify-start items-end gap-2",
+                  )}
+                >
+                  <MyInput
+                    id="height"
+                    label="身長"
+                    type="text"
+                    value={editHeight}
+                    onChange={(e) => setEditHeight(e.target.value)}
+                    placeholder="例: 165.5"
+                  />
+                  <span>cm</span>
+                </div>
+                <div
+                  className={cn(
+                    "grid grid-flow-col justify-start items-end gap-2",
+                  )}
+                >
+                  <MyInput
+                    id="weight"
+                    label="体重"
+                    type="text"
+                    value={editWeight}
+                    onChange={(e) => setEditWeight(e.target.value)}
+                    placeholder="例: 50.5"
+                  />
+                  <span>kg</span>
+                </div>
+                {editError && <p className={cn("text-red-700")}>{editError}</p>}
+              </div>
+            ) : (
+              <div>
+                <div>
+                  身長：
+                  <span>
+                    {formatValue(height)
+                      ? `${formatValue(height)} cm`
+                      : "未登録"}
+                  </span>
+                </div>
+                <div>
+                  体重：
+                  <span>
+                    {formatValue(weight)
+                      ? `${formatValue(weight)} kg`
+                      : "未登録"}
+                  </span>
                 </div>
               </div>
             )}
-          </div>
-        </Card>
+
+            {/* 登録日 */}
+            {!isEditing && (
+              <div>
+                登録日：
+                <span className={cn("text-sm")}>
+                  {formatDateTimeWithDay(created_at)}
+                </span>
+              </div>
+            )}
+
+            {/* 更新日 */}
+            {!isEditing && updated_at && (
+              <div>
+                更新日：
+                <span className={cn("text-sm")}>
+                  {formatDateTimeWithDay(updated_at)}
+                </span>
+              </div>
+            )}
+
+            {/* モード切り替えボタン */}
+            {!isEditing ? (
+              <MyButton
+                onClick={startEditing}
+                className={cn("justify-self-end")}
+              >
+                編集する
+              </MyButton>
+            ) : (
+              <div
+                className={cn(
+                  "grid grid-flow-col justify-start gap-2 justify-self-end",
+                )}
+              >
+                <MyButton onClick={handleSavePatient}>保存</MyButton>
+                <MyButton
+                  onClick={() => {
+                    // 変更をキャンセルして元に戻す
+                    setEditPatientId(patient.patient_id);
+                    setEditFirstNameKanji(patient.first_name_kanji);
+                    setEditLastNameKanji(patient.last_name_kanji);
+                    setEditFirstNameKana(patient.first_name_kana);
+                    setEditLastNameKana(patient.last_name_kana);
+                    setEditBirthDate(patient.birth_date);
+                    setEditHeight(
+                      patient.height != null ? patient.height.toString() : "",
+                    );
+                    setEditWeight(
+                      patient.weight != null ? patient.weight.toString() : "",
+                    );
+                    setEditPatientIdError(null);
+                    setEditKanjiError(null);
+                    setEditKanaError(null);
+                    setEditError(null);
+                    setIsEditing(false);
+                  }}
+                  className={cn("bg-red-500")}
+                >
+                  キャンセル
+                </MyButton>
+              </div>
+            )}
+
+            {/* 患者削除ボタン */}
+            {!isEditing && (
+              <div className="mt-2 justify-self-end">
+                {!showConfirm ? (
+                  <MyButton
+                    className="bg-red-500"
+                    onClick={() => setShowConfirm(true)}
+                  >
+                    この患者を削除する
+                  </MyButton>
+                ) : (
+                  <div className="delete-confirmation">
+                    <p className="confirm-text">
+                      本当に削除してもよろしいですか？
+                    </p>
+                    <div
+                      className={cn("grid grid-flow-col justify-start gap-2")}
+                    >
+                      <MyButton
+                        onClick={executeDelete}
+                        disabled={isDeleting}
+                        className={cn("bg-red-500")}
+                      >
+                        {isDeleting ? "削除中..." : "はい"}
+                      </MyButton>
+                      <MyButton
+                        onClick={() => setShowConfirm(false)}
+                        disabled={isDeleting}
+                      >
+                        いいえ
+                      </MyButton>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </Card>
+        </FadeIn>
       </div>
 
       {/* 検査登録フォーム */}

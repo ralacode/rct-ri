@@ -262,7 +262,7 @@ export const DailyOrderList: React.FC = () => {
         )}
       </div>
 
-      <div className={cn("grid gap-4 content-start", styles.for_print)}>
+      <div className={cn(styles.for_print)}>
         <div className={styles.report_title_area}>
           <h1 className={styles.report_title}>
             熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿
@@ -273,10 +273,10 @@ export const DailyOrderList: React.FC = () => {
           </p>
         </div>
 
-        <ul className={styles.order_list}>
+        <ul className={cn("space-y-2")}>
           {orders.map((order) => {
             return (
-              <li className={styles.order_item}>
+              <li className={cn(styles.order_item)} key={order.patient_id}>
                 <div className={`${styles.order_content_row_1}`}>
                   <div className={`${styles.order_content_item}`}>
                     <p>予約時間</p>

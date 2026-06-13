@@ -14,7 +14,7 @@ const { patient_id } = Astro.params;
 ---
 
 <Layout>
-  <PatientDetail client:only="react" patientId={patient_id} />
+  <PatientDetail client:load />
   <a href={`/patient/${patient_id}/edit/`}>編集する</a>
   <a href="/patient/list/">患者一覧</a>
 </Layout>
