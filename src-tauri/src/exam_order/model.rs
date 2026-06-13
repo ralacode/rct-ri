@@ -14,6 +14,10 @@ pub struct ExamOrder {
     pub exam_item: String,
     pub requesting_department: String,
     pub requesting_physician: String,
+    pub dosage_mbq: Option<f64>,
+    pub dosage_ml: Option<f64>,
+    pub remain_mbq: Option<f64>,
+    pub remain_ml: Option<f64>,
     pub created_at: String,
 }
 
@@ -35,6 +39,10 @@ pub struct ExamOrderWithPatient {
     pub gender: String,
     pub requesting_department: String,
     pub requesting_physician: String,
+    pub dosage_mbq: Option<f64>,
+    pub dosage_ml: Option<f64>,
+    pub remain_mbq: Option<f64>,
+    pub remain_ml: Option<f64>,
 }
 
 // 検査オーダーの登録
@@ -45,6 +53,10 @@ pub fn insert_order(
     exam_item: &str,
     requesting_department: &str,
     requesting_physician: &str,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
 ) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -56,14 +68,18 @@ pub fn insert_order(
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
     tx.execute(
-        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-        [
+        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        rusqlite::params![
             patient_db_id.to_string(),
             exam_date.to_string(),
             exam_time.to_string(),
             exam_item.to_string(),
             requesting_department.to_string(),
-            requesting_physician.to_string(), // 追加
+            requesting_physician.to_string(),
+            dosage_mbq,
+            dosage_ml,
+            remain_mbq,
+            remain_ml,
             now,
         ],
     )
@@ -79,7 +95,7 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
-        .prepare("SELECT id, patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
+        .prepare("SELECT id, patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
         .map_err(|e| e.to_string())?;
 
     let order_iter = stmt
@@ -92,7 +108,11 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
                 exam_item: row.get(4)?,
                 requesting_department: row.get(5)?,
                 requesting_physician: row.get(6)?,
-                created_at: row.get(7)?,
+                dosage_mbq: row.get(7)?,
+                dosage_ml: row.get(8)?,
+                remain_mbq: row.get(9)?,
+                remain_ml: row.get(10)?,
+                created_at: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -126,7 +146,11 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
                 p.birth_date,
                 p.gender,
                 o.requesting_department,
-                o.requesting_physician
+                o.requesting_physician,
+                o.dosage_mbq,
+                o.dosage_ml,
+                o.remain_mbq,
+                o.remain_ml
              FROM exam_orders o
              JOIN patients p ON o.patient_db_id = p.id
              WHERE o.exam_date = ?1
@@ -153,6 +177,10 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
                 gender: row.get(13)?,
                 requesting_department: row.get(14)?,
                 requesting_physician: row.get(15)?,
+                dosage_mbq: row.get(16)?,
+                dosage_ml: row.get(17)?,
+                remain_mbq: row.get(18)?,
+                remain_ml: row.get(19)?,
             })
         })
         .map_err(|e| e.to_string())?;

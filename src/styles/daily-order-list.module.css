@@ -33,7 +33,6 @@
 }
 
 .order_item_inner {
-  border: var(--my-border);
   box-shadow: var(--box-shadow);
   border-radius: var(--body);
   padding: var(--body);
@@ -45,10 +44,11 @@
     "name year"
     ". body"
     "physician physician"
+    "dosage dosage"
     "p_button p_button"
     "button button";
   grid-template-columns: minmax(0, auto) minmax(0, auto);
-  grid-template-rows: repeat(7, minmax(0, auto));
+  grid-template-rows: repeat(8, minmax(0, auto));
 
   @media (width >= 768px) {
     gap: revert;

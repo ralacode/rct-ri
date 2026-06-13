@@ -148,7 +148,7 @@ export const DailyOrderList: React.FC = () => {
       <ChevronLeft className="hidden absolute left-0 top-1/2  print:block" />
 
       <div className={styles.no_print_area}>
-        <label htmlFor="date-select" style={{ display: "none" }}>
+        <label htmlFor="date-select" className={cn("hidden")}>
           表示日:
         </label>
         {/* 手入力を防ぐために readOnly を設定し、クリックでカレンダーが開くようにする */}
@@ -233,6 +233,11 @@ export const DailyOrderList: React.FC = () => {
                     <p>{order.requesting_department}</p>
                     <p>{order.requesting_physician}</p>
                   </div>
+
+                  {(order.dosage_mbq ||
+                    order.dosage_ml ||
+                    order.remain_mbq ||
+                    order.remain_ml) && <div>dosage</div>}
 
                   {NEEDS_PROCEDURE_ITEMS.includes(order.exam_item) && (
                     <>

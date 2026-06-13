@@ -93,6 +93,10 @@ fn add_exam_order(
     exam_item: String,
     requesting_department: String,
     requesting_physician: String,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
 ) -> Result<(), String> {
     exam_order::model::insert_order(
         patient_db_id,
@@ -101,6 +105,10 @@ fn add_exam_order(
         &exam_item,
         &requesting_department,
         &requesting_physician,
+        dosage_mbq,
+        dosage_ml,
+        remain_mbq,
+        remain_ml,
     )
 }
 

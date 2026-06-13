@@ -56,6 +56,12 @@ pub fn init_db() -> Result<()> {
         [],
     );
 
+    // 投与量・残量
+    let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN dosage_mbq REAL", []);
+    let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN dosage_ml REAL", []);
+    let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_mbq REAL", []);
+    let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
+
     Ok(())
 }
 
@@ -92,6 +98,10 @@ fn create_exam_orders_table(conn: &Connection) -> Result<()> {
             exam_item TEXT NOT NULL DEFAULT '',
             requesting_department TEXT NOT NULL DEFAULT '',
             requesting_physician TEXT NOT NULL DEFAULT '',
+            dosage_mbq REAL,
+            dosage_ml REAL,
+            remain_mbq REAL,
+            remain_ml REAL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
         )",
