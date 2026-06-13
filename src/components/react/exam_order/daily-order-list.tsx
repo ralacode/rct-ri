@@ -18,6 +18,7 @@ import { MyButton } from "@components/react/my-button";
 import { PatientName } from "@components/react/patient-name";
 import { ProcedurePage } from "@components/react/exam_order/procedure_page/procedure-page";
 import { ChevronLeft } from "lucide-react";
+import { HOSPITAL_NAME } from "@lib/secret-utils";
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -265,7 +266,7 @@ export const DailyOrderList: React.FC = () => {
       <div className={cn(styles.for_print)}>
         <div className={styles.report_title_area}>
           <h1 className={styles.report_title}>
-            熊本市立熊本市民病院RI検査室　放射性医薬品使用記録簿
+            {HOSPITAL_NAME}　放射性医薬品使用記録簿
           </h1>
 
           <p className={styles.use_date}>
