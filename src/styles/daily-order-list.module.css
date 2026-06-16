@@ -167,20 +167,9 @@
       color: black;
     }
 
-    .report_title {
-      font-size: var(--heading3);
-    }
-
     .order_list {
       display: grid;
       gap: var(--body);
-    }
-
-    .order_item {
-      border-top: var(--black-border);
-      border-left: var(--black-border);
-      /* break-inside: avoid;
-      page-break-inside: avoid; */
     }
 
     .order_content_row_1 {
@@ -276,10 +265,6 @@
       > div:nth-of-type(2) {
         text-align: right;
       }
-    }
-
-    .volume_values {
-      font-size: var(--small);
     }
 
     .body_info_area {

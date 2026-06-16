@@ -127,6 +127,19 @@ fn delete_exam_order_cmd(id: i32) -> Result<(), String> {
     exam_order::model::delete_order(id)
 }
 
+#[tauri::command]
+fn edit_exam_order_fields(
+    id: i32,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
+) -> Result<(), String> {
+    exam_order::model::update_exam_order_specifc_fields(
+        id, dosage_mbq, dosage_ml, remain_mbq, remain_ml,
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -199,7 +212,8 @@ pub fn run() {
             add_exam_order,
             get_exam_orders,
             get_daily_exam_orders,
-            delete_exam_order_cmd
+            delete_exam_order_cmd,
+            edit_exam_order_fields
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

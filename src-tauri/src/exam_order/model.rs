@@ -205,3 +205,30 @@ pub fn delete_order(id: i32) -> Result<(), String> {
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
+
+pub fn update_exam_order_specifc_fields(
+    id: i32,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
+) -> Result<(), String> {
+    let db_path = get_db_path();
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+
+    tx.execute(
+        "UPDATE exam_orders 
+         SET dosage_mbq = ?1, 
+             dosage_ml = ?2, 
+             remain_mbq = ?3, 
+             remain_ml = ?4
+         WHERE id = ?5",
+        rusqlite::params![dosage_mbq, dosage_ml, remain_mbq, remain_ml, id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}

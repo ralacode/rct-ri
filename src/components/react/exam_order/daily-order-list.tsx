@@ -1,8 +1,8 @@
 // src/components/react/exam_order/daily-order-list.tsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, memo } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { ExamOrderWithPatient } from "@/types/exam_order";
+import type { ExamOrder, ExamOrderWithPatient } from "@/types/exam_order";
 import {
   calculateAge,
   cn,
@@ -19,6 +19,20 @@ import { PatientName } from "@components/react/patient-name";
 import { ProcedurePage } from "@components/react/exam_order/procedure_page/procedure-page";
 import { ChevronLeft } from "lucide-react";
 import { HOSPITAL_NAME } from "@lib/secret-utils";
+import { EditExamOrderModal } from "@components/react/exam_order/edit-exam-order-modal";
+import { Card } from "@components/react/card";
+import { BorderInGrid } from "@components/react/exam_order/border_in_grid/border-in-grid";
+import { BorderInGridItem1 } from "@components/react/exam_order/border_in_grid/border-in-grid-item1";
+import { BorderInGridContent1 } from "@components/react/exam_order/border_in_grid/border-in-grid-content1";
+import { GridTemplate, GridTemplateItem } from "../grid-template";
+
+interface EditableOrder {
+  id: number;
+  dosage_mbq: number | null;
+  dosage_ml: number | null;
+  remain_mbq: number | null;
+  remain_ml: number | null;
+}
 
 const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   センチネルリンパ節シンチ: (
@@ -26,6 +40,13 @@ const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
       <span>センチネル</span>
       <br />
       <span>リンパ節シンチ</span>
+    </>
+  ),
+  "腎レノグラム ラシックス負荷": (
+    <>
+      <span>腎レノグラム</span>
+      <br />
+      <span>ラシックス負荷</span>
     </>
   ),
   "心筋シンチ Tl 運動負荷": (
@@ -53,9 +74,16 @@ const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
   ),
 };
 
+const MemoizedProcedurePage = memo(ProcedurePage);
+
 export const DailyOrderList: React.FC = () => {
   const [targetDate, setTargetDate] = useState(getTodayLocalString());
   const [orders, setOrders] = useState<ExamOrderWithPatient[]>([]);
+
+  const [isEditDosage, setIsEditDosage] = useState<boolean>(false);
+  const [selectedOrder, setSelectedOrder] = useState<EditableOrder | null>(
+    null,
+  );
 
   // input要素にアクセスするためのref
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -143,8 +171,22 @@ export const DailyOrderList: React.FC = () => {
     }, 100); // 念のため100msに伸ばしています
   };
 
+  const handleEditDosage = (order: EditableOrder) => {
+    setSelectedOrder(order);
+    setIsEditDosage(true);
+  };
+
+  const handleCloseEditDosage = () => {
+    setIsEditDosage(false);
+    setSelectedOrder(null);
+  };
+
+  const handleRefresh = () => {
+    fetchOrders(targetDate); // 一覧データを再取得して画面を最新状態にする
+  };
+
   return (
-    <div className={cn("relative print:h-[297mm]", styles.container)}>
+    <div className={cn("relative", styles.container)}>
       <ChevronLeft className="hidden absolute left-0 top-1/2  print:block" />
 
       <div className={styles.no_print_area}>
@@ -187,238 +229,400 @@ export const DailyOrderList: React.FC = () => {
         ) : (
           <ul className={styles.order_list}>
             {orders.map((order) => (
-              <li key={order.id} className={styles.order_item}>
-                <div
+              <li key={order.id}>
+                <Card
                   className={cn(
-                    "md:items-center",
+                    "grid gap-4 content-start grid-cols-[minmax(0,auto)]",
                     styles.no_print_area,
-                    styles.order_item_inner,
+                    // styles.order_item_inner,
                   )}
                 >
-                  <p className={styles.order_time}>{order.exam_time}</p>
-                  <div
+                  <GridTemplate
                     className={cn(
-                      "[grid-area:name]",
-                      "lg:grid gap-4 grid-flow-col justify-start items-center",
+                      "gap-y-4",
+                      "grid-cols-[auto_1fr_auto] grid-rows-[repeat(4,minmax(0,auto))] [grid-template-areas:'time_time_time''examItem_examItem_examItem''name_._year''heightWeight_._physician']",
+                      "md:grid-cols-[auto_1rem_auto_2rem_auto_2rem_auto_1fr_auto] md:grid-rows-[auto_auto] md:[grid-template-areas:'time_._examItem_examItem_examItem_examItem_examItem_examItem_examItem_''name_name_name_._year_._heightWeight_._physician']",
                     )}
                   >
-                    <p>{order.patient_id}</p>
-                    <p className={cn("lg:text-2xl")}>
-                      <PatientName
-                        last_name_kanji={order.last_name_kanji}
-                        last_name_kana={toKatakana(order.last_name_kana)}
-                        first_name_kanji={order.first_name_kanji}
-                        first_name_kana={toKatakana(order.first_name_kana)}
-                      />
-                    </p>
-                  </div>
-                  <p className={styles.order_year}>
-                    {calculateAge(order.birth_date)}歳
-                  </p>
-                  <div className={styles.order_body}>
-                    <p>
-                      身長：{order.height ? `${order.height} cm` : "未登録"}
-                    </p>
-                    <p>
-                      体重：{order.weight ? `${order.weight} kg` : "未登録"}
-                    </p>
-                  </div>
-                  <p className={styles.order_name}>{order.exam_item}</p>
-                  <div
-                    className={cn(
-                      "[grid-area:physician] justify-self-end",
-                      styles.order_physician,
-                    )}
-                  >
-                    <p>{order.requesting_department}</p>
-                    <p>{order.requesting_physician}</p>
-                  </div>
+                    <GridTemplateItem area="time" className={cn("self-center")}>
+                      {order.exam_time}
+                    </GridTemplateItem>
 
-                  {(order.dosage_mbq ||
-                    order.dosage_ml ||
-                    order.remain_mbq ||
-                    order.remain_ml) && <div>dosage</div>}
-
-                  {NEEDS_PROCEDURE_ITEMS.includes(order.exam_item) && (
-                    <>
-                      <p className={styles.procedure_print_message}>
-                        「標識手順書」を印刷するには「Ctrl + 2」を押してください
+                    {/* 名前 */}
+                    <GridTemplateItem
+                      area="name"
+                      className={cn(
+                        "lg:grid gap-4 grid-flow-col justify-start items-center",
+                      )}
+                    >
+                      <p>{order.patient_id}</p>
+                      <p className={cn("lg:text-2xl")}>
+                        <PatientName
+                          last_name_kanji={order.last_name_kanji}
+                          last_name_kana={toKatakana(order.last_name_kana)}
+                          first_name_kanji={order.first_name_kanji}
+                          first_name_kana={toKatakana(order.first_name_kana)}
+                        />
                       </p>
+                    </GridTemplateItem>
 
-                      <MyButton
-                        onClick={() =>
-                          handlePrintIndividual("procedure", order.id)
-                        }
-                        className={styles.individual_print_button}
-                      >
-                        標識手順書を印刷
-                      </MyButton>
-                    </>
+                    {/* 年齢 */}
+                    <GridTemplateItem
+                      area="year"
+                      className={cn("self-center justify-self-end")}
+                    >
+                      {calculateAge(order.birth_date)}歳
+                    </GridTemplateItem>
+
+                    {/* 身長・体重 */}
+                    <GridTemplateItem
+                      area="heightWeight"
+                      className={cn("md:self-center")}
+                    >
+                      <p>
+                        身長：{order.height ? `${order.height} cm` : "未登録"}
+                      </p>
+                      <p>
+                        体重：{order.weight ? `${order.weight} kg` : "未登録"}
+                      </p>
+                    </GridTemplateItem>
+
+                    {/* オーダー名 */}
+                    <GridTemplateItem
+                      area="examItem"
+                      className={cn(
+                        "font-bold text",
+                        "md:text-xl",
+                        "lg:text-2xl",
+                      )}
+                    >
+                      {order.exam_item}
+                    </GridTemplateItem>
+                    <GridTemplateItem
+                      area="physician"
+                      className={cn("justify-self-end", "md:self-center")}
+                    >
+                      <p>{order.requesting_department}</p>
+                      <p>{order.requesting_physician}</p>
+                    </GridTemplateItem>
+                  </GridTemplate>
+
+                  {(order.dosage_mbq !== null ||
+                    order.dosage_ml !== null ||
+                    order.remain_mbq !== null ||
+                    order.remain_ml !== null) && (
+                    <div
+                      className={cn(
+                        "grid gap-2 content-start justify-self-end",
+                        "md:grid-flow-col md:gap-5",
+                      )}
+                    >
+                      {(order.dosage_mbq !== null ||
+                        order.dosage_ml !== null) && (
+                        <div className={cn("bg-gray-200 p-2 rounded-md")}>
+                          <div>投与量</div>
+                          <div
+                            className={cn(
+                              "grid grid-flow-col gap-4 justify-end",
+                            )}
+                          >
+                            {order.dosage_mbq !== null ? (
+                              <div>{order.dosage_mbq} MBq</div>
+                            ) : (
+                              <div>- MBq</div>
+                            )}
+                            {order.dosage_ml !== null ? (
+                              <div>{order.dosage_ml} mL</div>
+                            ) : (
+                              <div>- mL</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {(order.remain_mbq !== null ||
+                        order.remain_ml !== null) && (
+                        <div className={cn("bg-gray-200 p-2 rounded-md")}>
+                          <div>残量</div>
+                          <div
+                            className={cn(
+                              "grid grid-flow-col gap-4 justify-end",
+                            )}
+                          >
+                            {order.remain_mbq !== null ? (
+                              <div>{order.remain_mbq} MBq</div>
+                            ) : (
+                              <div>- MBq</div>
+                            )}
+                            {order.remain_ml !== null ? (
+                              <div>{order.remain_ml} mL</div>
+                            ) : (
+                              <div>- mL</div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   )}
 
-                  <DeleteOrderButton
-                    orderId={order.id}
-                    onSuccess={() => fetchOrders(targetDate)}
-                    className={styles.delete_button}
-                  />
-                </div>
+                  <div className={cn("grid gap-4 justify-items-end")}>
+                    <div
+                      className={cn(
+                        "grid gap-4 content-start",
+                        "md:grid-flow-col md:gap-2",
+                      )}
+                    >
+                      {NEEDS_PROCEDURE_ITEMS.includes(order.exam_item) && (
+                        <div>
+                          <p className={cn("text-sm", "md:hidden")}>
+                            「標識手順書」を印刷するには
+                            <br />
+                            「Ctrl + 2」を押してください
+                          </p>
+
+                          <MyButton
+                            onClick={() =>
+                              handlePrintIndividual("procedure", order.id)
+                            }
+                            className={cn("hidden", "md:block")}
+                          >
+                            標識手順書を印刷
+                          </MyButton>
+                        </div>
+                      )}
+
+                      {order.dosage_mbq ||
+                      order.dosage_ml ||
+                      order.remain_mbq ||
+                      order.remain_ml ? (
+                        <MyButton
+                          onClick={() => handleEditDosage(order)}
+                          className={cn("bg-blue-500 justify-self-end")}
+                        >
+                          投与量を編集
+                        </MyButton>
+                      ) : (
+                        <MyButton
+                          onClick={() => handleEditDosage(order)}
+                          className={cn("justify-self-end")}
+                        >
+                          投与量を入力
+                        </MyButton>
+                      )}
+
+                      <EditExamOrderModal
+                        isOpen={isEditDosage}
+                        onClose={handleCloseEditDosage}
+                        onSuccess={handleRefresh}
+                        order={selectedOrder}
+                      />
+                    </div>
+
+                    <DeleteOrderButton
+                      orderId={order.id}
+                      onSuccess={() => fetchOrders(targetDate)}
+                    />
+                  </div>
+                </Card>
               </li>
             ))}
           </ul>
         )}
       </div>
 
-      <div className={cn(styles.for_print)}>
-        <div className={styles.report_title_area}>
-          <h1 className={styles.report_title}>
-            {HOSPITAL_NAME}　放射性医薬品使用記録簿
-          </h1>
+      {!isEditDosage && (
+        <div
+          className={cn(
+            "hidden text-black",
+            "print:grid",
+            "[...[data-print-mode='summary']_&]:grid gap-4",
+            styles.for_print,
+          )}
+        >
+          <div className={cn("[...[data-print-mode='summary']_&]:block")}>
+            <h1 className={"text-xl"}>
+              {HOSPITAL_NAME}　放射性医薬品使用記録簿
+            </h1>
 
-          <p className={styles.use_date}>
-            使用日：{formatDateTimeWithDay(targetDate)}
-          </p>
+            <p>使用日：{formatDateTimeWithDay(targetDate)}</p>
+          </div>
+
+          <ul className={cn("space-y-2")}>
+            {orders.map((order) => {
+              return (
+                <li
+                  className={cn("border-t border-l border-black")}
+                  key={order.patient_id}
+                >
+                  <div className={cn("grid grid-flow-col")}>
+                    <BorderInGrid>
+                      <BorderInGridItem1>予約時間</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {order.exam_time}
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>氏名</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        <ruby>
+                          {order.last_name_kanji}
+                          <rt className="name-rt">
+                            {toKatakana(order.last_name_kana)}
+                          </rt>
+                        </ruby>{" "}
+                        <ruby>
+                          {order.first_name_kanji}
+                          <rt className="name-rt">
+                            {toKatakana(order.first_name_kana)}
+                          </rt>
+                        </ruby>
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>ID</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {order.patient_id}
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>性別</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {order.gender}
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>年齢</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {calculateAge(order.birth_date)}歳
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>依頼科</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {order.requesting_department}
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+
+                    <BorderInGrid>
+                      <BorderInGridItem1>依頼医</BorderInGridItem1>
+                      <BorderInGridContent1>
+                        {order.requesting_physician}
+                      </BorderInGridContent1>
+                    </BorderInGrid>
+                  </div>
+
+                  <div className={`${styles.order_content_row_2}`}>
+                    <div
+                      className={`${styles.exam_item_area} ${styles.order_content_item}`}
+                    >
+                      <p>検査項目</p>
+
+                      <div>
+                        <p className={styles.exam_item}>
+                          {EXAM_ITEM_DISPLAY_MAP[order.exam_item] ||
+                            order.exam_item}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`${styles.drug_label} ${styles.order_content_item}`}
+                    >
+                      <p>放射性医薬品ラベル</p>
+                    </div>
+
+                    <div
+                      className={`${styles.record_area} ${styles.order_content_item}`}
+                    >
+                      <div className={`${styles.record_area_user}`}>
+                        <p>使用者</p>
+                        <p></p>
+                      </div>
+
+                      <div className={`${styles.record_area_time}`}>
+                        <p>投与時刻</p>
+                        <p></p>
+                      </div>
+
+                      <div
+                        className={cn(
+                          styles.activity_volume,
+                          styles.administered,
+                        )}
+                      >
+                        <div>
+                          <p>投与量</p>
+                        </div>
+                        <div className={cn("pr-1 text-sm")}>
+                          {order.dosage_mbq !== null ? (
+                            <div>{order.dosage_mbq} MBq</div>
+                          ) : (
+                            <p> MBq</p>
+                          )}
+                          {order.dosage_ml !== null ? (
+                            <div>{order.dosage_ml} mL</div>
+                          ) : (
+                            <p> mL</p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div
+                        className={`${styles.activity_volume} ${styles.residual}`}
+                      >
+                        <div>
+                          <p>残量</p>
+                        </div>
+                        <div className={cn("pr-1 text-sm")}>
+                          {order.remain_mbq !== null ? (
+                            <div>{order.remain_mbq} MBq</div>
+                          ) : (
+                            <p> MBq</p>
+                          )}
+                          {order.remain_ml !== null ? (
+                            <div>{order.remain_ml} mL</div>
+                          ) : (
+                            <p> mL</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div
+                      className={`${styles.body_info_area} ${styles.order_content_item}`}
+                    >
+                      <div className={styles.body_info}>
+                        <p>{order.height} cm</p>
+                        <p>{order.weight} kg</p>
+                      </div>
+
+                      <div>
+                        <p>備考)</p>
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         </div>
+      )}
 
-        <ul className={cn("space-y-2")}>
-          {orders.map((order) => {
-            return (
-              <li className={cn(styles.order_item)} key={order.patient_id}>
-                <div className={`${styles.order_content_row_1}`}>
-                  <div className={`${styles.order_content_item}`}>
-                    <p>予約時間</p>
-                    <p>{order.exam_time}</p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>氏名</p>
-                    <p>
-                      <ruby>
-                        {order.last_name_kanji}
-                        <rt className="name-rt">
-                          {toKatakana(order.last_name_kana)}
-                        </rt>
-                      </ruby>{" "}
-                      <ruby>
-                        {order.first_name_kanji}
-                        <rt className="name-rt">
-                          {toKatakana(order.first_name_kana)}
-                        </rt>
-                      </ruby>
-                    </p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>ID</p>
-                    <p>{order.patient_id}</p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>性別</p>
-                    <p>{order.gender}</p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>年齢</p>
-                    <p>{calculateAge(order.birth_date)}歳</p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>依頼科</p>
-                    <p>{order.requesting_department}</p>
-                  </div>
-
-                  <div className={`${styles.order_content_item}`}>
-                    <p>依頼医</p>
-                    <p>{order.requesting_physician}</p>
-                  </div>
-                </div>
-
-                <div className={`${styles.order_content_row_2}`}>
-                  <div
-                    className={`${styles.exam_item_area} ${styles.order_content_item}`}
-                  >
-                    <p>検査項目</p>
-
-                    <div>
-                      <p className={styles.exam_item}>
-                        {EXAM_ITEM_DISPLAY_MAP[order.exam_item] ||
-                          order.exam_item}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`${styles.drug_label} ${styles.order_content_item}`}
-                  >
-                    <p>放射性医薬品ラベル</p>
-                  </div>
-
-                  <div
-                    className={`${styles.record_area} ${styles.order_content_item}`}
-                  >
-                    <div className={`${styles.record_area_user}`}>
-                      <p>使用者</p>
-                      <p></p>
-                    </div>
-
-                    <div className={`${styles.record_area_time}`}>
-                      <p>投与時刻</p>
-                      <p></p>
-                    </div>
-
-                    <div
-                      className={`${styles.activity_volume} ${styles.administered}`}
-                    >
-                      <div>
-                        <p>投与量</p>
-                      </div>
-                      <div className={styles.volume_values}>
-                        <p> MBq</p>
-                        <p> mL</p>
-                      </div>
-                    </div>
-
-                    <div
-                      className={`${styles.activity_volume} ${styles.residual}`}
-                    >
-                      <div>
-                        <p>残量</p>
-                      </div>
-                      <div className={styles.volume_values}>
-                        <p> MBq</p>
-                        <p> mL</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div
-                    className={`${styles.body_info_area} ${styles.order_content_item}`}
-                  >
-                    <div className={styles.body_info}>
-                      <p>{order.height} cm</p>
-                      <p>{order.weight} kg</p>
-                    </div>
-
-                    <div>
-                      <p>備考)</p>
-                    </div>
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </div>
-
-      <div className={styles.procedure_for_print}>
-        {orders.map((order) => (
-          <ProcedurePage
-            key={`proc-${order.id}`}
-            order={order}
-            targetDate={targetDate}
-          />
-        ))}
-      </div>
+      {!isEditDosage && (
+        <div className={styles.procedure_for_print}>
+          {orders.map((order) => (
+            <MemoizedProcedurePage
+              key={`proc-${order.id}`}
+              order={order}
+              targetDate={targetDate}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
