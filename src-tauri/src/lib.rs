@@ -97,6 +97,7 @@ fn add_exam_order(
     dosage_ml: Option<f64>,
     remain_mbq: Option<f64>,
     remain_ml: Option<f64>,
+    injection_time: Option<String>,
 ) -> Result<(), String> {
     exam_order::model::insert_order(
         patient_db_id,
@@ -109,6 +110,7 @@ fn add_exam_order(
         dosage_ml,
         remain_mbq,
         remain_ml,
+        injection_time,
     )
 }
 
@@ -134,9 +136,15 @@ fn edit_exam_order_fields(
     dosage_ml: Option<f64>,
     remain_mbq: Option<f64>,
     remain_ml: Option<f64>,
+    injection_time: Option<String>,
 ) -> Result<(), String> {
     exam_order::model::update_exam_order_specifc_fields(
-        id, dosage_mbq, dosage_ml, remain_mbq, remain_ml,
+        id,
+        dosage_mbq,
+        dosage_ml,
+        remain_mbq,
+        remain_ml,
+        injection_time,
     )
 }
 

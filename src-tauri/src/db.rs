@@ -56,6 +56,9 @@ pub fn init_db() -> Result<()> {
         [],
     );
 
+    // 投与時刻
+    let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN injection_time TEXT", []);
+
     // 投与量・残量
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN dosage_mbq REAL", []);
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN dosage_ml REAL", []);
@@ -102,6 +105,7 @@ fn create_exam_orders_table(conn: &Connection) -> Result<()> {
             dosage_ml REAL,
             remain_mbq REAL,
             remain_ml REAL,
+            injection_time TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
         )",

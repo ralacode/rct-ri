@@ -18,6 +18,7 @@ pub struct ExamOrder {
     pub dosage_ml: Option<f64>,
     pub remain_mbq: Option<f64>,
     pub remain_ml: Option<f64>,
+    pub injection_time: Option<String>,
     pub created_at: String,
 }
 
@@ -43,6 +44,7 @@ pub struct ExamOrderWithPatient {
     pub dosage_ml: Option<f64>,
     pub remain_mbq: Option<f64>,
     pub remain_ml: Option<f64>,
+    pub injection_time: Option<String>,
 }
 
 // 検査オーダーの登録
@@ -57,6 +59,7 @@ pub fn insert_order(
     dosage_ml: Option<f64>,
     remain_mbq: Option<f64>,
     remain_ml: Option<f64>,
+    injection_time: Option<String>,
 ) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -68,7 +71,7 @@ pub fn insert_order(
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
     tx.execute(
-        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        "INSERT INTO exam_orders (patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, injection_time, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
         rusqlite::params![
             patient_db_id.to_string(),
             exam_date.to_string(),
@@ -80,6 +83,7 @@ pub fn insert_order(
             dosage_ml,
             remain_mbq,
             remain_ml,
+            injection_time,
             now,
         ],
     )
@@ -95,7 +99,7 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     let mut stmt = conn
-        .prepare("SELECT id, patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
+        .prepare("SELECT id, patient_db_id, exam_date, exam_time, exam_item, requesting_department, requesting_physician, dosage_mbq, dosage_ml, remain_mbq, remain_ml, injection_time, created_at FROM exam_orders WHERE patient_db_id = ?1 ORDER BY exam_date DESC, exam_time DESC")
         .map_err(|e| e.to_string())?;
 
     let order_iter = stmt
@@ -112,7 +116,8 @@ pub fn get_orders_by_patient(patient_db_id: i32) -> Result<Vec<ExamOrder>, Strin
                 dosage_ml: row.get(8)?,
                 remain_mbq: row.get(9)?,
                 remain_ml: row.get(10)?,
-                created_at: row.get(11)?,
+                injection_time: row.get(11)?,
+                created_at: row.get(12)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -150,7 +155,8 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
                 o.dosage_mbq,
                 o.dosage_ml,
                 o.remain_mbq,
-                o.remain_ml
+                o.remain_ml,
+                o.injection_time
              FROM exam_orders o
              JOIN patients p ON o.patient_db_id = p.id
              WHERE o.exam_date = ?1
@@ -181,6 +187,7 @@ pub fn get_orders_by_date(date: &str) -> Result<Vec<ExamOrderWithPatient>, Strin
                 dosage_ml: row.get(17)?,
                 remain_mbq: row.get(18)?,
                 remain_ml: row.get(19)?,
+                injection_time: row.get(20)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -212,6 +219,7 @@ pub fn update_exam_order_specifc_fields(
     dosage_ml: Option<f64>,
     remain_mbq: Option<f64>,
     remain_ml: Option<f64>,
+    injection_time: Option<String>,
 ) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -223,9 +231,17 @@ pub fn update_exam_order_specifc_fields(
          SET dosage_mbq = ?1, 
              dosage_ml = ?2, 
              remain_mbq = ?3, 
-             remain_ml = ?4
-         WHERE id = ?5",
-        rusqlite::params![dosage_mbq, dosage_ml, remain_mbq, remain_ml, id],
+             remain_ml = ?4,
+             injection_time = ?5
+         WHERE id = ?6",
+        rusqlite::params![
+            dosage_mbq,
+            dosage_ml,
+            remain_mbq,
+            remain_ml,
+            injection_time,
+            id
+        ],
     )
     .map_err(|e| e.to_string())?;
 

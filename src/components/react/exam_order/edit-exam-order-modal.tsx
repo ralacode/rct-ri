@@ -1,6 +1,6 @@
 // src/components/react/exam_order/edit-exam-order-modal.tsx
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { ExamOrder } from "@/types/exam_order";
 import {
@@ -15,6 +15,7 @@ import {
 import { MyButton } from "../my-button";
 import { MyInput } from "../my-input";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
 
 interface ExamOrderProps {
   id: number;
@@ -22,6 +23,7 @@ interface ExamOrderProps {
   dosage_ml: ExamOrder["dosage_ml"];
   remain_mbq: ExamOrder["remain_mbq"];
   remain_ml: ExamOrder["remain_ml"];
+  injection_time: ExamOrder["injection_time"];
 }
 
 interface EditExamOrderModalProps {
@@ -29,7 +31,6 @@ interface EditExamOrderModalProps {
   onClose: () => void;
   onSuccess: () => void;
   order: ExamOrderProps | null;
-  // onButtonClick: () => void;
 }
 
 export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
@@ -43,8 +44,11 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
   const [dosageMl, setDosageMl] = useState<string>("");
   const [remainMbq, setRemainMbq] = useState<string>("");
   const [remainMl, setRemainMl] = useState<string>("");
+  const [injectionTime, setInjectionTime] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  const baseId = useId();
 
   // モーダルが開いた時、または対象のオーダーが変わった時に初期値をセット
   useEffect(() => {
@@ -57,13 +61,14 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
         order.remain_mbq !== null ? order.remain_mbq.toString() : "",
       );
       setRemainMl(order.remain_ml !== null ? order.remain_ml.toString() : "");
+      setInjectionTime(
+        order.injection_time ? order.injection_time.toString() : "",
+      );
       setError(null);
     }
   }, [order, isOpen]);
 
-  // [order, isOpen]
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.SubmitEvent) => {
     e.preventDefault();
     if (!order) return;
 
@@ -85,6 +90,7 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
         dosageMl: parseValue(dosageMl),
         remainMbq: parseValue(remainMbq),
         remainMl: parseValue(remainMl),
+        injectionTime: injectionTime,
       });
 
       onSuccess(); // 親コンポーネント側で再取得などを走らせるコールバック
@@ -114,28 +120,41 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
 
             <div className={cn("grid gap-2 content-start")}>
               <MyInput
-                id="dosage_mbq"
+                label="投与時刻"
+                type="time"
+                id={`time-picker-optional-${baseId}`}
+                // step="1" を削除（または step="60" に変更）することで、秒数を非表示にします。
+                defaultValue={injectionTime}
+                onChange={(e) => setInjectionTime(e.target.value)}
+                inputClassName={cn(
+                  "text-xl w-auto appearance-none bg-background tracking-[0.2rem]",
+                  "[&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none",
+                  "cursor-pointer",
+                )}
+              />
+              <MyInput
+                id={`dosage_mbq_${baseId}`}
                 label="投与量（MBq）"
                 value={dosageMbq}
                 onChange={(e) => setDosageMbq(e.target.value)}
                 placeholder="例：740"
               />
               <MyInput
-                id="dosage_ml"
+                id={`dosage_ml_${baseId}`}
                 label="投与量（mL）"
                 value={dosageMl}
                 onChange={(e) => setDosageMl(e.target.value)}
                 placeholder="例：1.5"
               />
               <MyInput
-                id="remain_mbq"
+                id={`remain_mbq_${baseId}`}
                 label="残量（MBq）"
                 value={remainMbq}
                 onChange={(e) => setRemainMbq(e.target.value)}
                 placeholder="例：0.5"
               />
               <MyInput
-                id="remain_ml"
+                id={`remain_ml_${baseId}`}
                 label="残量（mL）"
                 value={remainMl}
                 onChange={(e) => setRemainMl(e.target.value)}

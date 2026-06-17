@@ -12,6 +12,7 @@ export interface ExamOrder {
   dosage_ml: number | null;
   remain_mbq: number | null;
   remain_ml: number | null;
+  injection_time: string;
   created_at: string;
 }
 
@@ -35,4 +36,5 @@ interface ExamOrderWithPatient {
   dosage_ml: ExamOrder["dosage_ml"];
   remain_mbq: ExamOrder["remain_mbq"];
   remain_ml: ExamOrder["remain_ml"];
+  injection_time: ExamOrder["injection_time"];
 }
