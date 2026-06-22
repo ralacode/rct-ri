@@ -7,11 +7,12 @@ interface GenderSelectProps {
   value: Patient["gender"]; // 💡 string から Patient["gender"] に変更
   onChange: (newValue: Patient["gender"]) => void; // 💡 引数の型も変更
   disabled?: boolean;
+  className?: string;
 }
 
 // ベースとなるボタン全体のスタイル（共通）
 const BASE_STYLE =
-  "grid justify-center items-center py-4 text-xl rounded-full border font-medium cursor-pointer transition-colors select-none";
+  "grid justify-center items-center py-4 text-xl rounded-md border font-medium cursor-pointer transition-colors select-none";
 
 // 選択されているときのスタイル
 const ACTIVE_STYLE =
@@ -28,9 +29,10 @@ export const GenderSelect: React.FC<GenderSelectProps> = ({
   value,
   onChange,
   disabled = false,
+  className,
 }) => {
   return (
-    <div className={cn("grid gap-2")}>
+    <div className={cn("grid gap-2", className)}>
       <p className={cn("text-sm")}>性別</p>
 
       <div className={cn("grid grid-flow-col gap-4")}>

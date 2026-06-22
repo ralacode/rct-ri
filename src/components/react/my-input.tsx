@@ -58,7 +58,7 @@ export const MyInput = ({
         // cn関数を使い、inputのデフォルトスタイルを設定
         className={cn(
           // --- ベース ---
-          "rounded-4xl border transition-colors text-base text-(--text)!",
+          "rounded-4xl border transition-colors text-base text-(--text)",
           // --- サイズ・余白 ---
           "px-4 py-2 w-full",
           // --- 色・枠線（ライトモード） ---

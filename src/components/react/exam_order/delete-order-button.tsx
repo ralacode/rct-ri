@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { MyButton } from "@components/react/my-button";
-import styles from "@styles/delete-order-button.module.css";
+import { cn } from "@/lib/utils";
 
 interface Props {
   orderId: number;
@@ -32,43 +32,30 @@ export const DeleteOrderButton: React.FC<Props> = ({
     }
   };
 
-  // if (!isConfirming) {
-  //   return (
-  //     <MyButton
-  //       onClick={() => setIsConfirming(true)}
-  //       type="button"
-  //       className={styles.delete_order_button}
-  //     >
-  //       オーダー削除
-  //     </MyButton>
-  //   );
-  // }
-
   return (
-    <div className={`${styles.container} ${className}`}>
+    <div className={cn("grid grid-rows-[1.5rem_2.5rem]", className)}>
       {!isConfirming ? (
         <MyButton
           onClick={() => setIsConfirming(true)}
           type="button"
-          className={styles.delete_order_button}
+          className={cn("bg-red-500 text-white row-span-full self-end")}
         >
           オーダー削除
         </MyButton>
       ) : (
         <>
           <p>本当に削除しますか？</p>
-          <div className={styles.button_area}>
+          <div className={cn("grid grid-cols-2 gap-4")}>
             <MyButton
               onClick={handleDelete}
               disabled={isDeleting}
-              className={styles.confirm_delete}
+              className={cn("bg-red-500 text-white")}
             >
               {isDeleting ? "削除中..." : "削除する"}
             </MyButton>
             <MyButton
               onClick={() => setIsConfirming(false)}
               disabled={isDeleting}
-              className={styles.cancel_button}
             >
               キャンセル
             </MyButton>

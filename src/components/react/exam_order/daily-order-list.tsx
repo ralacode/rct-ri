@@ -417,7 +417,7 @@ export const DailyOrderList: React.FC = () => {
                     </div>
                   )}
 
-                  <div className={cn("grid gap-4 justify-items-end")}>
+                  <div className={cn("grid justify-items-end")}>
                     <div
                       className={cn(
                         "grid gap-4 content-start",

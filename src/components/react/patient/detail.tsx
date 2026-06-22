@@ -10,6 +10,9 @@ import {
   examTimeSlots,
   formatDateString,
   formatDateTimeWithDay,
+  normalizeToDbDateFormat,
+  normalizeToDisplayDateFormat,
+  scrollToTop,
   toKatakana,
   validateHiragana,
   validateKanjiName,
@@ -25,12 +28,27 @@ import { MyButton } from "@components/react/my-button";
 import { MyInput } from "../my-input";
 import { GenderSelect } from "../gender-select";
 import { FadeIn } from "@components/react/fade-in";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { format, isFuture, isValid, parse } from "date-fns";
+import { DatePickerTime } from "../date-picker-time";
 
 export const PatientDetail: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
-  const [newExamDate, setNewExamDate] = useState("");
-  const [newExamTime, setNewExamTime] = useState("08:30");
+  const [newExamDate, setNewExamDate] = useState(() => {
+    // 既存のフォーマット "yyyy / MM / dd" に合わせて今日の文字列を生成
+    return format(new Date(), "yyyy/MM/dd");
+  });
+  const [newExamTime, setNewExamTime] = useState("10:30");
   const [dept, setDept] = useState("");
   const [pys, setPys] = useState("");
   const [examItem, setExamItem] = useState("");
@@ -51,10 +69,16 @@ export const PatientDetail: React.FC = () => {
   const [editLastNameKana, setEditLastNameKana] = useState<string>("");
   const [editKanaError, setEditKanaError] = useState<string | null>(null);
   const [editBirthDate, setEditBirthDate] = useState<string>("");
+  const [editBirthDateError, setEditBirthDateError] = useState<string | null>(
+    null,
+  );
   const [editGender, setEditGender] = useState<Patient["gender"]>("");
   const [editHeight, setEditHeight] = useState<string>("");
   const [editWeight, setEditWeight] = useState<string>("");
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
 
   // 1. URLのクエリパラメータからIDを取得する関数
   const getPatientIdFromUrl = () => {
@@ -79,18 +103,6 @@ export const PatientDetail: React.FC = () => {
         const p = patients[0];
         setPatient(p);
 
-        // setEditPatientId(p.patient_id);
-        // setEditFirstNameKanji(p.first_name_kanji);
-        // setEditLastNameKanji(p.last_name_kanji);
-        // setEditFirstNameKana(p.first_name_kana);
-        // setEditLastNameKana(p.last_name_kana);
-        // setEditBirthDate(p.birth_date.replaceAll("/", " / "));
-        // setEditHeight(p.height != null ? p.height.toString() : "");
-        // setEditWeight(p.weight != null ? p.weight.toString() : "");
-
-        // 2. 検査履歴の取得
-        // Rust側のコマンド名は 'get_exam_orders'
-        // 引数名は 'patientDbId' で、型は数値(i32)が必要です。
         try {
           const orderResults = await invoke<ExamOrder[]>("get_exam_orders", {
             patientDbId: p.id,
@@ -121,6 +133,7 @@ export const PatientDetail: React.FC = () => {
 
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
+    setEditBirthDateError(null);
 
     // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
     if (inputValue.length < editBirthDate.length) {
@@ -151,12 +164,29 @@ export const PatientDetail: React.FC = () => {
     }
 
     setEditBirthDate(formatted);
+
+    if (formatted.length === 14) {
+      // スペースを取り除いて "YYYY/MM/DD" にする
+      const cleanStr = formatted.replace(/\s+/g, "");
+      const parsedDate = parse(cleanStr, "yyyy/MM/dd", new Date());
+
+      if (!isValid(parsedDate)) {
+        setEditBirthDateError("存在しない日付です");
+      } else if (isFuture(parsedDate)) {
+        // プロジェクトの既存の仕様（未来日制限）に合わせる場合
+        setEditBirthDateError("未来の日付は入力できません");
+      } else {
+        setEditBirthDateError(null); // 正しければエラーをクリア
+      }
+    } else {
+      // 入力途中（14文字未満）はエラーをクリアしておく
+      setEditBirthDateError(null);
+    }
   };
 
   const startEditing = () => {
     if (patient) {
-      // 編集モードに入る瞬間に、スラッシュの両側にスペースを空けるフォーマットに変換してセット
-      setEditBirthDate(patient.birth_date.replaceAll("/", " / "));
+      setEditBirthDate(normalizeToDisplayDateFormat(patient.birth_date));
 
       // 他の項目も編集開始時に最新の patient の状態と同期させる
       setEditPatientId(patient.patient_id);
@@ -168,6 +198,7 @@ export const PatientDetail: React.FC = () => {
       setEditHeight(patient.height != null ? patient.height.toString() : "");
       setEditWeight(patient.weight != null ? patient.weight.toString() : "");
     }
+    setEditBirthDateError(null);
     setEditError(null);
     setIsEditing(true);
   };
@@ -231,6 +262,12 @@ export const PatientDetail: React.FC = () => {
       return;
     }
 
+    const dbBirthDate = normalizeToDbDateFormat(editBirthDate);
+    if (!dbBirthDate) {
+      setEditError("生年月日の日付が正しくありません。");
+      return;
+    }
+
     try {
       // lib.rs の edit_patient が要求するすべての引数を渡す
       await invoke("edit_patient", {
@@ -241,7 +278,7 @@ export const PatientDetail: React.FC = () => {
         firstNameKanji: editFirstNameKanji,
         lastNameKana: editLastNameKana,
         firstNameKana: editFirstNameKana,
-        birthDate: editBirthDate,
+        birthDate: dbBirthDate,
         gender: editGender,
         height: heightNum,
         weight: weightNum,
@@ -268,45 +305,57 @@ export const PatientDetail: React.FC = () => {
       setEditFirstNameKana(editFirstNameKana);
       setEditBirthDate(editBirthDate);
       setIsEditing(false);
+      scrollToTop("main-scroll-area");
 
-      window.scrollTo({
-        top: 0,
-        behavior: "smooth", // "smooth" でアニメーション付き、"auto" で一瞬で移動
-      });
+      if (finalPatientId) {
+        await loadAllData(finalPatientId);
+      }
     } catch (err) {
       setEditError(`更新に失敗しました: ${err}`);
     }
   };
 
   const handleAddOrder = async () => {
+    setIsSubmittingOrder(true);
+
     if (!patient) return;
 
     if (!newExamDate || !newExamTime || !examItem || !dept || !pys) {
       alert("検査日、予約時間、検査項目、依頼科、依頼医を入力してください。");
-      return;
+      return setIsSubmittingOrder(false);
+    }
+
+    const dbExamDate = normalizeToDbDateFormat(newExamDate);
+    if (!dbExamDate) {
+      alert("検査日の日付が正しくありません。");
+      return setIsSubmittingOrder(false);
     }
 
     try {
       // Rust側は 'add_exam_order' で、引数は 'patientDbId' (数値)
       await invoke("add_exam_order", {
         patientDbId: patient.id,
-        examDate: newExamDate,
+        examDate: dbExamDate,
         examTime: newExamTime,
         examItem: examItem,
         requestingDepartment: dept,
         requestingPhysician: pys,
       });
 
-      setNewExamDate("");
-      setNewExamTime("08:30");
+      setNewExamDate(() => format(new Date(), "yyyy/MM/dd"));
+      setNewExamTime("10:30");
       setExamItem("");
       setDept("");
       setPys("");
+
+      setIsOrderModalOpen(false);
+      setIsSubmittingOrder(false);
 
       const id = getPatientIdFromUrl();
       if (id) loadAllData(id);
     } catch (err) {
       alert("検査登録に失敗しました。");
+      setIsSubmittingOrder(false);
     }
   };
 
@@ -355,7 +404,7 @@ export const PatientDetail: React.FC = () => {
   } = patient;
 
   return (
-    <div className={cn("grid gap-4 content-start", "@container")}>
+    <div className={cn("grid gap-8 content-start", "@container")}>
       {/* 患者基本情報セクション */}
       <div
         className={cn(
@@ -366,12 +415,7 @@ export const PatientDetail: React.FC = () => {
         <h2 className="text-2xl">患者情報</h2>
 
         <FadeIn>
-          <Card
-            className={cn(
-              "grid min-w-71.75 overflow-x-hidden",
-              isEditing && "gap-4",
-            )}
-          >
+          <Card className={cn("grid min-w-71.75 overflow-x-hidden")}>
             {isEditing ? (
               <div className={cn("grid grid-rows-[auto_1rem]")}>
                 <MyInput
@@ -384,6 +428,7 @@ export const PatientDetail: React.FC = () => {
                     setEditPatientIdError(null);
                   }}
                   placeholder="患者IDを入力"
+                  required
                 />
                 {editPatientIdError && (
                   <p className={cn("text-red-700")}>{editPatientIdError}</p>
@@ -469,23 +514,33 @@ export const PatientDetail: React.FC = () => {
                 last_name_kana={toKatakana(last_name_kana)}
                 first_name_kanji={first_name_kanji}
                 first_name_kana={toKatakana(first_name_kana)}
-                className={cn("text-xl")}
+                className={cn("text-xl font-bold", "@md:text-2xl")}
               />
             )}
 
             {/* 生年月日 */}
             {isEditing ? (
-              <MyInput
-                id="birth_date"
-                label="生年月日"
-                placeholder="1989 / 09 / 11"
-                required
-                value={editBirthDate}
-                onChange={handleBirthDateChange}
-                maxLength={14}
-              />
+              <div className={cn("grid grid-rows-[auto_1rem]")}>
+                <MyInput
+                  id="birth_date"
+                  label="生年月日"
+                  placeholder="1989 / 09 / 11"
+                  required
+                  value={editBirthDate}
+                  onChange={handleBirthDateChange}
+                  maxLength={14}
+                  inputClassName={cn(
+                    editBirthDateError && "text-white bg-red-500",
+                  )}
+                />
+                {editBirthDateError && (
+                  <p className={cn("text-red-700 justify-self-end")}>
+                    {editBirthDateError}
+                  </p>
+                )}
+              </div>
             ) : (
-              <div>
+              <div className={cn("@md:mt-4")}>
                 生年月日：
                 <span className="detail-value">
                   {formatDateString(birth_date)}
@@ -519,7 +574,7 @@ export const PatientDetail: React.FC = () => {
 
             {/* 身長・体重 */}
             {isEditing ? (
-              <div className={cn("grid gap-2 grid-rows-[auto_auto_1rem]")}>
+              <div className={cn("grid gap-2 grid-rows-[auto_auto_1rem] mt-4")}>
                 <div
                   className={cn(
                     "grid grid-flow-col justify-start items-end gap-2",
@@ -577,190 +632,237 @@ export const PatientDetail: React.FC = () => {
             {!isEditing && (
               <div>
                 登録日：
-                <span className={cn("text-sm")}>
+                <span className={cn("text-sm", "@md:text-base")}>
                   {formatDateTimeWithDay(created_at)}
                 </span>
               </div>
             )}
 
             {/* 更新日 */}
-            {!isEditing && updated_at && (
+            {!isEditing && created_at !== updated_at && (
               <div>
                 更新日：
-                <span className={cn("text-sm")}>
+                <span className={cn("text-sm", "@md:text-base")}>
                   {formatDateTimeWithDay(updated_at)}
                 </span>
               </div>
             )}
 
-            {/* モード切り替えボタン */}
-            {!isEditing ? (
-              <MyButton
-                onClick={startEditing}
-                className={cn("justify-self-end")}
-              >
-                編集する
-              </MyButton>
-            ) : (
+            {/* ボタン集 */}
+            <div className={cn("grid gap-2 content-start mt-2")}>
               <div
                 className={cn(
-                  "grid grid-flow-col justify-start gap-2 justify-self-end",
+                  "grid gap-2 content-start",
+                  "@md:grid-flow-col @md:justify-end",
                 )}
               >
-                <MyButton onClick={handleSavePatient}>保存</MyButton>
-                <MyButton
-                  onClick={() => {
-                    // 変更をキャンセルして元に戻す
-                    setEditPatientId(patient.patient_id);
-                    setEditFirstNameKanji(patient.first_name_kanji);
-                    setEditLastNameKanji(patient.last_name_kanji);
-                    setEditFirstNameKana(patient.first_name_kana);
-                    setEditLastNameKana(patient.last_name_kana);
-                    setEditBirthDate(patient.birth_date);
-                    setEditHeight(
-                      patient.height != null ? patient.height.toString() : "",
-                    );
-                    setEditWeight(
-                      patient.weight != null ? patient.weight.toString() : "",
-                    );
-                    setEditPatientIdError(null);
-                    setEditKanjiError(null);
-                    setEditKanaError(null);
-                    setEditError(null);
-                    setIsEditing(false);
-                  }}
-                  className={cn("bg-red-500")}
-                >
-                  キャンセル
-                </MyButton>
-              </div>
-            )}
-
-            {/* 患者削除ボタン */}
-            {!isEditing && (
-              <div className="mt-2 justify-self-end">
-                {!showConfirm ? (
+                {/* 患者を編集する */}
+                {!isEditing ? (
                   <MyButton
-                    className="bg-red-500"
-                    onClick={() => setShowConfirm(true)}
+                    onClick={startEditing}
+                    className={cn("justify-self-end")}
                   >
-                    この患者を削除する
+                    患者情報を編集する
                   </MyButton>
                 ) : (
-                  <div className="delete-confirmation">
-                    <p className="confirm-text">
-                      本当に削除してもよろしいですか？
-                    </p>
-                    <div
-                      className={cn("grid grid-flow-col justify-start gap-2")}
+                  <div
+                    className={cn(
+                      "grid grid-flow-col justify-start gap-2 justify-self-end",
+                    )}
+                  >
+                    <MyButton onClick={handleSavePatient}>保存</MyButton>
+                    <MyButton
+                      onClick={() => {
+                        setEditPatientId(patient.patient_id);
+                        setEditFirstNameKanji(patient.first_name_kanji);
+                        setEditLastNameKanji(patient.last_name_kanji);
+                        setEditFirstNameKana(patient.first_name_kana);
+                        setEditLastNameKana(patient.last_name_kana);
+                        setEditBirthDate(patient.birth_date);
+                        setEditHeight(
+                          patient.height != null
+                            ? patient.height.toString()
+                            : "",
+                        );
+                        setEditWeight(
+                          patient.weight != null
+                            ? patient.weight.toString()
+                            : "",
+                        );
+                        setEditPatientIdError(null);
+                        setEditKanjiError(null);
+                        setEditKanaError(null);
+                        setEditError(null);
+                        setIsEditing(false);
+                        scrollToTop("main-scroll-area");
+                      }}
+                      className={cn("bg-red-500")}
                     >
-                      <MyButton
-                        onClick={executeDelete}
-                        disabled={isDeleting}
-                        className={cn("bg-red-500")}
-                      >
-                        {isDeleting ? "削除中..." : "はい"}
-                      </MyButton>
-                      <MyButton
-                        onClick={() => setShowConfirm(false)}
-                        disabled={isDeleting}
-                      >
-                        いいえ
-                      </MyButton>
-                    </div>
+                      キャンセル
+                    </MyButton>
                   </div>
                 )}
+
+                {/* 検査登録フォーム（モーダル） */}
+                {!isEditing && (
+                  <Dialog
+                    open={isOrderModalOpen}
+                    onOpenChange={setIsOrderModalOpen}
+                  >
+                    <DialogTrigger asChild className={cn("justify-self-end")}>
+                      <MyButton>検査オーダーを登録</MyButton>
+                    </DialogTrigger>
+                    <DialogContent
+                      className={cn(
+                        "font-(family-name:--font-family)! text-(--text)!",
+                        "duration-0 animate-none",
+                      )}
+                    >
+                      <DialogHeader>
+                        <DialogTitle>新規検査オーダー登録</DialogTitle>
+                      </DialogHeader>
+
+                      <DialogDescription className="sr-only">
+                        新しく患者の検査オーダーを入力して登録するためのフォームです
+                      </DialogDescription>
+
+                      <div className={cn("grid gap-4")}>
+                        <DatePickerTime
+                          valueString={newExamDate}
+                          timeString={newExamTime}
+                          onChange={setNewExamDate}
+                          onChangeTime={(e) => setNewExamTime(e.target.value)}
+                        />
+                        <DatalistInput
+                          id="modal_requesting_department_name"
+                          label="依頼科"
+                          list="modal_requesting_department_list"
+                          placeholder="依頼科を入力..."
+                          value={dept}
+                          onChange={(e) => setDept(e.target.value)}
+                          options={DEPARTMENTS}
+                          inputClassName={cn("h-10 cursor-pointer")}
+                        />
+                        <DatalistInput
+                          id="modal_requesting_physician"
+                          label="依頼医"
+                          list="modal_requesting_physician_list"
+                          placeholder="依頼医を入力..."
+                          value={pys}
+                          onChange={(e) => setPys(e.target.value)}
+                          options={PHYSICIAN}
+                          inputClassName={cn("h-10 cursor-pointer")}
+                        />
+
+                        <DatalistInput
+                          id="modal_exam_item"
+                          label="検査項目"
+                          list="modal_exam_item_list"
+                          placeholder="検査項目を入力..."
+                          value={examItem}
+                          onChange={(e) => setExamItem(e.target.value)}
+                          options={EXAM_ITEMS}
+                          inputClassName={cn("h-10 cursor-pointer")}
+                        />
+                      </div>
+
+                      <DialogFooter className={cn("grid")}>
+                        <MyButton
+                          onClick={handleAddOrder}
+                          disabled={isSubmittingOrder}
+                        >
+                          {isSubmittingOrder ? "登録中..." : "登録する"}
+                        </MyButton>
+                        <DialogClose asChild>
+                          <MyButton className={cn("bg-red-500")}>
+                            キャンセル
+                          </MyButton>
+                        </DialogClose>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </div>
-            )}
+
+              {/* 患者削除ボタン */}
+              {!isEditing && (
+                <div
+                  className={cn(
+                    "grid justify-self-end grid-rows-[1.5rem_2.5rem]",
+                  )}
+                >
+                  {!showConfirm ? (
+                    <MyButton
+                      className="bg-red-500 row-span-full self-end"
+                      onClick={() => setShowConfirm(true)}
+                    >
+                      この患者を削除する
+                    </MyButton>
+                  ) : (
+                    <>
+                      <p className="confirm-text">
+                        本当に削除してもよろしいですか？
+                      </p>
+                      <div className={cn("grid grid-flow-col gap-2")}>
+                        <MyButton
+                          onClick={executeDelete}
+                          disabled={isDeleting}
+                          className={cn("bg-red-500")}
+                        >
+                          {isDeleting ? "削除中..." : "はい"}
+                        </MyButton>
+                        <MyButton
+                          onClick={() => setShowConfirm(false)}
+                          disabled={isDeleting}
+                        >
+                          いいえ
+                        </MyButton>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </Card>
         </FadeIn>
       </div>
 
-      {/* 検査登録フォーム */}
-      <div>
-        <h3>新規検査登録</h3>
-
-        <div>
-          <div>
-            <input
-              type="date"
-              value={newExamDate}
-              onChange={(e) => setNewExamDate(e.target.value)}
-              className="exam-date-input"
-            />
-
-            <select
-              value={newExamTime}
-              onChange={(e) => setNewExamTime(e.target.value)}
-              className="exam-time-select"
-            >
-              {examTimeSlots.map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <DatalistInput
-            id="requesting_department"
-            label="依頼科："
-            list="requesting_department_list"
-            placeholder="依頼科を入力..."
-            value={dept}
-            onChange={(e) => setDept(e.target.value)}
-            options={DEPARTMENTS}
-          />
-
-          <DatalistInput
-            id="requesting_physician"
-            label="依頼医："
-            list="requesting_physician_list"
-            placeholder="依頼医を入力..."
-            value={pys}
-            onChange={(e) => setPys(e.target.value)}
-            options={PHYSICIAN}
-          />
-
-          <DatalistInput
-            id="exam_item"
-            label="検査項目："
-            list="exam_item_list"
-            placeholder="検査項目を入力..."
-            value={examItem}
-            onChange={(e) => setExamItem(e.target.value)}
-            options={EXAM_ITEMS}
-          />
-
-          <button onClick={handleAddOrder}>登録する</button>
-        </div>
-      </div>
-
       {/* 検査履歴一覧 */}
-      <div>
-        <h3>検査一覧</h3>
+      <div className={cn("grid gap-2 content-start")}>
+        <h2 className="text-2xl">検査一覧</h2>
 
         {orders.length === 0 ? (
           <p className="text-gray-500">登録された検査はありません。</p>
         ) : (
-          <div style={{ display: "grid", gap: "16px", justifyItems: "start" }}>
+          <div className={cn("grid gap-4 content-start", "@lg:grid-cols-2")}>
             {orders.map((order) => (
-              <div key={order.id} style={{ border: "solid 1px #ddd" }}>
-                <p>検査日：{formatDateTimeWithDay(order.exam_date)}</p>
-                <p>
-                  <span className="exam-label">予約時間：</span>
-                  {order.exam_time}
-                </p>
-                <p>登録日：{formatDateTimeWithDay(order.created_at)}</p>
-                <p>依頼科：{order.requesting_department}</p>
-                <p>依頼医：{order.requesting_physician}</p>
-                <p>検査項目：{order.exam_item}</p>
+              <Card key={order.id} className={cn("grid gap-2 content-start")}>
+                <div className={cn("grid grid-flow-col gap-2 justify-start")}>
+                  <div>{formatDateTimeWithDay(order.exam_date)}</div>
+                  <div>{order.exam_time}</div>
+                </div>
+
+                <div className={cn("text-lg font-bold", "md:text-2xl")}>
+                  {order.exam_item}
+                </div>
+
+                <div className={cn("text-right justify-self-end")}>
+                  <div>{order.requesting_department}</div>
+                  <div>{order.requesting_physician}</div>
+                </div>
+
+                <div
+                  className={cn("text-sm justify-self-end", "@md:text-base")}
+                >
+                  登録日：{formatDateTimeWithDay(order.created_at)}
+                </div>
 
                 <DeleteOrderButton
                   orderId={order.id}
                   onSuccess={successfetchData}
+                  className={cn("justify-self-end")}
                 />
-              </div>
+              </Card>
             ))}
           </div>
         )}

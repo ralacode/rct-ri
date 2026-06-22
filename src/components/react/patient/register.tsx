@@ -2,6 +2,8 @@
 import React, { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import {
+  cn,
+  normalizeToDbDateFormat,
   toKatakana,
   validateDateString,
   validateHiragana,
@@ -11,6 +13,7 @@ import {
 import { MyInput } from "@components/react/my-input";
 import { Input } from "@/components/ui/input";
 import { MyButton } from "../my-button";
+import { PatientName } from "../patient-name";
 
 const getTodayFormatted = () => {
   const now = new Date();
@@ -230,7 +233,7 @@ export const PatientRegisterForm = () => {
     if (!fnaRes.isValid)
       return setMessage(`名前（かな）: ${fnaRes.errorMessage}`);
 
-    const cleanBirthDate = formData.birth_date.replace(/\s+/g, "");
+    const cleanBirthDate = normalizeToDbDateFormat(formData.birth_date);
     const cleanCreatedAt = formData.created_at.replace(/\s+/g, "");
 
     try {
@@ -276,74 +279,102 @@ export const PatientRegisterForm = () => {
 
   return (
     <div className="mx-auto max-w-md">
-      <form onSubmit={handleSubmit} className="grid gap-4">
-        <MyInput
-          id="patient_id"
-          label="患者ID"
-          placeholder="例: 0000000123"
-          required
-          value={formData.patient_id}
-          onChange={handleChange}
-        />
-
-        <div className="grid grid-flow-col gap-2 justify-start">
-          <MyInput
-            id="last_name_kanji"
-            label="姓（漢字）"
-            placeholder="例: 山田"
-            required
-            value={formData.last_name_kanji}
-            onChange={handleChange}
-          />
-          <MyInput
-            id="first_name_kanji"
-            label="名（漢字）"
-            placeholder="例: 太郎"
-            required
-            value={formData.first_name_kanji}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div className="grid grid-flow-col gap-2 justify-start">
-          <MyInput
-            id="last_name_kana"
-            label="姓（ふりがな）"
-            placeholder="例: やまだ"
-            required
-            value={formData.last_name_kana}
-            onChange={handleChange}
-          />
-          <MyInput
-            id="first_name_kana"
-            label="名（ふりがな）"
-            placeholder="例: たろう"
-            required
-            value={formData.first_name_kana}
-            onChange={handleChange}
-          />
-        </div>
-
-        <div className="hidden">
-          <label htmlFor="patient_type">区分</label>
-          <select
-            id="patient_type"
-            value={formData.patient_type}
-            onChange={handleChange}
+      {saveMessage === "success" && lastRegistered ? (
+        <div className={cn("grid gap-4 content-start")}>
+          <p className={cn("grid grid-flow-col gap-2 justify-start items-end")}>
+            <PatientName
+              last_name_kanji={lastRegistered.last_name_kanji}
+              last_name_kana={toKatakana(lastRegistered.last_name_kana)}
+              first_name_kanji={lastRegistered.first_name_kanji}
+              first_name_kana={toKatakana(lastRegistered.first_name_kana)}
+            />
+            <span>様を登録しました</span>
+          </p>
+          <MyButton
+            onClick={() => {
+              window.location.href = `/patient/detail?id=${lastRegistered.patient_id}`; // 遷移先のURLを指定
+            }}
           >
-            <option value="ri">ri</option>
-            <option value="rt">rt</option>
-          </select>
+            患者情報を見る
+          </MyButton>
+          <MyButton
+            onClick={() => {
+              setLastRegistered(null);
+              setSaveMessage("");
+            }}
+          >
+            続けて別の患者を登録
+          </MyButton>
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="grid gap-4">
+          <MyInput
+            id="patient_id"
+            label="患者ID"
+            placeholder="例: 0000000123"
+            required
+            value={formData.patient_id}
+            onChange={handleChange}
+          />
 
-        <div className="gender-field grid gap-1">
-          <label>性別</label>
+          <div className="grid grid-flow-col gap-2 justify-start">
+            <MyInput
+              id="last_name_kanji"
+              label="姓（漢字）"
+              placeholder="例: 山田"
+              required
+              value={formData.last_name_kanji}
+              onChange={handleChange}
+            />
+            <MyInput
+              id="first_name_kanji"
+              label="名（漢字）"
+              placeholder="例: 太郎"
+              required
+              value={formData.first_name_kanji}
+              onChange={handleChange}
+            />
+          </div>
 
-          {/* ボタンの並び（横並びで隙間を空ける） */}
-          <div className="flex gap-3">
-            {/* 「男」ボタン */}
-            <label
-              className={`
+          <div className="grid grid-flow-col gap-2 justify-start">
+            <MyInput
+              id="last_name_kana"
+              label="姓（ふりがな）"
+              placeholder="例: やまだ"
+              required
+              value={formData.last_name_kana}
+              onChange={handleChange}
+            />
+            <MyInput
+              id="first_name_kana"
+              label="名（ふりがな）"
+              placeholder="例: たろう"
+              required
+              value={formData.first_name_kana}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="hidden">
+            <label htmlFor="patient_type">区分</label>
+            <select
+              id="patient_type"
+              value={formData.patient_type}
+              onChange={handleChange}
+            >
+              <option value="ri">ri</option>
+              <option value="rt">rt</option>
+            </select>
+          </div>
+
+          <div className="gender-field grid gap-1">
+            <label>性別</label>
+
+            {/* ボタンの並び（横並びで隙間を空ける） */}
+            <div className="flex gap-3">
+              {/* 「男」ボタン */}
+              <label
+                className={`
                 flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
                 ${
                   formData.gender === "男"
@@ -351,21 +382,21 @@ export const PatientRegisterForm = () => {
                     : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
                 }
               `}
-            >
-              <input
-                type="radio"
-                name="gender"
-                value="男"
-                checked={formData.gender === "男"}
-                onChange={handleChange}
-                className="sr-only"
-              />
-              男
-            </label>
+              >
+                <input
+                  type="radio"
+                  name="gender"
+                  value="男"
+                  checked={formData.gender === "男"}
+                  onChange={handleChange}
+                  className="sr-only"
+                />
+                男
+              </label>
 
-            {/* 「女」ボタン */}
-            <label
-              className={`
+              {/* 「女」ボタン */}
+              <label
+                className={`
                 flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
                 ${
                   formData.gender === "女"
@@ -373,77 +404,62 @@ export const PatientRegisterForm = () => {
                     : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
                 }
               `}
-            >
-              <input
-                type="radio"
-                name="gender"
-                value="女"
-                checked={formData.gender === "女"}
-                onChange={handleChange}
-                className="sr-only"
-              />
-              女
-            </label>
+              >
+                <input
+                  type="radio"
+                  name="gender"
+                  value="女"
+                  checked={formData.gender === "女"}
+                  onChange={handleChange}
+                  className="sr-only"
+                />
+                女
+              </label>
+            </div>
           </div>
-        </div>
 
-        <MyInput
-          id="birth_date"
-          label="生年月日"
-          placeholder="1989 / 09 / 11"
-          required
-          value={formData.birth_date}
-          onChange={handleBirthDateChange}
-          maxLength={14} // "YYYY / MM / DD" は最大14文字
-        />
+          <MyInput
+            id="birth_date"
+            label="生年月日"
+            placeholder="1989 / 09 / 11"
+            required
+            value={formData.birth_date}
+            onChange={handleBirthDateChange}
+            maxLength={14} // "YYYY / MM / DD" は最大14文字
+          />
 
-        <MyInput
-          id="height"
-          label="身長 (cm)"
-          type="text"
-          placeholder="170.5"
-          value={formData.height}
-          onChange={handleChange}
-        />
+          <MyInput
+            id="height"
+            label="身長 (cm)"
+            type="text"
+            placeholder="170.5"
+            value={formData.height}
+            onChange={handleChange}
+          />
 
-        <MyInput
-          id="weight"
-          label="体重 (kg)"
-          type="text"
-          placeholder="50.5"
-          value={formData.weight}
-          onChange={handleChange}
-        />
+          <MyInput
+            id="weight"
+            label="体重 (kg)"
+            type="text"
+            placeholder="50.5"
+            value={formData.weight}
+            onChange={handleChange}
+          />
 
-        <MyInput
-          id="created_at"
-          label="登録日"
-          placeholder={getTodayFormatted()}
-          required
-          value={formData.created_at}
-          onChange={handleRegistrationDateChange}
-          maxLength={14}
-        />
+          <MyInput
+            id="created_at"
+            label="登録日"
+            placeholder={getTodayFormatted()}
+            required
+            value={formData.created_at}
+            onChange={handleRegistrationDateChange}
+            maxLength={14}
+          />
 
-        <MyButton type="submit" className="mt-4">
-          登録する
-        </MyButton>
-      </form>
-
-      {saveMessage === "success" && lastRegistered && (
-        <p>
-          <span>
-            <ruby>
-              {lastRegistered.last_name_kanji}
-              <rt>{toKatakana(lastRegistered.last_name_kana)}</rt>
-            </ruby>{" "}
-            <ruby>
-              {lastRegistered.first_name_kanji}
-              <rt>{toKatakana(lastRegistered.first_name_kana)}</rt>
-            </ruby>
-          </span>{" "}
-          様を登録しました
-        </p>
+          <MyButton type="submit" className="mt-4">
+            登録する
+          </MyButton>
+        </form>
       )}
 
       {message && (

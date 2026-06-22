@@ -37,7 +37,6 @@ export const PatientList = () => {
           <div>
             <a href={`/patient/detail?id=${p.patient_id}`}>{p.patient_id}</a>
           </div>
-          <p>{p.patient_type}</p>
         </div>
       ))}
     </>

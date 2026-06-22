@@ -1,4 +1,6 @@
 import * as React from "react";
+import { Input } from "../ui/input";
+import { cn } from "@/lib/utils";
 
 interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
   className?: string;
@@ -27,9 +29,9 @@ export const DatalistInput = ({
   ...rest
 }: Props) => {
   return (
-    <div>
+    <div className={cn("grid gap-2")}>
       <label htmlFor={id}>{label}</label>
-      <input
+      <Input
         id={id}
         name={id}
         type={type}
@@ -37,6 +39,7 @@ export const DatalistInput = ({
         placeholder={placeholder}
         value={value}
         onChange={onChange}
+        className={inputClassName}
         {...rest}
       />
       <datalist id={list}>

@@ -3,6 +3,7 @@ import type { ValidationResult } from "@/types/patient";
 import { siteMeta } from "@lib/constants";
 import { invoke } from "@tauri-apps/api/core";
 import { clsx, type ClassValue } from "clsx";
+import { format, isValid, parse } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -14,6 +15,17 @@ export function cn(...inputs: ClassValue[]) {
  */
 export const getPageTitle = (pageTitle?: string) => {
   return pageTitle ? pageTitle : siteMeta.siteTitle;
+};
+
+// ウインドウの一番上に移動する
+export const scrollToTop = (
+  elementId: string,
+  behavior: ScrollBehavior = "smooth",
+) => {
+  document.getElementById(elementId)?.scrollTo({
+    top: 0,
+    behavior,
+  });
 };
 
 export const validatePatientId = (rawId: string): ValidationResult => {
@@ -208,6 +220,48 @@ export const validateDateString = (
   }
 
   return null;
+};
+
+/**
+ * 【共通コア関数】
+ * ランダムな形式の日付文字列を、厳密に判定して Date オブジェクトに変換する
+ * @param rawDateStr 不揃いな日付文字列
+ * @returns 正しい日付なら Date オブジェクト、解析失敗時は null
+ */
+const parseAnyDateFormat = (rawDateStr: string): Date | null => {
+  if (!rawDateStr) return null;
+
+  // 1. すべての余分なスペースを消去（" / " やハイフン間の空白などを一掃）
+  const cleanStr = rawDateStr.replace(/\s+/g, "");
+
+  // 2. 許容するすべてのフォーマットパターン
+  const formatsToTry = ["yyyy/MM/dd", "yyyy/M/d", "yyyy-MM-dd"];
+
+  // 3. パターンを順に試す
+  for (const fmt of formatsToTry) {
+    const parsedDate = parse(cleanStr, fmt, new Date());
+    if (isValid(parsedDate)) {
+      return parsedDate; // 最初に見つかった有効な日付を返す
+    }
+  }
+
+  return null; // どのパターンにも合致しなかった場合
+};
+
+/**
+ * データベース保存用：「yyyy-MM-dd」に正規化
+ */
+export const normalizeToDbDateFormat = (rawDateStr: string): string => {
+  const date = parseAnyDateFormat(rawDateStr);
+  return date ? format(date, "yyyy-MM-dd") : "";
+};
+
+/**
+ * 画面表示・UI用：「yyyy / MM / dd」に正規化
+ */
+export const normalizeToDisplayDateFormat = (rawDateStr: string): string => {
+  const date = parseAnyDateFormat(rawDateStr);
+  return date ? format(date, "yyyy / MM / dd") : "";
 };
 
 // 予約時間枠

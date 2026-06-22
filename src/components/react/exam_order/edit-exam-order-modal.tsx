@@ -15,7 +15,6 @@ import {
 import { MyButton } from "../my-button";
 import { MyInput } from "../my-input";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
 
 interface ExamOrderProps {
   id: number;
@@ -38,7 +37,6 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
   onClose,
   onSuccess,
   order,
-  // onButtonClick,
 }) => {
   const [dosageMbq, setDosageMbq] = useState<string>("");
   const [dosageMl, setDosageMl] = useState<string>("");
