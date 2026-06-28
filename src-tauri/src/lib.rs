@@ -41,7 +41,7 @@ fn add_patient(
 
 #[tauri::command]
 fn get_patients() -> Result<Vec<Patient>, String> {
-    patient::model::search(None, false)
+    patient::model::search(None, true)
 }
 
 #[tauri::command]

@@ -4,6 +4,10 @@ import { PatientList } from "@components/react/patient/list";
 ---
 
 <Layout pageTitle="患者一覧">
-  <PatientList client:load />
-  <a href="/patient/register/">患者登録</a>
+  <div class:list={["grid gap-4 content-start"]}>
+    <h2 class:list={["text-2xl", "@xl:justify-self-center"]}>
+      患者一覧（最新6件）
+    </h2>
+    <PatientList client:load />
+  </div>
 </Layout>

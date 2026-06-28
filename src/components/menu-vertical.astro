@@ -1,5 +1,5 @@
 ---
-import { ClipboardList, ContactRound, Contact } from "@lucide/astro";
+import { ClipboardList, ContactRound, Contact, Search } from "@lucide/astro";
 import MyIcon from "@components/my-icon.astro";
 
 interface Props {
@@ -14,6 +14,7 @@ const menuItems = [
   { name: "検査一覧", href: "/exam_order/daily-list/", icon: ClipboardList },
   { name: "患者登録", href: "/patient/register/", icon: ContactRound },
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
+  { name: "患者検索", href: "/patient/search/", icon: Search },
 ];
 ---
 
