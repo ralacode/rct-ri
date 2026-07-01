@@ -1,6 +1,7 @@
 ---
 import { ClipboardList, ContactRound, Contact, Search } from "@lucide/astro";
 import MyIcon from "@components/my-icon.astro";
+import { Home } from "lucide-react";
 
 interface Props {
   className?: string;
@@ -11,6 +12,7 @@ const { className } = Astro.props;
 const { pathname } = Astro.url;
 
 const menuItems = [
+  { name: "ホーム", href: "/", icon: Home },
   { name: "検査一覧", href: "/exam_order/daily-list/", icon: ClipboardList },
   { name: "患者登録", href: "/patient/register/", icon: ContactRound },
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
