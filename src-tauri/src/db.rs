@@ -7,7 +7,7 @@ use std::path::PathBuf;
 pub fn get_db_path() -> PathBuf {
     let exe_path = std::env::current_exe().expect("実行ファイルパス取得失敗");
     let exe_dir = exe_path.parent().expect("親ディレクトリ取得失敗");
-    exe_dir.join("patients.db")
+    exe_dir.join("rct_local.db")
 }
 
 // pub fn get_connection() -> Result<Connection, String> {

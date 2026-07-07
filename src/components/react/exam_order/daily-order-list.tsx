@@ -482,16 +482,17 @@ export const DailyOrderList: React.FC = () => {
         )}
       </div>
 
+      {/* 使用記録簿 */}
       {!isEditDosage && (
         <div
           className={cn(
             "hidden text-black",
             "print:grid",
-            "[...[data-print-mode='summary']_&]:grid gap-4",
+            // "[body[data-print-mode='summary']_&]:grid gap-4",
             styles.for_print,
           )}
         >
-          <div className={cn("[...[data-print-mode='summary']_&]:block")}>
+          <div>
             <h1 className={"text-xl"}>
               {HOSPITAL_NAME}　放射性医薬品使用記録簿
             </h1>
@@ -596,6 +597,7 @@ export const DailyOrderList: React.FC = () => {
                         <p></p>
                       </div>
 
+                      {/* 投与時刻 */}
                       <div className={`${styles.record_area_time}`}>
                         <p>投与時刻</p>
                         {order.injection_time ? (
@@ -671,6 +673,7 @@ export const DailyOrderList: React.FC = () => {
         </div>
       )}
 
+      {/* 標識手順書 */}
       {!isEditDosage && (
         <div className={styles.procedure_for_print}>
           {orders.map((order) => (

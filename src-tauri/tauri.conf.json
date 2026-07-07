@@ -1,10 +1,10 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "RC Tools RI",
+  "productName": "rct_ri",
   "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "identifier": "com.rct-tools.ri-app",
   "build": {
-    "frontendDist": "dist",
+    "frontendDist": "../dist",
     "devUrl": "http://localhost:4321",
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build"

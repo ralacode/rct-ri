@@ -292,7 +292,7 @@ export const PatientRegisterForm = () => {
           </p>
           <MyButton
             onClick={() => {
-              window.location.href = `/patient/detail?id=${lastRegistered.patient_id}`; // 遷移先のURLを指定
+              window.location.href = `/patient/detail/?id=${lastRegistered.patient_id}`; // 遷移先のURLを指定
             }}
           >
             患者情報を見る

@@ -84,7 +84,7 @@ export const PatientSearch: FC = () => {
               {patients.map((patient) => (
                 <li key={patient.id}>
                   <a
-                    href={`/patient/detail?id=${patient.patient_id}`}
+                    href={`/patient/detail/?id=${patient.patient_id}`}
                     className={cn(
                       "block hover:bg-gray-200 transition-colors duration-300 rounded-md",
                     )}

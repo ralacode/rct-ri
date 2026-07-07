@@ -22,5 +22,9 @@ export default defineConfig({
     plugins: [tailwindcss()],
   },
   output: "static",
+  trailingSlash: "always",
+  build: {
+    format: "directory",
+  },
   integrations: [react()],
 });

@@ -8,6 +8,7 @@ import { PatientList } from "@components/react/patient/list";
     <h2 class:list={["text-2xl", "@xl:justify-self-center"]}>
       患者一覧（最新6件）
     </h2>
-    <PatientList client:load />
+
+    <PatientList client:only="react" />
   </div>
 </Layout>
