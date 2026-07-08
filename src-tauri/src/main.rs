@@ -2,5 +2,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  app_lib::run();
+    #[cfg(not(debug_assertions))]
+    {
+        std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", "./webview2runtime");
+    }
+
+    app_lib::run();
 }
