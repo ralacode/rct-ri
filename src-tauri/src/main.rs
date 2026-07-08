@@ -4,7 +4,15 @@
 fn main() {
     #[cfg(not(debug_assertions))]
     {
-        std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", "./webview2runtime");
+        let webview_dir = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("webview2runtime");
+
+        std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", &webview_dir);
+
+        println!("{:?}", webview_dir);
     }
 
     app_lib::run();
