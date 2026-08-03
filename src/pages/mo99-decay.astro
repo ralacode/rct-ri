@@ -1,0 +1,14 @@
+---
+import { UltraTechnekowCalculator } from "@/components/react/ultratechnekow-calculator";
+import Layout from "@/layouts/layout.astro";
+import { cn } from "@/lib/utils";
+---
+
+<Layout>
+  <div class={cn("grid gap-4")}>
+    <h1 class={cn("font-bold justify-self-center text-lg")}>
+      ウルトラテクネカウ減衰計算
+    </h1>
+    <UltraTechnekowCalculator client:load />
+  </div>
+</Layout>

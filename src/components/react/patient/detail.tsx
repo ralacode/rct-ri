@@ -732,6 +732,8 @@ export const PatientDetail: React.FC = () => {
                           timeString={newExamTime}
                           onChange={setNewExamDate}
                           onChangeTime={(e) => setNewExamTime(e.target.value)}
+                          dateText="検査日"
+                          timeText="予約時間"
                         />
                         <DatalistInput
                           id="modal_requesting_department_name"

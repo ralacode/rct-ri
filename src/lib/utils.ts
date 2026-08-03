@@ -4,6 +4,7 @@ import { siteMeta } from "@lib/constants";
 import { invoke } from "@tauri-apps/api/core";
 import { clsx, type ClassValue } from "clsx";
 import { format, isValid, parse } from "date-fns";
+import { ja } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -382,4 +383,10 @@ export async function deleteOrder(
   } finally {
     if (onFinish) onFinish();
   }
+}
+
+export function formatDateJapanese(date: Date | undefined) {
+  if (!date) return "";
+  // 'eeeeee' で「月」「火」「水」のような一文字の曜日になります
+  return format(date, "yyyy年MM月dd日(eeeeee)", { locale: ja });
 }

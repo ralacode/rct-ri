@@ -16,21 +16,17 @@ import {
 } from "@/components/ui/popover";
 import { format, isValid, parse } from "date-fns";
 import { ja } from "date-fns/locale";
-import { cn } from "@/lib/utils";
+import { cn, formatDateJapanese } from "@/lib/utils";
 import { Input } from "../ui/input";
 
 interface Props {
   valueString: string; // 親が管理している日付文字列 (例: "2026 / 06 / 17")
   timeString?: string;
   onChange: (dateStr: string) => void; // 値が変更されたときに親に通知する関数
-  onChangeTime: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChangeTime?: (e: React.ChangeEvent<HTMLInputElement>) => void;
   className?: string;
-}
-
-function formatDateJapanese(date: Date | undefined) {
-  if (!date) return "";
-  // 'eeeeee' で「月」「火」「水」のような一文字の曜日になります
-  return format(date, "yyyy年MM月dd日(eeeeee)", { locale: ja });
+  dateText: string;
+  timeText?: string;
 }
 
 export const DatePickerTime: React.FC<Props> = ({
@@ -39,6 +35,8 @@ export const DatePickerTime: React.FC<Props> = ({
   onChange,
   onChangeTime,
   className,
+  dateText,
+  timeText,
 }) => {
   const [open, setOpen] = React.useState(false);
 
@@ -70,15 +68,16 @@ export const DatePickerTime: React.FC<Props> = ({
   };
 
   return (
-    <FieldGroup className={className}>
+    <FieldGroup className={cn("grid gap-4", className)}>
       {/* 日にち */}
       <Field className="w-full">
-        <FieldLabel htmlFor="date-required">検査日</FieldLabel>
+        <FieldLabel htmlFor="date-required">{dateText}</FieldLabel>
         <InputGroup className="h-10">
           <InputGroupInput
             id="date-required"
             value={displayValue}
             placeholder="日付を選択"
+            className={cn("text-base!")}
             readOnly
           />
           <InputGroupAddon align="inline-end">
@@ -118,13 +117,13 @@ export const DatePickerTime: React.FC<Props> = ({
       {/* 時間 */}
       {timeString && (
         <Field className="w-full">
-          <FieldLabel htmlFor="time-picker-optional">予約時間</FieldLabel>
+          <FieldLabel htmlFor="time-picker-optional">{timeText}</FieldLabel>
           <Input
             type="time"
             id="time-picker-optional"
             value={timeString}
             onChange={onChangeTime}
-            className="h-10 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
+            className="h-10 appearance-none bg-background [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none text-base!"
           />
         </Field>
       )}

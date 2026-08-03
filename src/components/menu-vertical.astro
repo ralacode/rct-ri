@@ -1,5 +1,11 @@
 ---
-import { ClipboardList, ContactRound, Contact, Search } from "@lucide/astro";
+import {
+  ClipboardList,
+  ContactRound,
+  Contact,
+  Search,
+  TrendingDown,
+} from "@lucide/astro";
 import MyIcon from "@components/my-icon.astro";
 import { Home } from "lucide-react";
 
@@ -17,6 +23,7 @@ const menuItems = [
   { name: "患者登録", href: "/patient/register/", icon: ContactRound },
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
   { name: "患者検索", href: "/patient/search/", icon: Search },
+  { name: "減衰計算", href: "/mo99-decay/", icon: TrendingDown },
 ];
 ---
 
