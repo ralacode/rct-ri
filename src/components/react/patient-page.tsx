@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PatientRegister } from "@components/react/patient-register";
 import { PatientList } from "@components/react/patient-list";
+import { invoke } from "@/lib/api";
 
 type Patient = {
   id: number;
@@ -14,7 +15,7 @@ export function PatientPage() {
   const [sortDesc, setSortDesc] = useState(true);
 
   const loadPatients = async () => {
-    const data = await window.__TAURI__.core.invoke("search_patients_cmd", {
+    const data = await invoke("search_patients_cmd", {
       keyword: keyword || null,
       sortDesc,
     });

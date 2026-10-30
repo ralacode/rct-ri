@@ -6,6 +6,7 @@ import Header from "@components/header.astro";
 import Meta from "@components/meta.astro";
 import { siteMeta } from "@lib/constants";
 import { getPageTitle } from "@lib/utils";
+import { ClientRouter } from "astro:transitions";
 import "@styles/global.css";
 
 interface Props {
@@ -18,8 +19,9 @@ const title = getPageTitle(pageTitle);
 ---
 
 <!doctype html>
-<html lang={siteMeta.siteLocale}>
+<html lang={siteMeta.siteLocale} transition:animate="none">
   <head>
+    <ClientRouter fallback="swap" />
     <Meta title={title} />
   </head>
   <body>
@@ -51,6 +53,7 @@ const title = getPageTitle(pageTitle);
           "md:px-4 md:group-[.is-toggled]:px-0",
           "print:hidden",
         ]}
+        transition:persist="app-sidebar"
       >
         <MenuVertical />
       </aside>

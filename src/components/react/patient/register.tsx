@@ -1,6 +1,7 @@
 // src/components/react/patient/register.tsx
 import React, { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
+import { go } from "@/lib/nav";
 import {
   cn,
   normalizeToDbDateFormat,
@@ -292,7 +293,7 @@ export const PatientRegisterForm = () => {
           </p>
           <MyButton
             onClick={() => {
-              window.location.href = `/patient/detail/?id=${lastRegistered.patient_id}`; // 遷移先のURLを指定
+              go(`/patient/detail/?id=${lastRegistered.patient_id}`);
             }}
           >
             患者情報を見る
@@ -307,7 +308,12 @@ export const PatientRegisterForm = () => {
           </MyButton>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form
+          method="post"
+          data-astro-reload
+          onSubmit={handleSubmit}
+          className="grid gap-4"
+        >
           <MyInput
             id="patient_id"
             label="患者ID"

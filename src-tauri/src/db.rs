@@ -34,6 +34,7 @@ pub fn init_db() -> Result<()> {
 
     create_patients_table(&conn)?;
     create_exam_orders_table(&conn)?;
+    crate::patient::model::migrate_created_at_formats(&conn)?;
 
     // カラム追加のマイグレーション（すでに存在する場合は無視される）
     let _ = conn.execute(

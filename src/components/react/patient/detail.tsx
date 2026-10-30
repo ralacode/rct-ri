@@ -1,6 +1,7 @@
 // src/components/react/patient/detail.tsx
 import React, { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
+import { go } from "@/lib/nav";
 import type { Patient } from "@/types/patient";
 import {
   calculateAge,
@@ -366,7 +367,7 @@ export const PatientDetail: React.FC = () => {
     setIsDeleting(true);
     try {
       await invoke("remove_patient", { id: patient.id });
-      window.location.href = "/patient/list/";
+      go("/patient/list/");
     } catch (err) {
       console.error("削除エラー:", err);
       alert("削除に失敗しました。");

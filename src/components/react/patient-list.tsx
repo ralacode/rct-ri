@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { invoke } from "@/lib/api";
 
 type Patient = {
   id: number;
@@ -23,7 +24,7 @@ export function PatientList({
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleDelete = async (id: number) => {
-    await window.__TAURI__.core.invoke("remove_patient", { id });
+    await invoke("remove_patient", { id });
     // loadPatients();
     setRefreshKey((prev) => prev + 1);
   };
@@ -40,7 +41,7 @@ export function PatientList({
     setError("");
 
     try {
-      await window.__TAURI__.core.invoke("edit_patient", {
+      await invoke("edit_patient", {
         id,
         patientId: editPatientId,
         patientType: editType,

@@ -1,7 +1,7 @@
 // src/components/react/exam_order/daily-order-list.tsx
 
 import React, { useState, useEffect, useRef, memo } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
 import type { ExamOrder, ExamOrderWithPatient } from "@/types/exam_order";
 import {
   calculateAge,

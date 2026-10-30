@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { invoke } from "@/lib/api";
 
 export function PatientRegister({ onAdded }: { onAdded: () => void }) {
   const [patientId, setPatientId] = useState("");
@@ -27,7 +28,7 @@ export function PatientRegister({ onAdded }: { onAdded: () => void }) {
 
     try {
       // ✅ Rust呼び出し
-      await window.__TAURI__.core.invoke("add_patient", {
+      await invoke("add_patient", {
         patientId: normalized,
         patientType: type,
       });

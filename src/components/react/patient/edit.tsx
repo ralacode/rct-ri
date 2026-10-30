@@ -1,6 +1,7 @@
 // src/components/react/patient/edit.tsx
 import React, { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
+import { go } from "@/lib/nav";
 import type { Patient } from "@/types/patient";
 import { validatePatientId } from "@lib/utils";
 import { MyInput } from "../my-input";
@@ -61,7 +62,7 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
       });
 
       // 更新成功後、詳細画面へ戻る
-      window.location.href = `/patient/${validation.normalizedId}/`;
+      go(`/patient/${validation.normalizedId}/`);
     } catch (err) {
       setError(String(err)); // Rust側のResult::Errがここに入る
     }
@@ -73,7 +74,7 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
   return (
     <div>
       <h2>患者情報の編集</h2>
-      <form onSubmit={handleUpdate}>
+      <form method="post" data-astro-reload onSubmit={handleUpdate}>
         <MyInput
           id="patientId"
           label="患者ID: "

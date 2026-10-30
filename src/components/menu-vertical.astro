@@ -38,6 +38,7 @@ const menuItems = [
         <li class="text-white">
           <a
             href={item.href}
+            data-nav-href={item.href}
             class:list={[
               "px-2 py-3 rounded-md",
               "grid grid-cols-[auto,1fr] grid-flow-col gap-4 justify-start items-center",
@@ -57,3 +58,22 @@ const menuItems = [
     })
   }
 </ul>
+
+<script>
+  function syncCurrentNav() {
+    const path = window.location.pathname;
+    document.querySelectorAll<HTMLAnchorElement>("[data-nav-href]").forEach((link) => {
+      const href = link.dataset.navHref ?? "";
+      const isCurrent =
+        path === href || (href !== "/" && path.startsWith(href));
+      link.classList.toggle("bg-gray-600", isCurrent);
+      link.classList.toggle("hover:bg-gray-600", !isCurrent);
+    });
+  }
+
+  syncCurrentNav();
+  if (!window.__rctNavCurrentInit) {
+    window.__rctNavCurrentInit = true;
+    document.addEventListener("astro:page-load", syncCurrentNav);
+  }
+</script>

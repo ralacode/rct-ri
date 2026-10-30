@@ -43,6 +43,67 @@ pub fn normalize_and_validate(input: &str) -> Result<String, String> {
     Ok(format!("{:0>10}", trimmed))
 }
 
+/// `YYYY-MM-DD HH:MM:SS` に揃える。日付だけの今日は現在時刻、過去日は 00:00:00。
+pub fn normalize_created_at(raw: Option<&str>, use_now_for_today: bool) -> String {
+    let now = chrono::Local::now();
+    let now_str = now.format("%Y-%m-%d %H:%M:%S").to_string();
+    let Some(raw) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return now_str;
+    };
+
+    let nums: Vec<u32> = raw
+        .split(|c: char| !c.is_ascii_digit())
+        .filter(|part| !part.is_empty())
+        .filter_map(|part| part.parse().ok())
+        .collect();
+
+    if nums.len() < 3 {
+        return now_str;
+    }
+
+    let year = nums[0] as i32;
+    let month = nums[1];
+    let day = nums[2];
+    let Some(date) = chrono::NaiveDate::from_ymd_opt(year, month, day) else {
+        return now_str;
+    };
+
+    let (hour, minute, second) = if nums.len() >= 6 {
+        (nums[3], nums[4], nums[5])
+    } else if nums.len() >= 5 {
+        (nums[3], nums[4], 0)
+    } else if nums.len() >= 4 {
+        (nums[3], 0, 0)
+    } else if use_now_for_today && date == now.date_naive() {
+        return now_str;
+    } else {
+        (0, 0, 0)
+    };
+
+    date.and_hms_opt(hour, minute, second)
+        .map(|datetime| datetime.format("%Y-%m-%d %H:%M:%S").to_string())
+        .unwrap_or(now_str)
+}
+
+pub fn migrate_created_at_formats(conn: &Connection) -> rusqlite::Result<()> {
+    let mut stmt = conn.prepare("SELECT id, created_at FROM patients")?;
+    let rows: Vec<(i32, String)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<rusqlite::Result<_>>()?;
+    drop(stmt);
+
+    for (id, created_at) in rows {
+        let normalized = normalize_created_at(Some(&created_at), false);
+        if normalized != created_at {
+            conn.execute(
+                "UPDATE patients SET created_at = ?1 WHERE id = ?2",
+                rusqlite::params![normalized, id],
+            )?;
+        }
+    }
+    Ok(())
+}
+
 pub fn insert(
     p: &PatientFields,
 ) -> Result<(), String> {
@@ -55,15 +116,7 @@ pub fn insert(
     let normalized_id = normalize_and_validate(&p.patient_id)?;
     if p.birth_date.trim().is_empty() { return Err("生年月日は必須です".into()); }
 
-    // 登録日時が指定されていない場合は現在の日本時間を取得
-    // (外部クレートを使わずシンプルにするため、SQLiteの datetime('now', 'localtime') を利用する手法も取れますが、
-    // ここではRust側から値を渡す形にします。空ならNULLを渡してDBのDEFAULTを動かすか、以下のように値をセットします)
-    let final_created_at = p.created_at.clone().unwrap_or_else(|| {
-        // Rust側で生成する場合（簡易版）
-        chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
-    });
-    // 注意: chronoクレートを使用する場合は Cargo.toml に chrono = "0.4" の追加が必要です。
-    // もしクレートを追加したくない場合は、SQL側で COALESCE(?11, CURRENT_TIMESTAMP) を使う方法もあります。
+    let final_created_at = normalize_created_at(p.created_at.as_deref(), true);
 
     // 新規登録時も現在の日本時間を更新日時の初期値として設定
     let final_updated_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -133,6 +186,7 @@ pub fn update(
         .map_err(|e| e.to_string())?;
 
     let normalized_id = normalize_and_validate(patient_id)?;
+    let normalized_created_at = normalize_created_at(Some(created_at), false);
 
     // 更新処理時のシステム現在時刻を取得
     let current_updated_at = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
@@ -152,7 +206,7 @@ pub fn update(
             gender,
             height,
             weight,
-            created_at, // 追加
+            &normalized_created_at,
             &current_updated_at,
             &id,
         ],
@@ -184,7 +238,11 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
     }
 
     query.push_str(" ORDER BY created_at ");
-    query.push_str(if sort_desc { "DESC" } else { "ASC" });
+    query.push_str(if sort_desc {
+        "DESC, id DESC"
+    } else {
+        "ASC, id ASC"
+    });
 
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
 

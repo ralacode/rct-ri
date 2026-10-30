@@ -20,7 +20,9 @@
         "y": 0,
         "minWidth": 300,
         "minHeight": 560,
-        "resizable": true
+        "resizable": true,
+        "visible": true,
+        "focus": true
       }
     ],
     "security": {

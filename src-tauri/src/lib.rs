@@ -2,6 +2,7 @@
 
 mod db;
 mod exam_order;
+mod http;
 mod patient;
 
 use crate::exam_order::model::{ExamOrder, ExamOrderWithPatient};
@@ -153,6 +154,9 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             db::init_db().expect("DB初期化失敗");
+            http::spawn_and_wait().map_err(|error| {
+                Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>
+            })?;
 
             if cfg!(debug_assertions) {
                 app.handle().plugin(
@@ -163,11 +167,12 @@ pub fn run() {
             }
 
             let window = app.get_webview_window("main").unwrap();
-
-            // let _ = window.set_size(LogicalSize::new(800, 600));
-            // let _ = window.set_position(PhysicalPosition::new(0, 0));
-
-            // window.show()?;
+            let ui_url = tauri::Url::parse(&http::local_ui_url())
+                .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
+            window.navigate(ui_url)?;
+            let _ = window.show();
+            let _ = window.unminimize();
+            let _ = window.set_focus();
 
             app.handle().plugin(
                 tauri_plugin_global_shortcut::Builder::new()

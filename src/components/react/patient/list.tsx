@@ -1,6 +1,6 @@
 // src/components/react/patient/list.tsx
 import React, { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
 import type { Patient } from "@/types/patient";
 import { Card } from "../card";
 import { FadeIn } from "../fade-in";

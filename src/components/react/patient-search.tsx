@@ -1,6 +1,6 @@
 import { useEffect, useState, type FC } from "react";
 import { MyInput } from "./my-input";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
 import type { Patient } from "@/types/patient";
 import { PatientCard } from "./patient/patient-card";
 import { PulseAnimation } from "./pulse-animation";

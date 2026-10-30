@@ -1,7 +1,7 @@
 // src/lib/utils.ts
 import type { ValidationResult } from "@/types/patient";
 import { siteMeta } from "@lib/constants";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
 import { clsx, type ClassValue } from "clsx";
 import { format, isValid, parse } from "date-fns";
 import { ja } from "date-fns/locale";

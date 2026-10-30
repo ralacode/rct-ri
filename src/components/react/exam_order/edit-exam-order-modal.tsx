@@ -1,7 +1,7 @@
 // src/components/react/exam_order/edit-exam-order-modal.tsx
 
 import React, { useEffect, useId, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "@/lib/api";
 import type { ExamOrder } from "@/types/exam_order";
 import {
   Dialog,
@@ -109,7 +109,12 @@ export const EditExamOrderModal: React.FC<EditExamOrderModalProps> = ({
       }}
     >
       <DialogContent className="sm:max-w-sm duration-0 animate-none">
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          method="post"
+          data-astro-reload
+          onSubmit={handleSubmit}
+          className="space-y-4"
+        >
           <DialogHeader>
             <DialogTitle className="text-(--text)">投与量を入力</DialogTitle>
           </DialogHeader>

@@ -63,6 +63,12 @@ body {
   color: var(--text);
 }
 
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 @media print {
   body {
     -webkit-print-color-adjust: exact; /* Safari / Chrome 用 */

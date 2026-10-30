@@ -16,6 +16,7 @@ const { className } = Astro.props;
     "grid grid-cols-[auto_1fr] grid-flow-col gap-2 justify-start items-center px-2 py-2",
     className,
   ]}
+  transition:persist="app-header"
 >
   <Button
     id="menu-toggle"
@@ -39,9 +40,55 @@ const { className } = Astro.props;
 </header>
 
 <script>
-  const menuButton = document.getElementById("menu-toggle");
+  const MENU_TOGGLED_KEY = "rct-menu-toggled";
 
-  menuButton?.addEventListener("click", () => {
-    document.querySelector(".dashboard")?.classList.toggle("is-toggled");
-  });
+  function dashboard(root: ParentNode = document) {
+    return root.querySelector(".dashboard");
+  }
+
+  function applyMenuState(root: ParentNode = document) {
+    const el = dashboard(root);
+    if (!el) return;
+    if (sessionStorage.getItem(MENU_TOGGLED_KEY) === "1") {
+      el.classList.add("is-toggled");
+    } else {
+      el.classList.remove("is-toggled");
+    }
+  }
+
+  function bindMenuToggle() {
+    const menuButton = document.getElementById("menu-toggle");
+    if (!menuButton || menuButton.dataset.bound === "true") return;
+    menuButton.dataset.bound = "true";
+    menuButton.addEventListener("click", () => {
+      const root = dashboard();
+      root?.classList.toggle("is-toggled");
+      sessionStorage.setItem(
+        MENU_TOGGLED_KEY,
+        root?.classList.contains("is-toggled") ? "1" : "0",
+      );
+    });
+  }
+
+  function syncWindowTitle() {
+    const tauri = window.__TAURI__;
+    if (!tauri?.window?.getCurrentWindow) return;
+    void tauri.window.getCurrentWindow().setTitle(document.title);
+  }
+
+  applyMenuState();
+  bindMenuToggle();
+  syncWindowTitle();
+
+  if (!window.__rctShellNavInit) {
+    window.__rctShellNavInit = true;
+    document.addEventListener("astro:before-swap", (event) => {
+      applyMenuState(event.newDocument);
+    });
+    document.addEventListener("astro:page-load", () => {
+      applyMenuState();
+      bindMenuToggle();
+      syncWindowTitle();
+    });
+  }
 </script>
