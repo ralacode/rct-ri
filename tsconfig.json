@@ -13,5 +13,5 @@
     "jsxImportSource": "react"
   },
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist"]
+  "exclude": ["dist", "src-tauri", "node_modules"]
 }
