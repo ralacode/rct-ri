@@ -1,6 +1,7 @@
 // src/components/react/patient/detail.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { invoke } from "@/lib/api";
+import { onDataChanged } from "@/lib/live";
 import { go } from "@/lib/nav";
 import type { Patient } from "@/types/patient";
 import {
@@ -59,6 +60,8 @@ export const PatientDetail: React.FC = () => {
 
   // --- インライン編集用のStateを追加 ---
   const [isEditing, setIsEditing] = useState(false);
+  const isEditingRef = useRef(isEditing);
+  isEditingRef.current = isEditing;
   const [editPatientId, setEditPatientId] = useState<string>("");
   const [editPatientIdError, setEditPatientIdError] = useState<string | null>(
     null,
@@ -130,6 +133,12 @@ export const PatientDetail: React.FC = () => {
     } else {
       setError("患者IDが指定されていません。");
     }
+
+    return onDataChanged(() => {
+      if (isEditingRef.current) return;
+      const currentId = getPatientIdFromUrl();
+      if (currentId) loadAllData(currentId);
+    });
   }, []);
 
   const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -14,5 +14,6 @@ declare global {
     };
     __rctShellNavInit?: boolean;
     __rctNavCurrentInit?: boolean;
+    __rctLiveStarted?: boolean;
   }
 }

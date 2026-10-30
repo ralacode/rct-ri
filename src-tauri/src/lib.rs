@@ -1,6 +1,7 @@
 // src-tauri/src/lib.rs
 
 mod db;
+mod events;
 mod exam_order;
 mod http;
 mod patient;

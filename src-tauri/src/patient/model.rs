@@ -142,7 +142,11 @@ pub fn insert(
     );
 
     match result {
-        Ok(_) => { tx.commit().map_err(|e| e.to_string())?; Ok(()) }
+        Ok(_) => {
+            tx.commit().map_err(|e| e.to_string())?;
+            crate::events::notify();
+            Ok(())
+        }
         Err(Error::SqliteFailure(err, _)) if err.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE => {
             Err("この患者IDは既に登録されています".into())
         }
@@ -161,6 +165,7 @@ pub fn delete(id: i32) -> Result<()> {
     tx.execute("DELETE FROM patients WHERE id = ?1", [id])?;
 
     tx.commit()?;
+    crate::events::notify();
 
     Ok(())
 }
@@ -215,6 +220,7 @@ pub fn update(
     match result {
         Ok(_) => {
             tx.commit().map_err(|e| e.to_string())?;
+            crate::events::notify();
             Ok(())
         }
         Err(Error::SqliteFailure(err, _))

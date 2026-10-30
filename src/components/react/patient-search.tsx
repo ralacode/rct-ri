@@ -1,6 +1,7 @@
-import { useEffect, useState, type FC } from "react";
+import { useEffect, useRef, useState, type FC } from "react";
 import { MyInput } from "./my-input";
 import { invoke } from "@/lib/api";
+import { onDataChanged } from "@/lib/live";
 import type { Patient } from "@/types/patient";
 import { PatientCard } from "./patient/patient-card";
 import { PulseAnimation } from "./pulse-animation";
@@ -11,6 +12,8 @@ export const PatientSearch: FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const keywordRef = useRef(keyword);
+  keywordRef.current = keyword;
 
   useEffect(() => {
     // 入力値が空の場合は、検索を行わず結果をクリアする
@@ -44,6 +47,24 @@ export const PatientSearch: FC = () => {
     // クリーンアップ処理
     return () => clearTimeout(delayDebounceFn);
   }, [keyword]);
+
+  useEffect(() => {
+    return onDataChanged(() => {
+      const current = keywordRef.current.trim();
+      if (!current) return;
+      void invoke<Patient[]>("search_patients_cmd", {
+        keyword: current,
+        sortDesc: true,
+      })
+        .then((result) => {
+          setPatients(result);
+          setError(null);
+        })
+        .catch((err) => {
+          console.error("検索エラー:", err);
+        });
+    });
+  }, []);
 
   return (
     <div className={cn("grid gap-4 content-start")}>

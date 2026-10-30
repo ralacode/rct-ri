@@ -4,10 +4,15 @@
 use crate::exam_order;
 use crate::patient::model::{self as patient_model, PatientFields};
 use axum::extract::{Path, Query};
-use axum::http::StatusCode;
+use axum::http::{header, HeaderName, HeaderValue, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, patch};
 use axum::{Json, Router};
+use std::convert::Infallible;
+use std::time::Duration;
+use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::StreamExt as _;
 use serde::Deserialize;
 use serde_json::json;
 use std::net::SocketAddr;
@@ -106,6 +111,41 @@ fn empty_ok(result: Result<(), String>) -> Response {
 
 async fn health() -> Json<serde_json::Value> {
     Json(json!({ "ok": true }))
+}
+
+async fn events() -> Response {
+    let live = BroadcastStream::new(crate::events::subscribe()).filter_map(|message| {
+        match message {
+            Ok(_) => Some(Ok(
+                Event::default().event("data-changed").data("changed")
+            )),
+            Err(_) => None,
+        }
+    });
+    // 接続直後に1件送ってヘッダを確定させ、EventSource が CONNECTING のまま固まらないようにする
+    let stream = tokio_stream::once(Ok::<Event, Infallible>(
+        Event::default().event("hello").data("ok"),
+    ))
+    .chain(live);
+
+    let mut response = Sse::new(stream)
+        .keep_alive(
+            KeepAlive::new()
+                .interval(Duration::from_secs(15))
+                .text("ping"),
+        )
+        .into_response();
+
+    let headers = response.headers_mut();
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-cache, no-transform"),
+    );
+    headers.insert(
+        HeaderName::from_static("x-accel-buffering"),
+        HeaderValue::from_static("no"),
+    );
+    response
 }
 
 async fn list_patients(Query(query): Query<PatientListQuery>) -> Response {
@@ -248,6 +288,8 @@ pub fn resolve_frontend_dir() -> Option<PathBuf> {
 fn api_router() -> Router {
     Router::new()
         .route("/health", get(health))
+        .route("/events", get(events))
+        .route("/events/", get(events))
         .route("/patients", get(list_patients).post(create_patient))
         .route(
             "/patients/{id}",

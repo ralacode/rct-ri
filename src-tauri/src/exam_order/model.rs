@@ -90,6 +90,7 @@ pub fn insert_order(
     .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
+    crate::events::notify();
     Ok(())
 }
 
@@ -210,6 +211,7 @@ pub fn delete_order(id: i32) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
+    crate::events::notify();
     Ok(())
 }
 
@@ -246,5 +248,6 @@ pub fn update_exam_order_specifc_fields(
     .map_err(|e| e.to_string())?;
 
     tx.commit().map_err(|e| e.to_string())?;
+    crate::events::notify();
     Ok(())
 }

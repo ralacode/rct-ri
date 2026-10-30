@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, memo } from "react";
 import { invoke } from "@/lib/api";
+import { onDataChanged } from "@/lib/live";
 import type { ExamOrder, ExamOrderWithPatient } from "@/types/exam_order";
 import {
   calculateAge,
@@ -90,8 +91,9 @@ export const DailyOrderList: React.FC = () => {
     null,
   );
 
-  // input要素にアクセスするためのref
   const dateInputRef = useRef<HTMLInputElement>(null);
+  const targetDateRef = useRef(targetDate);
+  targetDateRef.current = targetDate;
 
   const fetchOrders = async (date: string) => {
     try {
@@ -108,6 +110,10 @@ export const DailyOrderList: React.FC = () => {
   useEffect(() => {
     fetchOrders(targetDate);
   }, [targetDate]);
+
+  useEffect(() => {
+    return onDataChanged(() => fetchOrders(targetDateRef.current));
+  }, []);
 
   // カレンダーを開く処理
   const handleOpenCalendar = (e?: React.MouseEvent | React.FocusEvent) => {

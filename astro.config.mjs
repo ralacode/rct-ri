@@ -25,16 +25,19 @@ function proxyApiBeforeTrailingSlash() {
           return;
         }
 
+        const headers = {
+          ...req.headers,
+          host: `${AXUM_DEV.hostname}:${AXUM_DEV.port}`,
+          "accept-encoding": "identity",
+        };
+
         const proxyReq = http.request(
           {
             hostname: AXUM_DEV.hostname,
             port: AXUM_DEV.port,
             path: req.url,
             method: req.method,
-            headers: {
-              ...req.headers,
-              host: `${AXUM_DEV.hostname}:${AXUM_DEV.port}`,
-            },
+            headers,
           },
           (proxyRes) => {
             res.writeHead(proxyRes.statusCode ?? 502, proxyRes.headers);
@@ -42,11 +45,19 @@ function proxyApiBeforeTrailingSlash() {
           },
         );
 
+        proxyReq.setTimeout(0);
+        req.socket?.setTimeout(0);
+        res.socket?.setTimeout(0);
+
         proxyReq.on("error", (error) => {
           if (!res.headersSent) {
             res.statusCode = 502;
           }
           res.end(error.message);
+        });
+
+        res.on("close", () => {
+          proxyReq.destroy();
         });
 
         req.pipe(proxyReq);

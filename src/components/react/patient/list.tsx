@@ -1,6 +1,7 @@
 // src/components/react/patient/list.tsx
 import React, { useEffect, useState } from "react";
 import { invoke } from "@/lib/api";
+import { onDataChanged } from "@/lib/live";
 import type { Patient } from "@/types/patient";
 import { Card } from "../card";
 import { FadeIn } from "../fade-in";
@@ -21,29 +22,32 @@ export const PatientList = () => {
   const [showSkeleton, setShowSkeleton] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPatients = async () => {
+  const fetchPatients = async (silent = false) => {
     try {
-      setIsLoading(true);
+      if (!silent) setIsLoading(true);
       const data = await invoke<Patient[]>("get_patients");
       setPatients(data);
+      setError(null);
     } catch (err) {
       setError(err as string);
       console.error(err);
     } finally {
-      setIsLoading(false); // 🚀 成功・失敗に関わらず読み込み完了
+      if (!silent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchPatients();
+    const stop = onDataChanged(() => fetchPatients(true));
 
-    // 🚀 150ミリ秒（0.15秒）経ってもロードが終わっていなければ、初めてダミーの表示フラグをtrueにする
     const timer = setTimeout(() => {
       setShowSkeleton(true);
     }, 150);
 
-    // クリーンアップ（コンポーネントが消えたらタイマーを解除）
-    return () => clearTimeout(timer);
+    return () => {
+      stop();
+      clearTimeout(timer);
+    };
   }, []);
 
   if (error) return <div className="text-red-500">エラー: {error}</div>;
