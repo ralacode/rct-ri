@@ -196,6 +196,18 @@ pub fn run() {
                 )?;
             }
 
+            app.handle().plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ))?;
+            if !cfg!(debug_assertions) {
+                use tauri_plugin_autostart::ManagerExt;
+                if let Err(error) = app.autolaunch().enable() {
+                    log::warn!("スタートアップ登録に失敗しました: {error}");
+                    eprintln!("スタートアップ登録に失敗しました: {error}");
+                }
+            }
+
             let window = app.get_webview_window("main").unwrap();
             let ui_url = tauri::Url::parse(&http::local_ui_url())
                 .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
