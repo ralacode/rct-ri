@@ -7,7 +7,7 @@ use axum::extract::{Path, Query};
 use axum::http::{header, HeaderName, HeaderValue, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Response};
-use axum::routing::{get, patch};
+use axum::routing::{get, put};
 use axum::{Json, Router};
 use std::convert::Infallible;
 use std::time::Duration;
@@ -90,6 +90,26 @@ struct AddExamOrderRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EditExamOrderRequest {
+    #[serde(default)]
+    dosage_mbq: Option<f64>,
+    #[serde(default)]
+    dosage_ml: Option<f64>,
+    #[serde(default)]
+    remain_mbq: Option<f64>,
+    #[serde(default)]
+    remain_ml: Option<f64>,
+    #[serde(default)]
+    injection_time: Option<String>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReplaceExamOrderRequest {
+    exam_date: String,
+    exam_time: String,
+    exam_item: String,
+    requesting_department: String,
+    requesting_physician: String,
     #[serde(default)]
     dosage_mbq: Option<f64>,
     #[serde(default)]
@@ -247,6 +267,25 @@ async fn update_exam_order(
     ))
 }
 
+async fn replace_exam_order(
+    Path(id): Path<i32>,
+    Json(body): Json<ReplaceExamOrderRequest>,
+) -> Response {
+    empty_ok(exam_order::model::update_order(
+        id,
+        &body.exam_date,
+        &body.exam_time,
+        &body.exam_item,
+        &body.requesting_department,
+        &body.requesting_physician,
+        body.dosage_mbq,
+        body.dosage_ml,
+        body.remain_mbq,
+        body.remain_ml,
+        body.injection_time,
+    ))
+}
+
 async fn delete_exam_order(Path(id): Path<i32>) -> Response {
     empty_ok(exam_order::model::delete_order(id))
 }
@@ -302,7 +341,9 @@ fn api_router() -> Router {
         .route("/exam-orders", get(daily_exam_orders))
         .route(
             "/exam-orders/{id}",
-            patch(update_exam_order).delete(delete_exam_order),
+            put(replace_exam_order)
+                .patch(update_exam_order)
+                .delete(delete_exam_order),
         )
 }
 

@@ -26,10 +26,7 @@ import { BorderInGrid } from "@components/react/exam_order/border_in_grid/border
 import { BorderInGridItem1 } from "@components/react/exam_order/border_in_grid/border-in-grid-item1";
 import { BorderInGridContent1 } from "@components/react/exam_order/border_in_grid/border-in-grid-content1";
 import { GridTemplate, GridTemplateItem } from "../grid-template";
-import {
-  InjectionDetails,
-  InjectionDetailsContent,
-} from "@components/react/exam_order/injection-details";
+import { InjectionSummary } from "@components/react/exam_order/injection-summary";
 
 interface EditableOrder {
   id: number;
@@ -318,110 +315,7 @@ export const DailyOrderList: React.FC = () => {
                     </GridTemplateItem>
                   </GridTemplate>
 
-                  {(order.dosage_mbq !== null ||
-                    order.dosage_ml !== null ||
-                    order.remain_mbq !== null ||
-                    order.remain_ml !== null ||
-                    order.injection_time) && (
-                    <div
-                      className={cn(
-                        "grid gap-2 content-start grid-flow-row",
-                        "[grid-template-areas:'one_two''three_four']",
-                        "lg:justify-end",
-                      )}
-                    >
-                      {/* 投与時刻 */}
-                      {(order.dosage_mbq !== null ||
-                        order.dosage_ml !== null ||
-                        order.injection_time) && (
-                        <InjectionDetails className={cn("[grid-area:three]")}>
-                          <div>投与時刻</div>
-                          {order.injection_time ? (
-                            <div className="justify-self-end tracking-widest">
-                              {order.injection_time}
-                            </div>
-                          ) : (
-                            <div className="justify-self-end tracking-widest">
-                              --:--
-                            </div>
-                          )}
-                        </InjectionDetails>
-                      )}
-
-                      {/* 投与量 */}
-                      {(order.dosage_mbq !== null ||
-                        order.dosage_ml !== null ||
-                        order.injection_time) && (
-                        <InjectionDetails className={cn("[grid-area:one]")}>
-                          <div>投与量</div>
-                          <InjectionDetailsContent>
-                            {order.dosage_mbq !== null ? (
-                              <div>{order.dosage_mbq} MBq</div>
-                            ) : (
-                              <div>- MBq</div>
-                            )}
-                            {order.dosage_ml !== null ? (
-                              <div>{order.dosage_ml} mL</div>
-                            ) : (
-                              <div>- mL</div>
-                            )}
-                          </InjectionDetailsContent>
-                        </InjectionDetails>
-                      )}
-
-                      {/* 残量 */}
-                      {(order.dosage_mbq !== null ||
-                        order.dosage_ml !== null ||
-                        order.injection_time) && (
-                        <InjectionDetails className={cn("[grid-area:two]")}>
-                          <div>残量</div>
-                          <InjectionDetailsContent>
-                            {order.remain_mbq !== null ? (
-                              <div>{order.remain_mbq} MBq</div>
-                            ) : (
-                              <div>- MBq</div>
-                            )}
-                            {order.remain_ml !== null ? (
-                              <div>{order.remain_ml} mL</div>
-                            ) : (
-                              <div>- mL</div>
-                            )}
-                          </InjectionDetailsContent>
-                        </InjectionDetails>
-                      )}
-
-                      {/* 実投与量 */}
-                      {(order.dosage_mbq !== null ||
-                        order.dosage_ml !== null ||
-                        order.injection_time) && (
-                        <InjectionDetails className={cn("[grid-area:four]")}>
-                          <div>実投与量</div>
-                          <InjectionDetailsContent>
-                            {order.dosage_mbq !== null &&
-                            order.remain_mbq !== null ? (
-                              <div>
-                                {(order.dosage_mbq - order.remain_mbq).toFixed(
-                                  1,
-                                )}{" "}
-                                MBq
-                              </div>
-                            ) : (
-                              <div>- MBq</div>
-                            )}
-                            {order.dosage_ml !== null &&
-                            order.remain_ml !== null ? (
-                              <div>
-                                {(order.dosage_ml - order.remain_ml).toFixed(1)}{" "}
-                                mL
-                              </div>
-                            ) : (
-                              <div>- mL</div>
-                            )}
-                          </InjectionDetailsContent>
-                        </InjectionDetails>
-                      )}
-                    </div>
-                  )}
+                  <InjectionSummary order={order} />
 
                   <div className={cn("grid justify-items-end")}>
                     <div

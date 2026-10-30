@@ -95,6 +95,12 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
+    case "edit_exam_order":
+      return request<T>(`${apiRoot()}/exam-orders/${args.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(args),
+      });
     case "delete_exam_order_cmd":
       return request<T>(`${apiRoot()}/exam-orders/${args.id}`, { method: "DELETE" });
     default:

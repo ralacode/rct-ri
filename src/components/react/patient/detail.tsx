@@ -24,6 +24,8 @@ import { PHYSICIAN } from "@/lib/secret-utils";
 import type { ExamOrder } from "@/types/exam_order";
 import { DatalistInput } from "../datalist-input";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
+import { EditOrderModal } from "@components/react/exam_order/edit-order-modal";
+import { InjectionSummary } from "@components/react/exam_order/injection-summary";
 import { PatientName } from "../patient-name";
 import { Card } from "@components/react/card";
 import { MyButton } from "@components/react/my-button";
@@ -83,6 +85,7 @@ export const PatientDetail: React.FC = () => {
 
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [editingOrder, setEditingOrder] = useState<ExamOrder | null>(null);
 
   // 1. URLのクエリパラメータからIDを取得する関数
   const getPatientIdFromUrl = () => {
@@ -863,22 +866,44 @@ export const PatientDetail: React.FC = () => {
                   <div>{order.requesting_physician}</div>
                 </div>
 
+                <InjectionSummary order={order} />
+
                 <div
                   className={cn("text-sm justify-self-end", "@md:text-base")}
                 >
                   登録日：{formatDateTimeWithDay(order.created_at)}
                 </div>
 
-                <DeleteOrderButton
-                  orderId={order.id}
-                  onSuccess={successfetchData}
-                  className={cn("justify-self-end")}
-                />
+                <div
+                  className={cn(
+                    "grid grid-flow-col gap-2 justify-self-end items-end",
+                  )}
+                >
+                  <div className={cn("grid grid-rows-[1.5rem_2.5rem]")}>
+                    <MyButton
+                      type="button"
+                      className={cn("row-span-full self-end")}
+                      onClick={() => setEditingOrder(order)}
+                    >
+                      編集
+                    </MyButton>
+                  </div>
+                  <DeleteOrderButton
+                    orderId={order.id}
+                    onSuccess={successfetchData}
+                  />
+                </div>
               </Card>
             ))}
           </div>
         )}
       </div>
+
+      <EditOrderModal
+        order={editingOrder}
+        onClose={() => setEditingOrder(null)}
+        onSuccess={successfetchData}
+      />
     </div>
   );
 };

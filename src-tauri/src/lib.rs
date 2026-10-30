@@ -150,6 +150,35 @@ fn edit_exam_order_fields(
     )
 }
 
+#[tauri::command]
+fn edit_exam_order(
+    id: i32,
+    exam_date: String,
+    exam_time: String,
+    exam_item: String,
+    requesting_department: String,
+    requesting_physician: String,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
+    injection_time: Option<String>,
+) -> Result<(), String> {
+    exam_order::model::update_order(
+        id,
+        &exam_date,
+        &exam_time,
+        &exam_item,
+        &requesting_department,
+        &requesting_physician,
+        dosage_mbq,
+        dosage_ml,
+        remain_mbq,
+        remain_ml,
+        injection_time,
+    )
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -227,7 +256,8 @@ pub fn run() {
             get_exam_orders,
             get_daily_exam_orders,
             delete_exam_order_cmd,
-            edit_exam_order_fields
+            edit_exam_order_fields,
+            edit_exam_order
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

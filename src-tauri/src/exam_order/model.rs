@@ -251,3 +251,63 @@ pub fn update_exam_order_specifc_fields(
     crate::events::notify();
     Ok(())
 }
+
+pub fn update_order(
+    id: i32,
+    exam_date: &str,
+    exam_time: &str,
+    exam_item: &str,
+    requesting_department: &str,
+    requesting_physician: &str,
+    dosage_mbq: Option<f64>,
+    dosage_ml: Option<f64>,
+    remain_mbq: Option<f64>,
+    remain_ml: Option<f64>,
+    injection_time: Option<String>,
+) -> Result<(), String> {
+    let db_path = get_db_path();
+    let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+    conn.busy_timeout(std::time::Duration::from_secs(5))
+        .map_err(|e| e.to_string())?;
+
+    let injection_time = injection_time.filter(|value| !value.trim().is_empty());
+
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let changed = tx
+        .execute(
+            "UPDATE exam_orders
+             SET exam_date = ?1,
+                 exam_time = ?2,
+                 exam_item = ?3,
+                 requesting_department = ?4,
+                 requesting_physician = ?5,
+                 dosage_mbq = ?6,
+                 dosage_ml = ?7,
+                 remain_mbq = ?8,
+                 remain_ml = ?9,
+                 injection_time = ?10
+             WHERE id = ?11",
+            rusqlite::params![
+                exam_date,
+                exam_time,
+                exam_item,
+                requesting_department,
+                requesting_physician,
+                dosage_mbq,
+                dosage_ml,
+                remain_mbq,
+                remain_ml,
+                injection_time,
+                id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+    if changed == 0 {
+        return Err("検査オーダーが見つかりません".into());
+    }
+
+    tx.commit().map_err(|e| e.to_string())?;
+    crate::events::notify();
+    Ok(())
+}
