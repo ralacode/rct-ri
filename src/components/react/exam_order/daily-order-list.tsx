@@ -229,11 +229,13 @@ export const DailyOrderList: React.FC = () => {
 
       <div className={`${styles.order_list_section} ${styles.no_print_area}`}>
         <div className={styles.no_print_area}>
-          <h3>{formatDateTimeWithDay(targetDate)}</h3>
+          <h3 className="text-xl font-semibold tracking-tight">
+            {formatDateTimeWithDay(targetDate)}
+          </h3>
           <MyButton onClick={handleOpenCalendar}>日付を選択</MyButton>
         </div>
         {orders.length === 0 ? (
-          <p className="no-data">該当するオーダーはありません。</p>
+          <p className="text-muted-foreground">該当するオーダーはありません。</p>
         ) : (
           <ul className={styles.order_list}>
             {orders.map((order) => (

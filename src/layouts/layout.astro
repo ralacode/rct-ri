@@ -1,8 +1,7 @@
 ---
 // src/layouts/layout.astro
 
-import MenuVertical from "@/components/menu-vertical.astro";
-import Header from "@components/header.astro";
+import { AppShell } from "@/components/react/app-shell";
 import Meta from "@components/meta.astro";
 import { siteMeta } from "@lib/constants";
 import { getPageTitle } from "@lib/utils";
@@ -16,6 +15,7 @@ interface Props {
 const { pageTitle } = Astro.props;
 
 const title = getPageTitle(pageTitle);
+const currentPath = Astro.url.pathname;
 ---
 
 <!doctype html>
@@ -24,40 +24,16 @@ const title = getPageTitle(pageTitle);
     <ClientRouter fallback="swap" />
     <Meta title={title} />
   </head>
-  <body>
-    <div
-      class:list={[
-        "dashboard group grid h-screen overflow-x-hidden grid-cols-[0%_auto] grid-rows-[auto_1fr] [grid-template-areas:'side_header''side_main'] transition-[grid-template-columns] duration-300 [&.is-toggled]:grid-cols-[220px_auto]",
-        "md:grid-cols-[280px_auto] md:overflow-x-auto md:[&.is-toggled]:grid-cols-[0px_auto]",
-      ]}
+  <body
+    class="grid h-svh overflow-hidden grid-cols-[auto_1fr] grid-rows-[auto_1fr] [grid-template-areas:'sidebar_header'_'sidebar_main'] print:block print:h-auto print:overflow-visible"
+  >
+    <AppShell client:load currentPath={currentPath} />
+    <main
+      id="main-scroll-area"
+      class="@container min-h-0 overflow-x-hidden overflow-y-auto px-2 pb-2 [grid-area:main] md:px-6 md:pb-6 print:col-span-full print:overflow-visible print:bg-white print:p-0"
     >
-      <Header className="[grid-area:header]" />
-
-      <main
-        id="main-scroll-area"
-        class:list={[
-          "main [grid-area:main] overflow-y-auto px-2 pb-2 overflow-x-hidden",
-          "group-[.is-toggled]:hidden",
-          "md:group-[.is-toggled]:block md:px-6 md:pb-6",
-          "print:bg-white print:col-span-full print:p-0",
-          "@container",
-        ]}
-      >
-        <slot />
-      </main>
-
-      <aside
-        class:list={[
-          "side grid grid-cols-[minmax(max-content,auto)] py-4 bg-gray-700 text-white [grid-area:side] overflow-y-auto",
-          "group-[.is-toggled]:px-4 group-[.is-toggled]:overflow-x-hidden",
-          "md:px-4 md:group-[.is-toggled]:px-0",
-          "print:hidden",
-        ]}
-        transition:persist="app-sidebar"
-      >
-        <MenuVertical />
-      </aside>
-    </div>
+      <slot />
+    </main>
     <script>
       import { startLiveUpdates } from "@/lib/live";
       startLiveUpdates();

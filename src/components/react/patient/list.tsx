@@ -1,12 +1,10 @@
 // src/components/react/patient/list.tsx
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@/lib/api";
 import { onDataChanged } from "@/lib/live";
 import type { Patient } from "@/types/patient";
-import { Card } from "../card";
 import { FadeIn } from "../fade-in";
-import { calculateAge, cn, toKatakana } from "@/lib/utils";
-import { PatientName } from "../patient-name";
+import { cn } from "@/lib/utils";
 import { PulseAnimation } from "../pulse-animation";
 import { PatientCard } from "./patient-card";
 
@@ -73,7 +71,7 @@ export const PatientList = () => {
   // 🚀 2. 読み込みが終わり、かつデータが本当に1件もない場合
   if (patients.length === 0) {
     return (
-      <div className="text-gray-500 text-center py-4">
+      <div className="py-4 text-center text-muted-foreground">
         登録されている患者はいません。
       </div>
     );
@@ -92,7 +90,7 @@ export const PatientList = () => {
           <a
             href={`/patient/detail/?id=${p.patient_id}`}
             className={cn(
-              "block hover:bg-gray-200 transition-colors duration-300 rounded-md",
+              "block rounded-xl transition-colors duration-200 hover:bg-accent",
             )}
           >
             <FadeIn>

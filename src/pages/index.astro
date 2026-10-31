@@ -1,34 +1,31 @@
 ---
 import Layout from "@layouts/layout.astro";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 ---
 
 <Layout>
   <div
     class:list={[
-      "grid gap-4 justify-center content-center h-full pb-16",
+      "grid h-full content-center justify-center gap-4 pb-16",
       "@container",
     ]}
   >
-    <h2 class:list={["text-xl text-center", "@lg:text-2xl"]}>
+    <h2 class:list={["text-center text-xl", "@lg:text-2xl"]}>
       今日もよろしくお願いします
     </h2>
     <div class:list={["grid gap-2", "@lg:grid-flow-col"]}>
       <a
         href="/patient/register/"
-        class={cn(
-          buttonVariants({ variant: "default", size: "lg" }),
-          "bg-green-500 hover:bg-green-600 text-white text-base",
-        )}
+        class={cn(buttonVariants({ variant: "default", size: "lg" }), "text-base")}
       >
         患者登録
       </a>
       <a
         href="/exam_order/daily-list/"
         class={cn(
-          buttonVariants({ variant: "default", size: "lg" }),
-          "bg-green-500 hover:bg-green-600 text-white text-base",
+          buttonVariants({ variant: "outline", size: "lg" }),
+          "border-2 border-foreground/45 text-base",
         )}
       >
         検査一覧

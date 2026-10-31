@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
+
+import { Card as UiCard } from "@/components/ui/card";
 import { cn } from "@lib/utils";
 
 interface Props {
@@ -8,10 +10,8 @@ interface Props {
 
 export const Card: React.FC<Props> = ({ children, className }) => {
   return (
-    <div
-      className={cn("w-full p-4 shadow-(--box-shadow) rounded-md", className)}
-    >
-      {children}
-    </div>
+    <UiCard className={cn("w-full gap-0 py-0", className)}>
+      <div className="p-4">{children}</div>
+    </UiCard>
   );
 };

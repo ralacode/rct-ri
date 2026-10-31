@@ -1,6 +1,7 @@
 // src/components/react/ultratechnekow-calculator.tsx
 
 import { useMemo, useState, type FC } from "react";
+import { Card } from "@components/react/card";
 import { DatePickerTime } from "@components/react/date-picker-time";
 import { format, parse } from "date-fns";
 import { cn, formatDateJapanese } from "@/lib/utils";
@@ -51,7 +52,7 @@ export const UltraTechnekowCalculator: FC = () => {
 
   return (
     <div className={cn("@container")}>
-      <div className={cn("grid gap-4", "@lg:mx-auto @lg:max-w-md")}>
+      <Card className={cn("grid gap-4", "@lg:mx-auto @lg:max-w-md")}>
         <DatePickerTime
           valueString={calibrationDate}
           timeString={calibrationTime}
@@ -119,7 +120,7 @@ export const UltraTechnekowCalculator: FC = () => {
             </Table>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

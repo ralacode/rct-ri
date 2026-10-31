@@ -117,6 +117,17 @@ body {
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --font-patient: var(--font-family);
+  --color-my-gray: var(--text);
+  --shadow-patient: var(--box-shadow);
+  --text-p-body: var(--body);
+  --text-p-h1: var(--heading1);
+  --text-p-h2: var(--heading2);
+  --text-p-h3: var(--heading3);
+  --text-p-h4: var(--heading4);
+  --text-p-small: var(--small);
+  --spacing-p-line: var(--space-line);
+  --spacing-p-half: var(--half);
 }
 
 .dark {

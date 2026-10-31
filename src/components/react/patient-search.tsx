@@ -88,12 +88,14 @@ export const PatientSearch: FC = () => {
       )}
 
       {/* エラー表示 */}
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="text-sm text-destructive">{error}</div>}
 
       {keyword.trim() && !isLoading && (
         <>
           {patients.length === 0 ? (
-            <p className="no-results">該当する患者が見つかりません。</p>
+            <p className="text-center text-muted-foreground">
+              該当する患者が見つかりません。
+            </p>
           ) : (
             <ul
               className={cn(
@@ -107,7 +109,7 @@ export const PatientSearch: FC = () => {
                   <a
                     href={`/patient/detail/?id=${patient.patient_id}`}
                     className={cn(
-                      "block hover:bg-gray-200 transition-colors duration-300 rounded-md",
+                      "block rounded-xl transition-colors duration-200 hover:bg-accent",
                     )}
                   >
                     <PatientCard patient={patient} />

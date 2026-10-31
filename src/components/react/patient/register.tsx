@@ -11,8 +11,8 @@ import {
   validateKanjiName,
   validatePatientId,
 } from "@lib/utils";
+import { Card } from "@/components/react/card";
 import { MyInput } from "@components/react/my-input";
-import { Input } from "@/components/ui/input";
 import { MyButton } from "../my-button";
 import { PatientName } from "../patient-name";
 
@@ -280,6 +280,7 @@ export const PatientRegisterForm = () => {
 
   return (
     <div className="mx-auto max-w-md">
+      <h2 className="mb-4 text-2xl font-semibold tracking-tight">患者登録</h2>
       {saveMessage === "success" && lastRegistered ? (
         <div className={cn("grid gap-4 content-start")}>
           <p className={cn("grid grid-flow-col gap-2 justify-start items-end")}>
@@ -308,6 +309,7 @@ export const PatientRegisterForm = () => {
           </MyButton>
         </div>
       ) : (
+        <Card>
         <form
           method="post"
           data-astro-reload
@@ -466,6 +468,7 @@ export const PatientRegisterForm = () => {
             登録する
           </MyButton>
         </form>
+        </Card>
       )}
 
       {message && (
