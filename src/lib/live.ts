@@ -1,3 +1,6 @@
+import { fetchAuthStatus, isAuthPage } from "@/lib/auth";
+import { go } from "@/lib/nav";
+
 const DATA_CHANGED = "rct-data-changed";
 
 export function startLiveUpdates() {
@@ -11,9 +14,21 @@ export function startLiveUpdates() {
     };
     source.addEventListener("data-changed", dispatch);
     source.onerror = () => {
-      if (source.readyState === EventSource.CLOSED) {
-        window.setTimeout(connect, 2000);
-      }
+      if (source.readyState !== EventSource.CLOSED) return;
+      void fetchAuthStatus()
+        .then((status) => {
+          if (status.authenticated) {
+            window.setTimeout(connect, 2000);
+            return;
+          }
+          window.__rctLiveStarted = false;
+          if (!isAuthPage()) {
+            go("/login/");
+          }
+        })
+        .catch(() => {
+          window.setTimeout(connect, 2000);
+        });
     };
   };
 

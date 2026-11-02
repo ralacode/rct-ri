@@ -1,0 +1,11 @@
+---
+import { UserAdmin } from "@/components/react/auth/user-admin";
+import Layout from "@layouts/layout.astro";
+---
+
+<Layout pageTitle="担当者管理">
+  <div class="grid gap-4 content-start">
+    <h2 class="text-2xl font-semibold tracking-tight">担当者管理</h2>
+    <UserAdmin client:load />
+  </div>
+</Layout>

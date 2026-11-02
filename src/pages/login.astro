@@ -1,0 +1,8 @@
+---
+import { LoginForm } from "@/components/react/auth/login-form";
+import AuthLayout from "@/layouts/auth-layout.astro";
+---
+
+<AuthLayout pageTitle="ログイン">
+  <LoginForm client:load />
+</AuthLayout>

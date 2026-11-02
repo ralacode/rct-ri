@@ -1,183 +1,14 @@
 // src-tauri/src/lib.rs
 
+mod auth;
 mod db;
 mod events;
 mod exam_order;
 mod http;
 mod patient;
 
-use crate::exam_order::model::{ExamOrder, ExamOrderWithPatient};
-use crate::patient::model::{Patient, PatientFields};
 use tauri::{LogicalSize, Manager, PhysicalPosition};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
-
-#[tauri::command]
-fn add_patient(
-    patient_id: String,
-    patient_type: String,
-    last_name_kanji: String,
-    first_name_kanji: String,
-    last_name_kana: String,
-    first_name_kana: String,
-    height: Option<f64>,
-    weight: Option<f64>,
-    birth_date: String,
-    gender: String,
-    created_at: Option<String>,
-) -> Result<(), String> {
-    let fields = PatientFields {
-        patient_id,
-        patient_type,
-        last_name_kanji,
-        first_name_kanji,
-        last_name_kana,
-        first_name_kana,
-        height,
-        weight,
-        birth_date,
-        gender,
-        created_at,
-    };
-    patient::model::insert(&fields)
-}
-
-#[tauri::command]
-fn get_patients() -> Result<Vec<Patient>, String> {
-    patient::model::search(None, true)
-}
-
-#[tauri::command]
-fn remove_patient(id: i32) -> Result<(), String> {
-    patient::model::delete(id).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
-fn edit_patient(
-    id: i32,
-    patient_id: String,
-    patient_type: String,
-    last_name_kanji: String,
-    first_name_kanji: String,
-    last_name_kana: String,
-    first_name_kana: String,
-    birth_date: String,
-    gender: String,
-    height: Option<f64>,
-    weight: Option<f64>,
-    created_at: String,
-) -> Result<(), String> {
-    patient::model::update(
-        id,
-        &patient_id,
-        &patient_type,
-        &last_name_kanji,
-        &first_name_kanji,
-        &last_name_kana,
-        &first_name_kana,
-        &birth_date,
-        &gender,
-        height,
-        weight,
-        &created_at,
-    )
-}
-
-#[tauri::command]
-fn search_patients_cmd(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, String> {
-    patient::model::search(keyword, sort_desc)
-}
-
-#[tauri::command]
-fn add_exam_order(
-    patient_db_id: i32,
-    exam_date: String,
-    exam_time: String,
-    exam_item: String,
-    requesting_department: String,
-    requesting_physician: String,
-    dosage_mbq: Option<f64>,
-    dosage_ml: Option<f64>,
-    remain_mbq: Option<f64>,
-    remain_ml: Option<f64>,
-    injection_time: Option<String>,
-) -> Result<(), String> {
-    exam_order::model::insert_order(
-        patient_db_id,
-        &exam_date,
-        &exam_time,
-        &exam_item,
-        &requesting_department,
-        &requesting_physician,
-        dosage_mbq,
-        dosage_ml,
-        remain_mbq,
-        remain_ml,
-        injection_time,
-    )
-}
-
-#[tauri::command]
-fn get_exam_orders(patient_db_id: i32) -> Result<Vec<ExamOrder>, String> {
-    exam_order::model::get_orders_by_patient(patient_db_id)
-}
-
-#[tauri::command]
-fn get_daily_exam_orders(date: String) -> Result<Vec<ExamOrderWithPatient>, String> {
-    exam_order::model::get_orders_by_date(&date)
-}
-
-#[tauri::command]
-fn delete_exam_order_cmd(id: i32) -> Result<(), String> {
-    exam_order::model::delete_order(id)
-}
-
-#[tauri::command]
-fn edit_exam_order_fields(
-    id: i32,
-    dosage_mbq: Option<f64>,
-    dosage_ml: Option<f64>,
-    remain_mbq: Option<f64>,
-    remain_ml: Option<f64>,
-    injection_time: Option<String>,
-) -> Result<(), String> {
-    exam_order::model::update_exam_order_specifc_fields(
-        id,
-        dosage_mbq,
-        dosage_ml,
-        remain_mbq,
-        remain_ml,
-        injection_time,
-    )
-}
-
-#[tauri::command]
-fn edit_exam_order(
-    id: i32,
-    exam_date: String,
-    exam_time: String,
-    exam_item: String,
-    requesting_department: String,
-    requesting_physician: String,
-    dosage_mbq: Option<f64>,
-    dosage_ml: Option<f64>,
-    remain_mbq: Option<f64>,
-    remain_ml: Option<f64>,
-    injection_time: Option<String>,
-) -> Result<(), String> {
-    exam_order::model::update_order(
-        id,
-        &exam_date,
-        &exam_time,
-        &exam_item,
-        &requesting_department,
-        &requesting_physician,
-        dosage_mbq,
-        dosage_ml,
-        remain_mbq,
-        remain_ml,
-        injection_time,
-    )
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -258,19 +89,6 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            add_patient,
-            get_patients,
-            remove_patient,
-            edit_patient,
-            search_patients_cmd,
-            add_exam_order,
-            get_exam_orders,
-            get_daily_exam_orders,
-            delete_exam_order_cmd,
-            edit_exam_order_fields,
-            edit_exam_order
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

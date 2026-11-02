@@ -1,20 +1,23 @@
 type InvokeArgs = Record<string, unknown>;
 
-function hasTauriIpc(): boolean {
-  return typeof window !== "undefined" && Boolean(window.__TAURI__?.core?.invoke);
-}
-
-function shouldUseHttp(): boolean {
-  if (typeof window === "undefined") return true;
-  const protocol = window.location.protocol;
-  return protocol === "http:" || protocol === "https:";
-}
-
 function apiRoot(): string {
-  if (typeof window !== "undefined" && window.location.port === "4321") {
-    return "http://127.0.0.1:8080/api";
-  }
   return "/api";
+}
+
+function isAuthExempt(url: string) {
+  return (
+    url.includes("/api/auth/status") ||
+    url.includes("/api/auth/login") ||
+    url.includes("/api/auth/setup") ||
+    url.includes("/api/auth/logout")
+  );
+}
+
+function redirectToLogin() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (path.startsWith("/login") || path.startsWith("/setup")) return;
+  window.location.assign("/login/");
 }
 
 async function readError(response: Response): Promise<string> {
@@ -22,11 +25,19 @@ async function readError(response: Response): Promise<string> {
   return text || response.statusText || `HTTP ${response.status}`;
 }
 
-async function request<T>(
-  url: string,
-  init?: RequestInit,
-): Promise<T> {
-  const response = await fetch(url, init);
+async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(url, {
+    credentials: "include",
+    ...init,
+    headers: {
+      ...(init?.body ? { "Content-Type": "application/json" } : {}),
+      ...init?.headers,
+    },
+  });
+  if (response.status === 401 && !isAuthExempt(url)) {
+    redirectToLogin();
+    throw new Error("ログインが必要です");
+  }
   if (!response.ok) {
     throw await readError(response);
   }
@@ -66,13 +77,11 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
     case "add_patient":
       return request<T>(`${apiRoot()}/patients`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
     case "edit_patient":
       return request<T>(`${apiRoot()}/patients/${args.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
     case "remove_patient":
@@ -82,7 +91,6 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
     case "add_exam_order":
       return request<T>(`${apiRoot()}/patients/${args.patientDbId}/orders`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
     case "get_daily_exam_orders":
@@ -92,13 +100,11 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
     case "edit_exam_order_fields":
       return request<T>(`${apiRoot()}/exam-orders/${args.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
     case "edit_exam_order":
       return request<T>(`${apiRoot()}/exam-orders/${args.id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(args),
       });
     case "delete_exam_order_cmd":
@@ -112,8 +118,5 @@ export async function invoke<T = unknown>(
   cmd: string,
   args: InvokeArgs = {},
 ): Promise<T> {
-  if (hasTauriIpc() && !shouldUseHttp()) {
-    return window.__TAURI__.core.invoke(cmd, args) as Promise<T>;
-  }
   return invokeViaHttp<T>(cmd, args);
 }

@@ -4,10 +4,17 @@ use rusqlite::{Connection, Result};
 use std::path::PathBuf;
 // use std::time::Duration;
 
-pub fn get_db_path() -> PathBuf {
+fn exe_dir() -> PathBuf {
     let exe_path = std::env::current_exe().expect("実行ファイルパス取得失敗");
-    let exe_dir = exe_path.parent().expect("親ディレクトリ取得失敗");
-    exe_dir.join("rct_local.db")
+    exe_path.parent().expect("親ディレクトリ取得失敗").to_path_buf()
+}
+
+pub fn get_db_path() -> PathBuf {
+    exe_dir().join("rct_local.db")
+}
+
+pub fn get_user_db_path() -> PathBuf {
+    exe_dir().join("user.db")
 }
 
 // pub fn get_connection() -> Result<Connection, String> {
@@ -34,6 +41,8 @@ pub fn init_db() -> Result<()> {
 
     create_patients_table(&conn)?;
     create_exam_orders_table(&conn)?;
+    let _ = conn.execute("DROP TABLE IF EXISTS sessions", []);
+    let _ = conn.execute("DROP TABLE IF EXISTS users", []);
     crate::patient::model::migrate_created_at_formats(&conn)?;
 
     // カラム追加のマイグレーション（すでに存在する場合は無視される）
@@ -66,6 +75,15 @@ pub fn init_db() -> Result<()> {
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_mbq REAL", []);
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
 
+    init_user_db()?;
+    Ok(())
+}
+
+fn init_user_db() -> Result<()> {
+    let conn = Connection::open(get_user_db_path())?;
+    conn.query_row("PRAGMA journal_mode = WAL;", [], |_| Ok(()))?;
+    conn.execute("PRAGMA foreign_keys = ON;", [])?;
+    crate::auth::init_tables(&conn)?;
     Ok(())
 }
 

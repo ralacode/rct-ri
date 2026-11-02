@@ -3,13 +3,17 @@ import {
   Contact,
   ContactRound,
   Home,
+  KeyRound,
+  LogOut,
   Search,
   TrendingDown,
+  Users,
 } from "lucide-react";
 
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarHeader,
@@ -20,6 +24,7 @@ import {
   guardSidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
+import type { AuthUser } from "@/lib/auth";
 import { siteMeta } from "@/lib/constants";
 import { go } from "@/lib/nav";
 
@@ -37,7 +42,15 @@ function isCurrentPath(path: string | undefined, href: string) {
   return path === href || (href !== "/" && path.startsWith(href));
 }
 
-export function AppSidebar({ currentPath }: { currentPath: string }) {
+export function AppSidebar({
+  currentPath,
+  user,
+  onLogout,
+}: {
+  currentPath: string;
+  user: AuthUser | null;
+  onLogout: () => void;
+}) {
   const { isMobile, setOpenMobile } = useSidebar();
 
   const handleNav = (
@@ -91,10 +104,60 @@ export function AppSidebar({ currentPath }: { currentPath: string }) {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
+                {user?.canManageUsers && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isCurrentPath(currentPath, "/users/")}
+                      tooltip="担当者管理"
+                    >
+                      <a
+                        href="/users/"
+                        onClick={(event) => handleNav(event, "/users/")}
+                      >
+                        <Users />
+                        <span>担当者管理</span>
+                      </a>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isCurrentPath(currentPath, "/account/")}
+                    tooltip="パスワード変更"
+                  >
+                    <a
+                      href="/account/"
+                      onClick={(event) => handleNav(event, "/account/")}
+                    >
+                      <KeyRound />
+                      <span>パスワード変更</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
+        <SidebarFooter className="border-t border-sidebar-border">
+          <SidebarMenu>
+            {user && (
+              <SidebarMenuItem>
+                <SidebarMenuButton tooltip={user.displayName}>
+                  <Users />
+                  <span className="truncate">{user.displayName}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
+            <SidebarMenuItem>
+              <SidebarMenuButton tooltip="ログアウト" onClick={onLogout}>
+                <LogOut />
+                <span>ログアウト</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
         <SidebarRail />
       </Sidebar>
     </div>
