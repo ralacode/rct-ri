@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import type { Modality } from "@/lib/auth";
 
 export function ModalityPicker({
@@ -11,12 +12,12 @@ export function ModalityPicker({
   onChange: (ids: number[]) => void;
   idPrefix?: string;
 }) {
-  const toggle = (id: number, checked: boolean) => {
-    if (checked) {
-      onChange(selectedIds.includes(id) ? selectedIds : [...selectedIds, id]);
+  const toggle = (id: number) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter((value) => value !== id));
       return;
     }
-    onChange(selectedIds.filter((value) => value !== id));
+    onChange([...selectedIds, id]);
   };
 
   if (modalities.length === 0) {
@@ -33,18 +34,24 @@ export function ModalityPicker({
         担当モダリティ
         <span className="ml-1 text-destructive">*</span>
       </legend>
-      <div className="grid gap-2 sm:grid-cols-2">
-        {modalities.map((modality) => (
-          <label key={modality.id} className="flex items-center gap-2 text-sm">
-            <input
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {modalities.map((modality) => {
+          const selected = selectedIds.includes(modality.id);
+          return (
+            <Button
+              key={modality.id}
               id={`${idPrefix}-${modality.id}`}
-              type="checkbox"
-              checked={selectedIds.includes(modality.id)}
-              onChange={(event) => toggle(modality.id, event.target.checked)}
-            />
-            {modality.name}
-          </label>
-        ))}
+              type="button"
+              size="lg"
+              variant={selected ? "default" : "outline"}
+              aria-pressed={selected}
+              className="h-11 w-full px-4"
+              onClick={() => toggle(modality.id)}
+            >
+              {modality.name}
+            </Button>
+          );
+        })}
       </div>
     </fieldset>
   );

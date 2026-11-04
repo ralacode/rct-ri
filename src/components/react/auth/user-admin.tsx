@@ -16,9 +16,16 @@ import {
   resetPassword,
   setManagePermission,
   setUserModalities,
+  updateUser,
   type AuthUser,
   type Modality,
 } from "@/lib/auth";
+
+type ProfileEdit = {
+  userId: string;
+  lastName: string;
+  firstName: string;
+};
 
 export function UserAdmin() {
   const [users, setUsers] = useState<AuthUser[]>([]);
@@ -37,6 +44,9 @@ export function UserAdmin() {
   const [passwordEdits, setPasswordEdits] = useState<Record<number, string>>(
     {},
   );
+  const [profileEdits, setProfileEdits] = useState<
+    Record<number, ProfileEdit>
+  >({});
 
   const defaultModalityIds = (items: Modality[]) =>
     items.filter((item) => item.isDefault).map((item) => item.id);
@@ -50,6 +60,18 @@ export function UserAdmin() {
     setUsers(nextUsers);
     setMe(nextMe);
     setModalities(nextModalities);
+    setProfileEdits(
+      Object.fromEntries(
+        nextUsers.map((user) => [
+          user.id,
+          {
+            userId: user.userId,
+            lastName: user.lastName,
+            firstName: user.firstName,
+          },
+        ]),
+      ),
+    );
     setModalityIds((current) =>
       current.length > 0 ? current : defaultModalityIds(nextModalities),
     );
@@ -101,6 +123,18 @@ export function UserAdmin() {
       showMessage(error instanceof Error ? error.message : String(error), true);
     } finally {
       setPending(false);
+    }
+  };
+
+  const handleUpdateProfile = async (user: AuthUser) => {
+    const edit = profileEdits[user.id];
+    if (!edit) return;
+    try {
+      await updateUser(user.id, edit);
+      await load();
+      showMessage("担当者情報を更新しました");
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : String(error), true);
     }
   };
 
@@ -319,50 +353,109 @@ export function UserAdmin() {
               {users.map((user) => (
                 <li
                   key={user.id}
-                  className="grid gap-3 rounded-lg border p-3 md:grid-cols-[1fr_auto] md:items-end"
+                  className="grid gap-3 rounded-lg border p-3"
                 >
-                  <div className="grid gap-2">
-                    <p className="font-medium">
-                      {user.displayName}
-                      {user.id === me?.id ? (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          （自分）
-                        </span>
-                      ) : null}
-                      {user.isInitialAdmin ? (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          初期管理者
-                        </span>
-                      ) : user.canManageUsers ? (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          ユーザー管理可
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{user.userId}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {(user.modalities ?? []).map((item) => item.name).join("、") ||
-                        "担当モダリティなし"}
-                    </p>
-                    {me?.isInitialAdmin && !user.isInitialAdmin && (
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={user.canManageUsers}
-                          onChange={(event) =>
-                            void handlePermission(user, event.target.checked)
-                          }
-                        />
-                        ユーザーを管理する
-                      </label>
-                    )}
-                    <ModalityPicker
-                      modalities={modalities}
-                      selectedIds={(user.modalities ?? []).map((item) => item.id)}
-                      onChange={(ids) => void handleUserModalities(user, ids)}
-                      idPrefix={`user-${user.id}-modality`}
+                  <p className="font-medium">
+                    {user.displayName}
+                    {user.id === me?.id ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        （自分）
+                      </span>
+                    ) : null}
+                    {user.isInitialAdmin ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        初期管理者
+                      </span>
+                    ) : user.canManageUsers ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        ユーザー管理可
+                      </span>
+                    ) : null}
+                  </p>
+                  <MyInput
+                    id={`edit-staff-id-${user.id}`}
+                    name="rct-no-store"
+                    label="ユーザーID（8桁の数字）"
+                    required
+                    inputMode="numeric"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={8}
+                    value={profileEdits[user.id]?.userId ?? user.userId}
+                    onChange={(event) =>
+                      setProfileEdits((prev) => ({
+                        ...prev,
+                        [user.id]: {
+                          userId: event.target.value,
+                          lastName:
+                            prev[user.id]?.lastName ?? user.lastName,
+                          firstName:
+                            prev[user.id]?.firstName ?? user.firstName,
+                        },
+                      }))
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <MyInput
+                      id={`edit-last-name-${user.id}`}
+                      label="姓"
+                      required
+                      autoComplete="off"
+                      value={profileEdits[user.id]?.lastName ?? user.lastName}
+                      onChange={(event) =>
+                        setProfileEdits((prev) => ({
+                          ...prev,
+                          [user.id]: {
+                            userId: prev[user.id]?.userId ?? user.userId,
+                            lastName: event.target.value,
+                            firstName:
+                              prev[user.id]?.firstName ?? user.firstName,
+                          },
+                        }))
+                      }
                     />
-                    {user.id !== me?.id && (
+                    <MyInput
+                      id={`edit-first-name-${user.id}`}
+                      label="名"
+                      required
+                      autoComplete="off"
+                      value={
+                        profileEdits[user.id]?.firstName ?? user.firstName
+                      }
+                      onChange={(event) =>
+                        setProfileEdits((prev) => ({
+                          ...prev,
+                          [user.id]: {
+                            userId: prev[user.id]?.userId ?? user.userId,
+                            lastName:
+                              prev[user.id]?.lastName ?? user.lastName,
+                            firstName: event.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  {me?.isInitialAdmin && !user.isInitialAdmin && (
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={user.canManageUsers}
+                        onChange={(event) =>
+                          void handlePermission(user, event.target.checked)
+                        }
+                      />
+                      ユーザーを管理する
+                    </label>
+                  )}
+                  <ModalityPicker
+                    modalities={modalities}
+                    selectedIds={(user.modalities ?? []).map((item) => item.id)}
+                    onChange={(ids) => void handleUserModalities(user, ids)}
+                    idPrefix={`user-${user.id}-modality`}
+                  />
+                  <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_auto]">
+                    {user.id !== me?.id ? (
                       <MyInput
                         id={`reset-password-${user.id}`}
                         label="新しいパスワード（初期化）"
@@ -377,23 +470,28 @@ export function UserAdmin() {
                           }))
                         }
                       />
+                    ) : (
+                      <div />
                     )}
+                    <MyButton onClick={() => void handleUpdateProfile(user)}>
+                      保存
+                    </MyButton>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {user.id !== me?.id && (
+                  {user.id !== me?.id && (
+                    <div className="flex flex-wrap gap-2">
                       <MyButton onClick={() => void handleReset(user)}>
                         パスワード初期化
                       </MyButton>
-                    )}
-                    {user.id !== me?.id && !user.isInitialAdmin && (
-                      <MyButton
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => void handleDelete(user)}
-                      >
-                        削除
-                      </MyButton>
-                    )}
-                  </div>
+                      {!user.isInitialAdmin && (
+                        <MyButton
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => void handleDelete(user)}
+                        >
+                          削除
+                        </MyButton>
+                      )}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

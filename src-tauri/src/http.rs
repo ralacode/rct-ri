@@ -124,6 +124,14 @@ struct AuthUserWriteRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct AuthUserProfileRequest {
+    user_id: String,
+    last_name: String,
+    first_name: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ModalityNameRequest {
     name: String,
 }
@@ -363,6 +371,27 @@ async fn create_user(
     ) {
         Ok(user) => Json(user).into_response(),
         Err(message) => auth_fail(StatusCode::BAD_REQUEST, message),
+    }
+}
+
+async fn update_user(
+    Path(id): Path<i32>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<AuthUserProfileRequest>,
+) -> Response {
+    if let Some(response) = forbid_unless_manager(&actor) {
+        return response;
+    }
+    match auth::update_user(id, &body.user_id, &body.last_name, &body.first_name) {
+        Ok(user) => Json(user).into_response(),
+        Err(message) => {
+            let status = if message.contains("既に使われています") {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_REQUEST
+            };
+            auth_fail(status, message)
+        }
     }
 }
 
@@ -679,7 +708,10 @@ fn protected_api() -> Router {
         .route("/auth/me", get(auth_me))
         .route("/auth/password", put(change_own_password))
         .route("/users", get(list_users).post(create_user))
-        .route("/users/{id}", axum::routing::delete(delete_user))
+        .route(
+            "/users/{id}",
+            put(update_user).delete(delete_user),
+        )
         .route("/users/{id}/password", put(reset_user_password))
         .route("/users/{id}/manage-permission", put(set_manage_permission))
         .route("/users/{id}/modalities", put(set_user_modalities))

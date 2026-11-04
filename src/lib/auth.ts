@@ -178,6 +178,20 @@ export async function createUser(input: {
   });
 }
 
+export async function updateUser(
+  id: number,
+  input: {
+    userId: string;
+    lastName: string;
+    firstName: string;
+  },
+): Promise<AuthUser> {
+  return authRequest<AuthUser>(`/users/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function deleteUser(id: number): Promise<void> {
   await authRequest<void>(`/users/${id}`, { method: "DELETE" });
 }

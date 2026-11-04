@@ -459,6 +459,41 @@ pub fn create_user(
     with_modalities(&conn, user)
 }
 
+pub fn update_user(
+    id: i32,
+    user_id: &str,
+    last_name: &str,
+    first_name: &str,
+) -> Result<AuthUser, String> {
+    let conn = open_db()?;
+    let user_id = normalize_user_id(user_id)?;
+    let last_name = normalize_name(last_name, "姓")?;
+    let first_name = normalize_name(first_name, "名")?;
+    let updated = conn
+        .execute(
+            "UPDATE users SET user_id = ?1, last_name = ?2, first_name = ?3 WHERE id = ?4",
+            params![user_id, last_name, first_name, id],
+        )
+        .map_err(|error| {
+            if error.to_string().contains("UNIQUE") {
+                "そのユーザーIDは既に使われています".to_string()
+            } else {
+                error.to_string()
+            }
+        })?;
+    if updated == 0 {
+        return Err("担当者が見つかりません".into());
+    }
+    let user = conn
+        .query_row(
+            &format!("SELECT {USER_COLUMNS} FROM users WHERE id = ?1"),
+            params![id],
+            map_user,
+        )
+        .map_err(|e| e.to_string())?;
+    with_modalities(&conn, user)
+}
+
 fn is_initial_admin_id(conn: &Connection, id: i32) -> Result<bool, String> {
     let flag: i32 = conn
         .query_row(
