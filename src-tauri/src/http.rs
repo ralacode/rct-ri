@@ -670,7 +670,7 @@ async fn help_page() -> Html<&'static str> {
   <body>
     <h1>RC Tools は起動しています</h1>
     <p>API: <a href="/api/health">/api/health</a></p>
-    <p>画面ファイル（dist）が見つかりません。サーバー役 PC でフロントをビルドするか、Tauri ウィンドウから操作してください。</p>
+    <p>画面ファイル（dist）が見つかりません。exe と同じ階層に dist フォルダ（中に index.html）を置いてください。</p>
   </body>
 </html>"#,
     )
@@ -680,6 +680,7 @@ pub fn resolve_frontend_dir() -> Option<PathBuf> {
     let mut candidates = Vec::new();
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
+            candidates.push(dir.to_path_buf());
             candidates.push(dir.join("dist"));
             candidates.push(dir.join("../dist"));
             candidates.push(dir.join("../../dist"));
@@ -687,6 +688,7 @@ pub fn resolve_frontend_dir() -> Option<PathBuf> {
         }
     }
     if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.clone());
         candidates.push(cwd.join("dist"));
         candidates.push(cwd.join("../dist"));
     }
