@@ -1,0 +1,10 @@
+---
+import Layout from "@layouts/layout.astro";
+import { VideoPlayer } from "@/components/react/videos/player";
+
+const fileName = Astro.url.searchParams.get("name") ?? "";
+---
+
+<Layout pageTitle={fileName || "動画再生"}>
+  <VideoPlayer client:load fileName={fileName} />
+</Layout>

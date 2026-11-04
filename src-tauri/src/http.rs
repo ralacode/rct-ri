@@ -740,6 +740,7 @@ fn protected_api() -> Router {
                 .patch(update_exam_order)
                 .delete(delete_exam_order),
         )
+        .merge(crate::videos::routes())
         .layer(middleware::from_fn(require_auth))
 }
 

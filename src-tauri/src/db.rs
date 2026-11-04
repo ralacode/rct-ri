@@ -4,9 +4,13 @@ use rusqlite::{Connection, Result};
 use std::path::PathBuf;
 // use std::time::Duration;
 
-fn exe_dir() -> PathBuf {
+pub fn exe_dir() -> PathBuf {
     let exe_path = std::env::current_exe().expect("実行ファイルパス取得失敗");
     exe_path.parent().expect("親ディレクトリ取得失敗").to_path_buf()
+}
+
+pub fn get_videos_dir() -> PathBuf {
+    exe_dir().join("videos")
 }
 
 pub fn get_db_path() -> PathBuf {
@@ -76,6 +80,7 @@ pub fn init_db() -> Result<()> {
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
 
     init_user_db()?;
+    let _ = std::fs::create_dir_all(get_videos_dir());
     Ok(())
 }
 
@@ -84,6 +89,7 @@ fn init_user_db() -> Result<()> {
     conn.query_row("PRAGMA journal_mode = WAL;", [], |_| Ok(()))?;
     conn.execute("PRAGMA foreign_keys = ON;", [])?;
     crate::auth::init_tables(&conn)?;
+    crate::videos::init_tables(&conn)?;
     Ok(())
 }
 

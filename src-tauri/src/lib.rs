@@ -6,6 +6,7 @@ mod events;
 mod exam_order;
 mod http;
 mod patient;
+mod videos;
 
 use tauri::{LogicalSize, Manager, PhysicalPosition};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};

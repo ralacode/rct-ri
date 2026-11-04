@@ -2,6 +2,7 @@ import {
   ClipboardList,
   Contact,
   ContactRound,
+  Film,
   Home,
   KeyRound,
   LogOut,
@@ -35,6 +36,7 @@ const menuItems = [
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
   { name: "患者検索", href: "/patient/search/", icon: Search },
   { name: "減衰計算", href: "/mo99-decay/", icon: TrendingDown },
+  { name: "動画", href: "/videos/", icon: Film },
 ] as const;
 
 function isCurrentPath(path: string | undefined, href: string) {
