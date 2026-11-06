@@ -134,23 +134,25 @@
     display: none !important;
   }
 
+  /*
+   * 紙の端からの余白は .container の padding ではなく @page の margin で取る。
+   * padding で取ると、本文が 1 ページに収まっていても下側の padding だけが
+   * 2 ページ目にはみ出し、空白ページが印刷されてしまうため。
+   */
   @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 10mm 10mm 10mm 20mm;
   }
 
-  body[data-print-mode="summary"] .container {
-    /* 紙の端から適切な余白を確保 */
-    padding-block: 10mm;
-    padding-inline: 20mm 10mm;
-    width: 100%;
-    box-sizing: border-box;
+  /* 標識手順書は 1 枚に収める必要があるので、下余白を 0 にして本文の領域を広げる */
+  @page procedure_sheet {
+    size: A4 portrait;
+    margin: 10mm 10mm 0 20mm;
   }
 
+  body[data-print-mode="summary"] .container,
   body[data-print-mode="procedure"] .container {
-    /* 紙の端から適切な余白を確保 */
-    padding-block: 10mm;
-    padding-inline: 20mm 10mm;
+    padding: 0;
     width: 100%;
     box-sizing: border-box;
   }
@@ -284,9 +286,14 @@
 
   body[data-print-mode="procedure"] .procedure_for_print {
     display: block !important;
+    page: procedure_sheet;
 
-    .procedure_page {
-      page-break-after: always;
+    /*
+     * 改ページは「印刷対象のページどうしの間」にだけ入れる。
+     * 最後のページの後ろに改ページを入れると空白ページの原因になるため。
+     */
+    .procedure_page:not(.no_print) ~ .procedure_page:not(.no_print) {
+      break-before: page;
     }
 
     .p_patient_info {
