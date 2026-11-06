@@ -26,6 +26,7 @@ import { DatalistInput } from "../datalist-input";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
 import { EditOrderModal } from "@components/react/exam_order/edit-order-modal";
 import { InjectionSummary } from "@components/react/exam_order/injection-summary";
+import { PediatricDoseBadge } from "@components/react/exam_order/pediatric-dose-badge";
 import { PatientName } from "../patient-name";
 import { Card } from "@components/react/card";
 import { MyButton } from "@components/react/my-button";
@@ -727,7 +728,7 @@ export const PatientDetail: React.FC = () => {
                     </DialogTrigger>
                     <DialogContent
                       className={cn(
-                        "font-(family-name:--font-family)! text-(--text)!",
+                        "font-(family-name:--font-family)! text-my-gray!",
                         "duration-0 animate-none",
                       )}
                     >
@@ -779,6 +780,8 @@ export const PatientDetail: React.FC = () => {
                           options={EXAM_ITEMS}
                           inputClassName={cn("h-10 cursor-pointer")}
                         />
+
+                        <PediatricDoseBadge examItem={examItem} weight={weight} />
                       </div>
 
                       <DialogFooter className={cn("grid")}>
@@ -860,6 +863,12 @@ export const PatientDetail: React.FC = () => {
                 <div className={cn("text-lg font-bold", "md:text-2xl")}>
                   {order.exam_item}
                 </div>
+
+                <PediatricDoseBadge
+                  examItem={order.exam_item}
+                  weight={weight}
+                  className={cn("justify-self-end")}
+                />
 
                 <div className={cn("text-right justify-self-end")}>
                   <div>{order.requesting_department}</div>

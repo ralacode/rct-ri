@@ -27,6 +27,7 @@ import { BorderInGridItem1 } from "@components/react/exam_order/border_in_grid/b
 import { BorderInGridContent1 } from "@components/react/exam_order/border_in_grid/border-in-grid-content1";
 import { GridTemplate, GridTemplateItem } from "../grid-template";
 import { InjectionSummary } from "@components/react/exam_order/injection-summary";
+import { PediatricDoseBadge } from "@components/react/exam_order/pediatric-dose-badge";
 
 interface EditableOrder {
   id: number;
@@ -316,6 +317,12 @@ export const DailyOrderList: React.FC = () => {
                       <p>{order.requesting_physician}</p>
                     </GridTemplateItem>
                   </GridTemplate>
+
+                  <PediatricDoseBadge
+                    examItem={order.exam_item}
+                    weight={order.weight}
+                    className={cn("justify-self-end", "lg:min-w-72")}
+                  />
 
                   <InjectionSummary order={order} />
 
