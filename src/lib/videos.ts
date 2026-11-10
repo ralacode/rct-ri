@@ -78,13 +78,81 @@ export function videoTitle(item: { name: string; title?: string | null }) {
   return title || item.name;
 }
 
-export async function saveVideoProgress(input: {
-  fileName: string;
-  positionSec: number;
-  durationSec: number;
-}): Promise<void> {
+export type SavePositionState = {
+  rememberedSec: number;
+  resumeFloorSec: number;
+  userSeeked: boolean;
+};
+
+/**
+ * 保存する再生位置。
+ * 画面遷移で video 要素が 0 秒に戻っても、見ていた位置は残す。
+ * ユーザーがシークしたときだけ、それより手前の位置を受け付ける。
+ */
+export function positionToSave(input: {
+  liveSec: number | null;
+  rememberedSec: number;
+  resumeFloorSec: number;
+  userSeeked: boolean;
+}): SavePositionState & { positionSec: number } {
+  const floor = finiteSec(input.resumeFloorSec);
+  const remembered = finiteSec(input.rememberedSec);
+  const live =
+    input.liveSec != null && Number.isFinite(input.liveSec)
+      ? Math.max(0, input.liveSec)
+      : null;
+  const baseline = Math.max(remembered, floor);
+
+  if (input.userSeeked) {
+    if (live == null) {
+      return {
+        positionSec: baseline,
+        rememberedSec: baseline,
+        resumeFloorSec: floor,
+        userSeeked: true,
+      };
+    }
+    return {
+      positionSec: live,
+      rememberedSec: live,
+      resumeFloorSec: live,
+      userSeeked: false,
+    };
+  }
+
+  if (live == null || live + 1 < baseline) {
+    return {
+      positionSec: baseline,
+      rememberedSec: baseline,
+      resumeFloorSec: floor,
+      userSeeked: false,
+    };
+  }
+  return {
+    positionSec: live,
+    rememberedSec: live,
+    resumeFloorSec: floor,
+    userSeeked: false,
+  };
+}
+
+function finiteSec(value: number) {
+  return Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+export async function saveVideoProgress(
+  input: {
+    fileName: string;
+    positionSec: number;
+    durationSec: number;
+    /** ユーザーがシークした、または最初から再生し直した */
+    seeked?: boolean;
+  },
+  options?: { keepalive?: boolean },
+): Promise<void> {
   await request<void>("/videos/progress", {
     method: "PUT",
+    keepalive: options?.keepalive ?? false,
     body: JSON.stringify(input),
   });
 }
@@ -127,9 +195,7 @@ export function normalizeForSearch(text: string) {
   return text
     .normalize("NFKC")
     .toLowerCase()
-    .replace(/[ァ-ヶ]/g, (ch) =>
-      String.fromCharCode(ch.charCodeAt(0) - 0x60),
-    );
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
 export function searchTerms(q: string) {
