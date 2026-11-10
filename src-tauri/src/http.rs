@@ -203,6 +203,73 @@ fn redirect_to(path: &str) -> Response {
     (StatusCode::SEE_OTHER, [(header::LOCATION, path)]).into_response()
 }
 
+/// ログイン後に戻す先として安全な、同一オリジン内のパスかを判定する。
+/// `//evil.example` や `/\\evil.example` のような外部へ飛ぶ値、ログイン・初期設定画面自体は拒否する。
+fn is_safe_next(path: &str) -> bool {
+    if !path.starts_with('/') || path.starts_with("//") || path.starts_with("/\\") {
+        return false;
+    }
+    if path.chars().any(|c| c.is_control()) {
+        return false;
+    }
+    let pathname = path.split(['?', '#']).next().unwrap_or("");
+    !(pathname.starts_with("/login") || pathname.starts_with("/setup") || pathname.starts_with("/api"))
+}
+
+fn percent_encode_component(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' | b'/' => {
+                out.push(byte as char)
+            }
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+fn percent_decode_component(value: &str) -> Option<String> {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' => {
+                let hex = value.get(i + 1..i + 3)?;
+                out.push(u8::from_str_radix(hex, 16).ok()?);
+                i += 3;
+            }
+            b'+' => {
+                out.push(b' ');
+                i += 1;
+            }
+            other => {
+                out.push(other);
+                i += 1;
+            }
+        }
+    }
+    String::from_utf8(out).ok()
+}
+
+/// 未ログインでアクセスされたページを `next` に付けたログイン画面の URL を返す。
+fn login_url_with_next(path_and_query: &str) -> String {
+    if path_and_query == "/" || !is_safe_next(path_and_query) {
+        return "/login/".to_string();
+    }
+    format!("/login/?next={}", percent_encode_component(path_and_query))
+}
+
+/// クエリ文字列の `next` から、安全な戻り先を取り出す。
+fn next_from_query(query: Option<&str>) -> Option<String> {
+    query?
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("next="))
+        .and_then(percent_decode_component)
+        .filter(|next| is_safe_next(next))
+}
+
 fn auth_fail(status: StatusCode, message: String) -> Response {
     (status, message).into_response()
 }
@@ -458,6 +525,11 @@ async fn require_auth(mut request: Request, next: Next) -> Response {
 
 async fn gate_pages(request: Request, next: Next) -> Response {
     let path = request.uri().path().to_string();
+    let path_and_query = request
+        .uri()
+        .path_and_query()
+        .map(|value| value.as_str().to_string())
+        .unwrap_or_else(|| path.clone());
     if path.starts_with("/api")
         || path.starts_with("/_astro")
         || path.starts_with("/favicon")
@@ -481,7 +553,8 @@ async fn gate_pages(request: Request, next: Next) -> Response {
             return redirect_to("/setup/");
         }
         if authenticated {
-            return redirect_to("/");
+            let next = next_from_query(request.uri().query());
+            return redirect_to(next.as_deref().unwrap_or("/"));
         }
         return next.run(request).await;
     }
@@ -490,7 +563,7 @@ async fn gate_pages(request: Request, next: Next) -> Response {
         return redirect_to("/setup/");
     }
     if !authenticated {
-        return redirect_to("/login/");
+        return redirect_to(&login_url_with_next(&path_and_query));
     }
     if path.starts_with("/users") {
         if let Ok(user) = auth::user_from_headers(request.headers()) {
@@ -819,4 +892,39 @@ pub fn spawn_and_wait() -> Result<(), String> {
     ready_rx
         .recv_timeout(std::time::Duration::from_secs(10))
         .map_err(|_| "HTTP サーバーの起動待ちがタイムアウトしました".to_string())?
+}
+
+#[cfg(test)]
+mod login_next_tests {
+    use super::*;
+
+    #[test]
+    fn login_url_keeps_requested_page() {
+        assert_eq!(login_url_with_next("/example/"), "/login/?next=/example/");
+        assert_eq!(
+            login_url_with_next("/patient/detail/?id=12&tab=a"),
+            "/login/?next=/patient/detail/%3Fid%3D12%26tab%3Da"
+        );
+        assert_eq!(login_url_with_next("/"), "/login/");
+    }
+
+    #[test]
+    fn next_round_trips() {
+        let url = login_url_with_next("/patient/detail/?id=12&tab=a");
+        let query = url.split_once('?').map(|(_, q)| q);
+        assert_eq!(
+            next_from_query(query).as_deref(),
+            Some("/patient/detail/?id=12&tab=a")
+        );
+    }
+
+    #[test]
+    fn rejects_external_or_auth_pages() {
+        assert_eq!(next_from_query(Some("next=%2F%2Fevil.example")), None);
+        assert_eq!(next_from_query(Some("next=https%3A%2F%2Fevil.example")), None);
+        assert_eq!(next_from_query(Some("next=%2F%5Cevil.example")), None);
+        assert_eq!(next_from_query(Some("next=%2Flogin%2F")), None);
+        assert_eq!(next_from_query(Some("next=%2Fsetup%2F")), None);
+        assert_eq!(next_from_query(None), None);
+    }
 }

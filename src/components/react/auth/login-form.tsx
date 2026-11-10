@@ -3,7 +3,12 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
 import { MyInput } from "@/components/react/my-input";
-import { fetchAuthStatus, login, onAuthEvent } from "@/lib/auth";
+import {
+  fetchAuthStatus,
+  login,
+  nextPathAfterLogin,
+  onAuthEvent,
+} from "@/lib/auth";
 import { go } from "@/lib/nav";
 
 export function LoginForm() {
@@ -15,11 +20,11 @@ export function LoginForm() {
   useEffect(() => {
     void fetchAuthStatus().then((status) => {
       if (status.needsSetup) go("/setup/");
-      if (status.authenticated) go("/");
+      if (status.authenticated) go(nextPathAfterLogin());
     });
     // 別タブでログインしたら、このタブもログイン後の画面へ移動する。
     return onAuthEvent((type) => {
-      if (type === "login") go("/");
+      if (type === "login") go(nextPathAfterLogin());
     });
   }, []);
 
@@ -32,7 +37,8 @@ export function LoginForm() {
     try {
       await login({ userId: nextUserId, password });
       setPassword("");
-      go("/");
+      // メール等で共有された URL から来た場合は、ログイン後にそのページへ戻す。
+      go(nextPathAfterLogin());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
