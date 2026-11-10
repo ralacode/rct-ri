@@ -6,6 +6,7 @@ import {
   fetchAuthStatus,
   logout,
   redirectForAuthStatus,
+  watchSession,
   type AuthUser,
 } from "@/lib/auth";
 import { siteMeta } from "@/lib/constants";
@@ -69,6 +70,8 @@ export function AppShell({
       document.removeEventListener("astro:page-load", syncAuth);
     };
   }, []);
+
+  useEffect(() => watchSession(), []);
 
   const handleLogout = async () => {
     try {

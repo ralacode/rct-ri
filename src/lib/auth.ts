@@ -24,21 +24,76 @@ export type AuthStatus = {
 };
 
 const AUTH_PAGES = ["/login/", "/setup/"];
-const SESSION_ALIVE_KEY = "rct_session_alive";
+// ログイン状態はサーバーの HttpOnly Cookie（全タブ共有）で判定する。
+// ここではタブ間でログイン・ログアウトを即時に伝えるためだけに localStorage を使う。
+const AUTH_EVENT_KEY = "rct_auth_event";
+// 自動ログアウト（サーバー側のセッション期限切れ）を検知する間隔。
+const AUTH_CHECK_INTERVAL_MS = 60 * 1000;
 
-export function markSessionAlive() {
+type AuthEvent = "login" | "logout";
+
+function broadcastAuthEvent(type: AuthEvent) {
   if (typeof window === "undefined") return;
-  sessionStorage.setItem(SESSION_ALIVE_KEY, "1");
+  try {
+    localStorage.setItem(
+      AUTH_EVENT_KEY,
+      JSON.stringify({ type, at: Date.now() }),
+    );
+  } catch {
+    // localStorage が使えない環境では定期チェックに任せる。
+  }
 }
 
-export function hasSessionAlive() {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(SESSION_ALIVE_KEY) === "1";
+export function onAuthEvent(callback: (type: AuthEvent) => void) {
+  if (typeof window === "undefined") return () => {};
+  const handler = (event: StorageEvent) => {
+    if (event.key !== AUTH_EVENT_KEY || !event.newValue) return;
+    try {
+      const { type } = JSON.parse(event.newValue) as { type: AuthEvent };
+      if (type === "login" || type === "logout") callback(type);
+    } catch {
+      // 不正な値は無視する。
+    }
+  };
+  window.addEventListener("storage", handler);
+  return () => window.removeEventListener("storage", handler);
 }
 
-export function clearSessionAlive() {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(SESSION_ALIVE_KEY);
+/**
+ * ログイン中の画面で、別タブでのログアウトとセッション期限切れ（自動ログアウト）を
+ * 検知してログイン画面へ移動する。
+ */
+export function watchSession() {
+  if (typeof window === "undefined") return () => {};
+  let stopped = false;
+  const toLogin = () => {
+    if (!stopped && !isAuthPage()) go("/login/");
+  };
+  const check = async () => {
+    if (stopped || document.visibilityState === "hidden") return;
+    try {
+      const status = await fetchAuthStatus();
+      if (!status.authenticated) toLogin();
+    } catch {
+      // 通信エラーは一時的なものとして次回に再確認する。
+    }
+  };
+  const onVisible = () => {
+    if (document.visibilityState === "visible") void check();
+  };
+  const offAuthEvent = onAuthEvent((type) => {
+    if (type === "logout") toLogin();
+  });
+  const timer = window.setInterval(check, AUTH_CHECK_INTERVAL_MS);
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("focus", onVisible);
+  return () => {
+    stopped = true;
+    offAuthEvent();
+    window.clearInterval(timer);
+    document.removeEventListener("visibilitychange", onVisible);
+    window.removeEventListener("focus", onVisible);
+  };
 }
 
 function apiUrl(path: string) {
@@ -77,16 +132,7 @@ async function authRequest<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchAuthStatus(): Promise<AuthStatus> {
-  const status = await authRequest<AuthStatus>("/auth/status");
-  if (status.authenticated && !hasSessionAlive()) {
-    await logout();
-    return {
-      needsSetup: status.needsSetup,
-      authenticated: false,
-      user: null,
-    };
-  }
-  return status;
+  return authRequest<AuthStatus>("/auth/status");
 }
 
 export async function listPublicModalities(): Promise<Modality[]> {
@@ -136,7 +182,7 @@ export async function setupAdmin(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
-  markSessionAlive();
+  broadcastAuthEvent("login");
   return user;
 }
 
@@ -148,13 +194,16 @@ export async function login(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
-  markSessionAlive();
+  broadcastAuthEvent("login");
   return user;
 }
 
 export async function logout(): Promise<void> {
-  clearSessionAlive();
-  await authRequest<void>("/auth/logout", { method: "POST" });
+  try {
+    await authRequest<void>("/auth/logout", { method: "POST" });
+  } finally {
+    broadcastAuthEvent("logout");
+  }
 }
 
 export async function fetchMe(): Promise<AuthUser> {

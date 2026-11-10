@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
 import { MyInput } from "@/components/react/my-input";
-import { fetchAuthStatus, login } from "@/lib/auth";
+import { fetchAuthStatus, login, onAuthEvent } from "@/lib/auth";
 import { go } from "@/lib/nav";
 
 export function LoginForm() {
@@ -16,6 +16,10 @@ export function LoginForm() {
     void fetchAuthStatus().then((status) => {
       if (status.needsSetup) go("/setup/");
       if (status.authenticated) go("/");
+    });
+    // 別タブでログインしたら、このタブもログイン後の画面へ移動する。
+    return onAuthEvent((type) => {
+      if (type === "login") go("/");
     });
   }, []);
 
