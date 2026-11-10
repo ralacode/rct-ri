@@ -67,7 +67,7 @@ export function watchSession() {
   if (typeof window === "undefined") return () => {};
   let stopped = false;
   const toLogin = () => {
-    if (!stopped && !isAuthPage()) go("/login/");
+    if (!stopped && !isAuthPage()) go(loginUrl());
   };
   const check = async () => {
     if (stopped || document.visibilityState === "hidden") return;
@@ -272,6 +272,45 @@ export async function setManagePermission(
   });
 }
 
+/**
+ * ログイン後に戻す先として安全な、同一オリジン内のパスかを判定する。
+ * `//evil.example` や `/\\evil.example` のような外部へ飛ぶ値と、ログイン・初期設定画面自体は拒否する。
+ */
+export function safeNextPath(value: string | null | undefined): string | null {
+  if (!value || !value.startsWith("/")) return null;
+  if (value.startsWith("//") || value.startsWith("/\\")) return null;
+  if (/[\u0000-\u001f\u007f]/.test(value)) return null;
+  const pathname = value.split(/[?#]/)[0];
+  if (
+    isAuthPage(pathname) ||
+    pathname.startsWith("/login") ||
+    pathname.startsWith("/setup") ||
+    pathname.startsWith("/api")
+  ) {
+    return null;
+  }
+  return value;
+}
+
+/** ログイン画面の URL の `next` から、ログイン後に戻す先を取り出す（なければ "/"）。 */
+export function nextPathAfterLogin(): string {
+  if (typeof window === "undefined") return "/";
+  const next = new URLSearchParams(window.location.search).get("next");
+  return safeNextPath(next) ?? "/";
+}
+
+/** 今いるページ（またはその `next`）をログイン後の戻り先として付けたログイン画面の URL。 */
+export function loginUrl(): string {
+  if (typeof window === "undefined") return "/login/";
+  const { pathname, search, hash } = window.location;
+  const current = isAuthPage(pathname)
+    ? nextPathAfterLogin()
+    : `${pathname}${search}${hash}`;
+  const next = safeNextPath(current);
+  if (!next || next === "/") return "/login/";
+  return `/login/?next=${encodeURIComponent(next)}`;
+}
+
 export function isAuthPage(pathname = window.location.pathname) {
   return AUTH_PAGES.some(
     (page) => pathname === page || pathname === page.slice(0, -1),
@@ -285,11 +324,11 @@ export async function redirectForAuthStatus(status: AuthStatus) {
     return false;
   }
   if (!status.needsSetup && !status.authenticated && !isAuthPage(path)) {
-    go("/login/");
+    go(loginUrl());
     return false;
   }
   if (status.authenticated && isAuthPage(path)) {
-    go("/");
+    go(nextPathAfterLogin());
     return false;
   }
   if (

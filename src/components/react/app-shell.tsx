@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/react/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   fetchAuthStatus,
+  loginUrl,
   logout,
   redirectForAuthStatus,
   watchSession,
@@ -60,7 +61,7 @@ export function AppShell({
           startLiveUpdates();
         }
       } catch {
-        if (!cancelled) go("/login/");
+        if (!cancelled) go(loginUrl());
       }
     };
     void syncAuth();

@@ -1,4 +1,4 @@
-import { fetchAuthStatus, isAuthPage } from "@/lib/auth";
+import { fetchAuthStatus, isAuthPage, loginUrl } from "@/lib/auth";
 import { go } from "@/lib/nav";
 
 const DATA_CHANGED = "rct-data-changed";
@@ -23,7 +23,7 @@ export function startLiveUpdates() {
           }
           window.__rctLiveStarted = false;
           if (!isAuthPage()) {
-            go("/login/");
+            go(loginUrl());
           }
         })
         .catch(() => {

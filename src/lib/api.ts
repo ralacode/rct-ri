@@ -1,3 +1,5 @@
+import { loginUrl } from "@/lib/auth";
+
 type InvokeArgs = Record<string, unknown>;
 
 function apiRoot(): string {
@@ -17,7 +19,7 @@ function redirectToLogin() {
   if (typeof window === "undefined") return;
   const path = window.location.pathname;
   if (path.startsWith("/login") || path.startsWith("/setup")) return;
-  window.location.assign("/login/");
+  window.location.assign(loginUrl());
 }
 
 async function readError(response: Response): Promise<string> {
