@@ -16,7 +16,8 @@ use tower_http::services::ServeFile;
 
 const ALLOWED_EXTENSIONS: &[&str] = &["mp4", "webm", "m4v"];
 const COMPLETE_REMAIN_SEC: f64 = 2.0;
-const COMPLETE_RATIO: f64 = 0.95;
+/// シークなしでこれより大きく戻る位置は、要素が外れたときの 0 秒とみなして捨てる。
+const BACKWARD_JUMP_SEC: f64 = 1.0;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,6 +57,10 @@ struct SaveProgressRequest {
     file_name: String,
     position_sec: f64,
     duration_sec: f64,
+    /// ユーザーがシークした、または完了後に最初から再生したとき true。
+    /// false のとき、保存済みより大きく手前の位置では上書きしない。
+    #[serde(default)]
+    seeked: bool,
 }
 
 #[derive(Deserialize)]
@@ -68,7 +73,6 @@ struct SaveTitleRequest {
 struct StoredProgress {
     position_sec: f64,
     duration_sec: f64,
-    completed: bool,
     updated_at: String,
 }
 
@@ -177,11 +181,27 @@ fn list_files() -> Result<Vec<(String, u64)>, String> {
 }
 
 fn is_completed(position_sec: f64, duration_sec: f64) -> bool {
-    if duration_sec <= 0.0 || !duration_sec.is_finite() {
+    if duration_sec <= 0.0 || !duration_sec.is_finite() || !position_sec.is_finite() {
         return false;
     }
     let position = position_sec.max(0.0);
-    position >= duration_sec - COMPLETE_REMAIN_SEC || position / duration_sec >= COMPLETE_RATIO
+    // 終了直前で止めたものと、最後まで再生したものだけ完了にする。
+    position > 0.0 && duration_sec - position <= COMPLETE_REMAIN_SEC
+}
+
+fn resolve_position(previous: Option<f64>, incoming: f64, seeked: bool) -> f64 {
+    let position = if incoming.is_finite() {
+        incoming.max(0.0)
+    } else {
+        0.0
+    };
+    let Some(previous) = previous.filter(|value| value.is_finite()) else {
+        return position;
+    };
+    if !seeked && position + BACKWARD_JUMP_SEC < previous {
+        return previous;
+    }
+    position
 }
 
 fn title_for(conn: &Connection, file_name: &str) -> Result<String, String> {
@@ -218,7 +238,7 @@ fn progress_for_user(
 ) -> Result<Option<StoredProgress>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT position_sec, duration_sec, completed, updated_at
+            "SELECT position_sec, duration_sec, updated_at
              FROM video_progress
              WHERE user_id = ?1 AND file_name = ?2",
         )
@@ -232,15 +252,14 @@ fn progress_for_user(
     Ok(Some(StoredProgress {
         position_sec: row.get(0).map_err(|e| e.to_string())?,
         duration_sec: row.get(1).map_err(|e| e.to_string())?,
-        completed: row.get::<_, i32>(2).map_err(|e| e.to_string())? != 0,
-        updated_at: row.get(3).map_err(|e| e.to_string())?,
+        updated_at: row.get(2).map_err(|e| e.to_string())?,
     }))
 }
 
 fn all_progress(conn: &Connection) -> Result<Vec<(i32, String, StoredProgress)>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT user_id, file_name, position_sec, duration_sec, completed, updated_at
+            "SELECT user_id, file_name, position_sec, duration_sec, updated_at
              FROM video_progress",
         )
         .map_err(|e| e.to_string())?;
@@ -252,8 +271,7 @@ fn all_progress(conn: &Connection) -> Result<Vec<(i32, String, StoredProgress)>,
                 StoredProgress {
                     position_sec: row.get(2)?,
                     duration_sec: row.get(3)?,
-                    completed: row.get::<_, i32>(4)? != 0,
-                    updated_at: row.get(5)?,
+                    updated_at: row.get(4)?,
                 },
             ))
         })
@@ -280,9 +298,18 @@ fn list_videos_for(user_id: i32) -> Result<Vec<VideoItem>, String> {
             name,
             title,
             size,
-            position_sec: progress.as_ref().map(|item| item.position_sec).unwrap_or(0.0),
-            duration_sec: progress.as_ref().map(|item| item.duration_sec).unwrap_or(0.0),
-            completed: progress.as_ref().map(|item| item.completed).unwrap_or(false),
+            position_sec: progress
+                .as_ref()
+                .map(|item| item.position_sec)
+                .unwrap_or(0.0),
+            duration_sec: progress
+                .as_ref()
+                .map(|item| item.duration_sec)
+                .unwrap_or(0.0),
+            completed: progress
+                .as_ref()
+                .map(|item| is_completed(item.position_sec, item.duration_sec))
+                .unwrap_or(false),
             updated_at: progress.map(|item| item.updated_at),
         });
     }
@@ -319,22 +346,27 @@ async fn save_progress(
 
 fn upsert_progress(user_id: i32, body: &SaveProgressRequest) -> Result<(), String> {
     let _ = resolve_video_file(&body.file_name)?;
-    let duration = if body.duration_sec.is_finite() && body.duration_sec > 0.0 {
+    let conn = open_db()?;
+    let previous = progress_for_user(&conn, user_id, &body.file_name)?;
+    let mut duration = if body.duration_sec.is_finite() && body.duration_sec > 0.0 {
         body.duration_sec
     } else {
         0.0
     };
-    let mut position = if body.position_sec.is_finite() {
-        body.position_sec.max(0.0)
-    } else {
-        0.0
-    };
+    if duration <= 0.0 {
+        if let Some(prev) = &previous {
+            duration = prev.duration_sec;
+        }
+    }
+    let mut position = resolve_position(
+        previous.as_ref().map(|item| item.position_sec),
+        body.position_sec,
+        body.seeked,
+    );
     if duration > 0.0 {
         position = position.min(duration);
     }
     let completed = is_completed(position, duration);
-    let conn = open_db()?;
-    let previous = progress_for_user(&conn, user_id, &body.file_name)?;
     let max_position = previous
         .as_ref()
         .map(|item| item.position_sec.max(position))
@@ -385,9 +417,9 @@ fn list_admin_progress() -> Result<Vec<WatchRow>, String> {
     let mut rows = Vec::new();
     for user in users {
         for (file_name, _) in &files {
-            let found = stored.iter().find(|(id, name, _)| {
-                *id == user.id && name == file_name
-            });
+            let found = stored
+                .iter()
+                .find(|(id, name, _)| *id == user.id && name == file_name);
             let progress = found.map(|(_, _, item)| item);
             rows.push(WatchRow {
                 user_id: user.user_id.clone(),
@@ -400,7 +432,9 @@ fn list_admin_progress() -> Result<Vec<WatchRow>, String> {
                     progress.map(|item| item.position_sec).unwrap_or(0.0),
                     progress.map(|item| item.duration_sec).unwrap_or(0.0),
                 ),
-                completed: progress.map(|item| item.completed).unwrap_or(false),
+                completed: progress
+                    .map(|item| is_completed(item.position_sec, item.duration_sec))
+                    .unwrap_or(false),
                 updated_at: progress.map(|item| item.updated_at.clone()),
             });
         }
@@ -446,4 +480,33 @@ fn upsert_title(file_name: &str, title: &str) -> Result<(), String> {
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{is_completed, resolve_position};
+
+    #[test]
+    fn completion_is_only_the_last_two_seconds() {
+        assert!(!is_completed(0.0, 100.0));
+        assert!(!is_completed(95.0, 100.0));
+        assert!(!is_completed(97.9, 100.0));
+        assert!(is_completed(98.0, 100.0));
+        assert!(is_completed(100.0, 100.0));
+        assert!(!is_completed(0.0, 1.0));
+        assert!(is_completed(1.0, 1.0));
+        assert!(!is_completed(10.0, 0.0));
+        assert!(!is_completed(f64::NAN, 100.0));
+    }
+
+    #[test]
+    fn backward_jump_without_seek_keeps_saved_position() {
+        assert_eq!(resolve_position(Some(42.0), 0.0, false), 42.0);
+        assert_eq!(resolve_position(Some(42.0), 41.2, false), 41.2);
+        assert_eq!(resolve_position(Some(42.0), 40.0, false), 42.0);
+        assert_eq!(resolve_position(Some(42.0), 50.0, false), 50.0);
+        assert_eq!(resolve_position(Some(100.0), 12.0, true), 12.0);
+        assert_eq!(resolve_position(None, 8.0, false), 8.0);
+        assert_eq!(resolve_position(Some(f64::NAN), 3.0, false), 3.0);
+    }
 }
