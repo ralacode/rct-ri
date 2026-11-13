@@ -9,8 +9,7 @@ import {
   updateTreatmentRequest,
   type TreatmentRequest,
 } from "@/lib/treatment";
-import { cn, formatDateTimeWithDay } from "@/lib/utils";
-import { Card } from "@/components/react/card";
+import { formatDateTimeWithDay } from "@/lib/utils";
 import { MyButton } from "@/components/react/my-button";
 import {
   TreatmentRequestDialog,
@@ -67,9 +66,9 @@ export function TreatmentRequestSection({
   };
 
   return (
-    <div className="grid gap-2 content-start">
+    <div className="mt-4 grid gap-3 border-t pt-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-2xl">治療依頼</h2>
+        <h3 className="text-base font-medium">治療依頼</h3>
         {canEdit && (
           <MyButton onClick={() => setCreating(true)}>
             治療依頼オーダー
@@ -78,28 +77,31 @@ export function TreatmentRequestSection({
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {requests.length === 0 ? (
-        <p className="text-gray-500">登録された治療依頼はありません。</p>
+        <p className="text-sm text-gray-500">
+          登録された治療依頼はありません。
+        </p>
       ) : (
-        <div className={cn("grid gap-4 content-start", "@lg:grid-cols-2")}>
+        <div className="grid gap-2">
           {requests.map((request) => (
-            <Card key={request.id} className="grid gap-2 content-start">
-              <div className="flex flex-wrap gap-2">
-                <div>{formatDateTimeWithDay(request.requestDate)}</div>
+            <div
+              key={request.id}
+              className="grid gap-2 rounded-md border bg-sky-50 p-3"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
+                  {formatDateTimeWithDay(request.requestDate)}{" "}
                   {request.slotTime}
                   {request.slotTime === "15:30" ? " 臨時" : ""}
                 </div>
+                {canEdit && (
+                  <MyButton onClick={() => setEditing(request)}>変更</MyButton>
+                )}
               </div>
-              <div className="text-right">
+              <div className="text-right text-sm">
                 <div>{request.requestingDepartment}</div>
                 <div>{request.requestingPhysician}</div>
               </div>
-              {canEdit && (
-                <div className="justify-self-end">
-                  <MyButton onClick={() => setEditing(request)}>変更</MyButton>
-                </div>
-              )}
-            </Card>
+            </div>
           ))}
         </div>
       )}

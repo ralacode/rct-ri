@@ -844,11 +844,13 @@ export const PatientDetail: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {!isEditing && (
+              <TreatmentRequestSection patientDbId={patient.id} />
+            )}
           </Card>
         </FadeIn>
       </div>
-
-      <TreatmentRequestSection patientDbId={patient.id} />
 
       {/* 検査履歴一覧 */}
       <div className={cn("grid gap-2 content-start")}>

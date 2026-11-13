@@ -427,22 +427,25 @@ function SlotCell({
   onOpen: (id: number) => void;
 }) {
   const closed = dayClosed || Boolean(closure);
+  const occupied = Boolean(request);
   return (
     <td
+      data-occupied={occupied ? "true" : undefined}
       className={cn(
         "relative min-h-28 border p-1 align-middle",
-        closed && "text-muted-foreground",
+        occupied && "bg-sky-200 shadow-[inset_4px_0_0_0_#0284c7]",
+        !occupied && closed && "text-muted-foreground",
       )}
-      style={closed ? closedStyle : undefined}
+      style={!occupied && closed ? closedStyle : undefined}
     >
       {request && (
         <>
-          <div className="absolute inset-x-1 top-0.5 text-[11px] leading-tight text-muted-foreground">
+          <div className="absolute inset-x-1 top-0.5 text-[11px] leading-tight font-medium text-sky-950">
             {request.requestingDepartment}
           </div>
           <a
             href={`/patient/detail/?id=${request.patientId}`}
-            className="flex h-full items-center justify-center px-1 pt-4 text-center text-foreground"
+            className="flex h-full items-center justify-center px-1 pt-4 text-center font-medium text-sky-950"
           >
             <PatientName
               last_name_kanji={request.lastNameKanji}

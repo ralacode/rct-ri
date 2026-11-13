@@ -518,6 +518,35 @@ pub fn delete_request_on(conn: &mut Connection, id: i32) -> Result<(), String> {
     Ok(())
 }
 
+pub fn closures_on_date(date: &str) -> Result<Vec<SlotClosure>, String> {
+    let conn = open()?;
+    closures_for_date(&conn, date)
+}
+
+fn closures_for_date(conn: &Connection, date: &str) -> Result<Vec<SlotClosure>, String> {
+    let date = date_str(parse_date(date)?);
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, closure_date, slot_time
+             FROM treatment_slot_closures
+             WHERE closure_date = ?1
+             ORDER BY CASE slot_time WHEN 'day' THEN 0 ELSE 1 END, slot_time ASC",
+        )
+        .map_err(|e| e.to_string())?;
+    let closures = stmt
+        .query_map(params![date], |row| {
+            Ok(SlotClosure {
+                id: row.get(0)?,
+                closure_date: row.get(1)?,
+                slot_time: row.get(2)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(closures)
+}
+
 pub fn close_slot(closure_date: &str, slot_time: &str) -> Result<(), String> {
     let mut conn = open()?;
     close_slot_on(&mut conn, closure_date, slot_time)?;
@@ -779,6 +808,24 @@ mod tests {
         assert_eq!(rows[0].request_date, "2026-11-03");
         assert_eq!(rows[0].slot_time, "14:30");
         assert_eq!(rows[0].requesting_department, "整形外科");
+    }
+
+    #[test]
+    fn lists_closures_for_one_date() {
+        let mut conn = test_db();
+        close_slot_on(&mut conn, "2026-11-04", "13:30").unwrap();
+        close_slot_on(&mut conn, "2026-11-04", "15:30").unwrap();
+        close_slot_on(&mut conn, "2026-11-05", DAY_CLOSURE).unwrap();
+
+        let rows = closures_for_date(&conn, "2026-11-04").unwrap();
+        assert_eq!(
+            rows.iter().map(|row| row.slot_time.as_str()).collect::<Vec<_>>(),
+            vec!["13:30", "15:30"]
+        );
+        let rows = closures_for_date(&conn, "2026-11-05").unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].slot_time, DAY_CLOSURE);
+        assert!(closures_for_date(&conn, "2026-11-02").unwrap().is_empty());
     }
 
     #[test]

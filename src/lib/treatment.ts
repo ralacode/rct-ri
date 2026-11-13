@@ -124,6 +124,31 @@ export function deleteTreatmentRequest(id: number) {
   return apiRequest<void>(`/treatment-requests/${id}`, { method: "DELETE" });
 }
 
+export function listTreatmentClosures(date: string) {
+  return apiRequest<SlotClosure[]>(`/treatment-closures${query({ date })}`);
+}
+
+export function closureMessages(
+  closures: Pick<SlotClosure, "slotTime">[],
+): string[] {
+  const dayClosed = closures.some(
+    (closure) => closure.slotTime === DAY_CLOSURE,
+  );
+  const closed = new Set(
+    closures
+      .map((closure) => closure.slotTime)
+      .filter((slot) => slot !== DAY_CLOSURE),
+  );
+  const messages: string[] = [];
+  if (dayClosed) messages.push("この日は休診です");
+  for (const slot of TREATMENT_SLOTS) {
+    if (dayClosed || closed.has(slot.value)) {
+      messages.push(`${slot.value}は閉じています`);
+    }
+  }
+  return messages;
+}
+
 export function closeTreatmentSlot(closureDate: string, slotTime: string) {
   return apiRequest<void>("/treatment-closures", {
     method: "POST",

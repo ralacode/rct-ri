@@ -4,7 +4,7 @@ use crate::auth::{self, AuthUser};
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, post, put};
+use axum::routing::{get, put};
 use axum::{Extension, Json, Router};
 use serde::Deserialize;
 
@@ -30,6 +30,11 @@ struct ClosureBody {
 }
 
 #[derive(Deserialize)]
+struct DateQuery {
+    date: String,
+}
+
+#[derive(Deserialize)]
 struct RemarkBody {
     body: String,
 }
@@ -44,7 +49,7 @@ pub fn routes() -> Router {
     Router::new()
         .route("/treatment-board", get(board))
         .route("/treatment-schedule", get(schedule).put(update_schedule))
-        .route("/treatment-closures", post(close_slot))
+        .route("/treatment-closures", get(list_closures).post(close_slot))
         .route("/treatment-closures/{id}", axum::routing::delete(open_slot))
         .route("/treatment-remarks/{date}", put(save_remark))
         .route(
@@ -171,6 +176,13 @@ async fn delete_request(Path(id): Path<i32>, Extension(actor): Extension<AuthUse
     }
     match model::delete_request(id) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(message) => bad(message),
+    }
+}
+
+async fn list_closures(Query(query): Query<DateQuery>) -> Response {
+    match model::closures_on_date(&query.date) {
+        Ok(closures) => Json(closures).into_response(),
         Err(message) => bad(message),
     }
 }

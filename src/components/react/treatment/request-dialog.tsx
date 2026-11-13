@@ -12,8 +12,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getTreatmentSchedule, TREATMENT_SLOTS } from "@/lib/treatment";
-import type { TreatmentRequestInput } from "@/lib/treatment";
+import { onDataChanged } from "@/lib/live";
+import {
+  closureMessages,
+  DAY_CLOSURE,
+  getTreatmentSchedule,
+  listTreatmentClosures,
+  TREATMENT_SLOTS,
+} from "@/lib/treatment";
+import type { SlotClosure, TreatmentRequestInput } from "@/lib/treatment";
 import { PHYSICIAN } from "@/lib/secret-utils";
 import {
   cn,
@@ -46,11 +53,18 @@ export function TreatmentRequestDialog({
   const [department, setDepartment] = useState("");
   const [physician, setPhysician] = useState("");
   const [openWeekdays, setOpenWeekdays] = useState<number[]>([1, 3, 4]);
+  const [closures, setClosures] = useState<SlotClosure[]>([]);
+  const [closureError, setClosureError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setDate("");
+      setClosures([]);
+      setClosureError(null);
+      return;
+    }
     setDate(
       initial
         ? normalizeToDisplayDateFormat(initial.requestDate)
@@ -71,7 +85,46 @@ export function TreatmentRequestDialog({
     initial?.requestingPhysician,
   ]);
 
+  useEffect(() => {
+    if (!open) return;
+    const requestDate = normalizeToDbDateFormat(date);
+    if (!requestDate) {
+      setClosures([]);
+      setClosureError(null);
+      return;
+    }
+    let cancelled = false;
+    const load = () => {
+      void listTreatmentClosures(requestDate)
+        .then((rows) => {
+          if (cancelled) return;
+          setClosures(rows);
+          setClosureError(null);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setClosures([]);
+          setClosureError("閉じ枠を確認できませんでした");
+        });
+    };
+    load();
+    const stop = onDataChanged(load);
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [open, date]);
+
   const keptDate = initial?.requestDate ?? "";
+  const notices = closureMessages(closures);
+  const dayClosed = closures.some(
+    (closure) => closure.slotTime === DAY_CLOSURE,
+  );
+  const closedSlots = new Set(
+    closures
+      .filter((closure) => closure.slotTime !== DAY_CLOSURE)
+      .map((closure) => closure.slotTime),
+  );
 
   const submit = async () => {
     const requestDate = normalizeToDbDateFormat(date);
@@ -138,6 +191,19 @@ export function TreatmentRequestDialog({
               return !openWeekdays.includes(getISODay(day));
             }}
           />
+          {notices.length > 0 && (
+            <div
+              role="status"
+              className="grid gap-1 rounded-md border border-amber-400 bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950"
+            >
+              {notices.map((notice) => (
+                <p key={notice}>{notice}</p>
+              ))}
+            </div>
+          )}
+          {closureError && (
+            <p className="text-sm text-destructive">{closureError}</p>
+          )}
           <label className="grid gap-2 text-sm">
             時間枠
             <select
@@ -145,11 +211,15 @@ export function TreatmentRequestDialog({
               onChange={(event) => setSlot(event.target.value)}
               className="h-10 rounded-md border border-input bg-transparent px-3 text-base"
             >
-              {TREATMENT_SLOTS.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
+              {TREATMENT_SLOTS.map((item) => {
+                const closed = dayClosed || closedSlots.has(item.value);
+                return (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                    {closed ? "（閉じています）" : ""}
+                  </option>
+                );
+              })}
             </select>
           </label>
           <DatalistInput
