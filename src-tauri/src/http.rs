@@ -11,14 +11,14 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
+use serde::Deserialize;
+use serde_json::json;
 use std::convert::Infallible;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio_stream::wrappers::BroadcastStream;
 use tokio_stream::StreamExt as _;
-use serde::Deserialize;
-use serde_json::json;
-use std::net::SocketAddr;
-use std::path::PathBuf;
 use tower_http::cors::CorsLayer;
 use tower_http::services::ServeDir;
 
@@ -40,7 +40,6 @@ struct DailyOrderQuery {
 #[serde(rename_all = "camelCase")]
 struct AddPatientRequest {
     patient_id: String,
-    patient_type: String,
     last_name_kanji: String,
     first_name_kanji: String,
     last_name_kana: String,
@@ -57,7 +56,6 @@ struct AddPatientRequest {
 #[serde(rename_all = "camelCase")]
 struct EditPatientRequest {
     patient_id: String,
-    patient_type: String,
     last_name_kanji: String,
     first_name_kanji: String,
     last_name_kana: String,
@@ -213,7 +211,9 @@ fn is_safe_next(path: &str) -> bool {
         return false;
     }
     let pathname = path.split(['?', '#']).next().unwrap_or("");
-    !(pathname.starts_with("/login") || pathname.starts_with("/setup") || pathname.starts_with("/api"))
+    !(pathname.starts_with("/login")
+        || pathname.starts_with("/setup")
+        || pathname.starts_with("/api"))
 }
 
 fn percent_encode_component(value: &str) -> String {
@@ -374,10 +374,7 @@ async fn rename_modality(
     empty_ok(auth::rename_modality(id, &body.name))
 }
 
-async fn delete_modality(
-    Path(id): Path<i32>,
-    Extension(actor): Extension<AuthUser>,
-) -> Response {
+async fn delete_modality(Path(id): Path<i32>, Extension(actor): Extension<AuthUser>) -> Response {
     if !actor.is_initial_admin {
         return auth_fail(
             StatusCode::FORBIDDEN,
@@ -462,10 +459,7 @@ async fn update_user(
     }
 }
 
-async fn delete_user(
-    Path(id): Path<i32>,
-    Extension(actor): Extension<AuthUser>,
-) -> Response {
+async fn delete_user(Path(id): Path<i32>, Extension(actor): Extension<AuthUser>) -> Response {
     if let Some(response) = forbid_unless_manager(&actor) {
         return response;
     }
@@ -576,14 +570,11 @@ async fn gate_pages(request: Request, next: Next) -> Response {
 }
 
 async fn events() -> Response {
-    let live = BroadcastStream::new(crate::events::subscribe()).filter_map(|message| {
-        match message {
-            Ok(_) => Some(Ok(
-                Event::default().event("data-changed").data("changed")
-            )),
+    let live =
+        BroadcastStream::new(crate::events::subscribe()).filter_map(|message| match message {
+            Ok(_) => Some(Ok(Event::default().event("data-changed").data("changed"))),
             Err(_) => None,
-        }
-    });
+        });
     // 接続直後に1件送ってヘッダを確定させ、EventSource が CONNECTING のまま固まらないようにする
     let stream = tokio_stream::once(Ok::<Event, Infallible>(
         Event::default().event("hello").data("ok"),
@@ -611,9 +602,7 @@ async fn events() -> Response {
 }
 
 async fn list_patients(Query(query): Query<PatientListQuery>) -> Response {
-    let keyword = query
-        .keyword
-        .filter(|value| !value.trim().is_empty());
+    let keyword = query.keyword.filter(|value| !value.trim().is_empty());
     let sort_desc = query.sort_desc.unwrap_or(true);
     match patient_model::search(keyword, sort_desc) {
         Ok(patients) => Json(patients).into_response(),
@@ -624,7 +613,6 @@ async fn list_patients(Query(query): Query<PatientListQuery>) -> Response {
 async fn create_patient(Json(body): Json<AddPatientRequest>) -> Response {
     let fields = PatientFields {
         patient_id: body.patient_id,
-        patient_type: body.patient_type,
         last_name_kanji: body.last_name_kanji,
         first_name_kanji: body.first_name_kanji,
         last_name_kana: body.last_name_kana,
@@ -638,14 +626,10 @@ async fn create_patient(Json(body): Json<AddPatientRequest>) -> Response {
     empty_ok(patient_model::insert(&fields))
 }
 
-async fn update_patient(
-    Path(id): Path<i32>,
-    Json(body): Json<EditPatientRequest>,
-) -> Response {
+async fn update_patient(Path(id): Path<i32>, Json(body): Json<EditPatientRequest>) -> Response {
     empty_ok(patient_model::update(
         id,
         &body.patient_id,
-        &body.patient_type,
         &body.last_name_kanji,
         &body.first_name_kanji,
         &body.last_name_kana,
@@ -765,7 +749,9 @@ pub fn resolve_frontend_dir() -> Option<PathBuf> {
         candidates.push(cwd.join("dist"));
         candidates.push(cwd.join("../dist"));
     }
-    candidates.into_iter().find(|path| path.join("index.html").is_file())
+    candidates
+        .into_iter()
+        .find(|path| path.join("index.html").is_file())
 }
 
 fn public_api() -> Router {
@@ -783,10 +769,7 @@ fn protected_api() -> Router {
         .route("/auth/me", get(auth_me))
         .route("/auth/password", put(change_own_password))
         .route("/users", get(list_users).post(create_user))
-        .route(
-            "/users/{id}",
-            put(update_user).delete(delete_user),
-        )
+        .route("/users/{id}", put(update_user).delete(delete_user))
         .route("/users/{id}/password", put(reset_user_password))
         .route("/users/{id}/manage-permission", put(set_manage_permission))
         .route("/users/{id}/modalities", put(set_user_modalities))
@@ -813,6 +796,7 @@ fn protected_api() -> Router {
                 .patch(update_exam_order)
                 .delete(delete_exam_order),
         )
+        .merge(crate::treatment::routes())
         .merge(crate::videos::routes())
         .layer(middleware::from_fn(require_auth))
 }
@@ -921,7 +905,10 @@ mod login_next_tests {
     #[test]
     fn rejects_external_or_auth_pages() {
         assert_eq!(next_from_query(Some("next=%2F%2Fevil.example")), None);
-        assert_eq!(next_from_query(Some("next=https%3A%2F%2Fevil.example")), None);
+        assert_eq!(
+            next_from_query(Some("next=https%3A%2F%2Fevil.example")),
+            None
+        );
         assert_eq!(next_from_query(Some("next=%2F%5Cevil.example")), None);
         assert_eq!(next_from_query(Some("next=%2Flogin%2F")), None);
         assert_eq!(next_from_query(Some("next=%2Fsetup%2F")), None);

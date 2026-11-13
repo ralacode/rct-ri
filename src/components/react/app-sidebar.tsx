@@ -1,4 +1,5 @@
 import {
+  CalendarDays,
   ClipboardList,
   Contact,
   ContactRound,
@@ -32,6 +33,7 @@ import { go } from "@/lib/nav";
 const menuItems = [
   { name: "ホーム", href: "/", icon: Home },
   { name: "検査一覧", href: "/exam_order/daily-list/", icon: ClipboardList },
+  { name: "治療依頼表", href: "/treatment/", icon: CalendarDays },
   { name: "患者登録", href: "/patient/register/", icon: ContactRound },
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
   { name: "患者検索", href: "/patient/search/", icon: Search },

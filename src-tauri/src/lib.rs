@@ -6,6 +6,7 @@ mod events;
 mod exam_order;
 mod http;
 mod patient;
+mod treatment;
 mod videos;
 
 use tauri::{LogicalSize, Manager, PhysicalPosition};

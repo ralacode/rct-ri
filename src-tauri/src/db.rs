@@ -6,7 +6,10 @@ use std::path::PathBuf;
 
 pub fn exe_dir() -> PathBuf {
     let exe_path = std::env::current_exe().expect("実行ファイルパス取得失敗");
-    exe_path.parent().expect("親ディレクトリ取得失敗").to_path_buf()
+    exe_path
+        .parent()
+        .expect("親ディレクトリ取得失敗")
+        .to_path_buf()
 }
 
 pub fn get_videos_dir() -> PathBuf {
@@ -44,7 +47,9 @@ pub fn init_db() -> Result<()> {
     conn.execute("PRAGMA foreign_keys = ON;", [])?;
 
     create_patients_table(&conn)?;
+    crate::patient::model::drop_patient_type_column(&conn)?;
     create_exam_orders_table(&conn)?;
+    crate::treatment::model::init_tables(&conn)?;
     let _ = conn.execute("DROP TABLE IF EXISTS sessions", []);
     let _ = conn.execute("DROP TABLE IF EXISTS users", []);
     crate::patient::model::migrate_created_at_formats(&conn)?;
@@ -98,7 +103,6 @@ fn create_patients_table(conn: &Connection) -> Result<()> {
         "CREATE TABLE IF NOT EXISTS patients (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             patient_id TEXT NOT NULL UNIQUE,
-            patient_type TEXT NOT NULL,
             last_name_kanji TEXT NOT NULL DEFAULT '',
             first_name_kanji TEXT NOT NULL DEFAULT '',
             last_name_kana TEXT NOT NULL DEFAULT '',

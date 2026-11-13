@@ -33,6 +33,7 @@ import { MyButton } from "@components/react/my-button";
 import { MyInput } from "../my-input";
 import { GenderSelect } from "../gender-select";
 import { FadeIn } from "@components/react/fade-in";
+import { TreatmentRequestSection } from "@components/react/treatment/patient-requests";
 import {
   Dialog,
   DialogClose,
@@ -287,7 +288,6 @@ export const PatientDetail: React.FC = () => {
       await invoke("edit_patient", {
         id: patient.id,
         patientId: finalPatientId,
-        patientType: patient.patient_type,
         lastNameKanji: editLastNameKanji,
         firstNameKanji: editFirstNameKanji,
         lastNameKana: editLastNameKana,
@@ -781,7 +781,10 @@ export const PatientDetail: React.FC = () => {
                           inputClassName={cn("h-10 cursor-pointer")}
                         />
 
-                        <PediatricDoseBadge examItem={examItem} weight={weight} />
+                        <PediatricDoseBadge
+                          examItem={examItem}
+                          weight={weight}
+                        />
                       </div>
 
                       <DialogFooter className={cn("grid")}>
@@ -844,6 +847,8 @@ export const PatientDetail: React.FC = () => {
           </Card>
         </FadeIn>
       </div>
+
+      <TreatmentRequestSection patientDbId={patient.id} />
 
       {/* 検査履歴一覧 */}
       <div className={cn("grid gap-2 content-start")}>

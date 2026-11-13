@@ -11,6 +11,8 @@ use std::time::Duration;
 
 pub const SESSION_COOKIE: &str = "rct_session";
 pub const DEFAULT_MODALITY_NAME: &str = "一般撮影";
+pub const RADIATION_THERAPY_CODE: &str = "radiation_therapy";
+pub const RADIATION_THERAPY_NAME: &str = "放射線治療";
 const SESSION_HOURS: i64 = 12;
 const MIN_PASSWORD_LEN: usize = 8;
 
@@ -33,6 +35,13 @@ pub struct Modality {
     pub id: i32,
     pub name: String,
     pub is_default: bool,
+    pub code: Option<String>,
+}
+
+pub fn can_edit_treatment(user: &AuthUser) -> bool {
+    user.modalities
+        .iter()
+        .any(|modality| modality.code.as_deref() == Some(RADIATION_THERAPY_CODE))
 }
 
 impl AuthUser {
@@ -84,6 +93,7 @@ fn init_modality_tables(conn: &Connection) -> rusqlite::Result<()> {
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
             is_default INTEGER NOT NULL DEFAULT 0,
+            code TEXT,
             created_at TEXT NOT NULL
         )",
         [],
@@ -103,6 +113,13 @@ fn init_modality_tables(conn: &Connection) -> rusqlite::Result<()> {
         "INSERT OR IGNORE INTO modalities (name, is_default, created_at) VALUES (?1, 1, ?2)",
         params![DEFAULT_MODALITY_NAME, created_at],
     )?;
+    let _ = conn.execute("ALTER TABLE modalities ADD COLUMN code TEXT", []);
+    conn.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_modalities_code
+         ON modalities(code) WHERE code IS NOT NULL",
+        [],
+    )?;
+    seed_radiation_therapy(conn, &created_at)?;
     conn.execute(
         "INSERT OR IGNORE INTO user_modalities (user_id, modality_id)
          SELECT u.id, m.id
@@ -116,9 +133,39 @@ fn init_modality_tables(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
+fn seed_radiation_therapy(conn: &Connection, created_at: &str) -> rusqlite::Result<()> {
+    let coded: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM modalities WHERE code = ?1",
+        params![RADIATION_THERAPY_CODE],
+        |row| row.get(0),
+    )?;
+    if coded > 0 {
+        return Ok(());
+    }
+    match conn.query_row(
+        "SELECT id FROM modalities WHERE name = ?1",
+        params![RADIATION_THERAPY_NAME],
+        |row| row.get::<_, i32>(0),
+    ) {
+        Ok(id) => {
+            conn.execute(
+                "UPDATE modalities SET code = ?1 WHERE id = ?2",
+                params![RADIATION_THERAPY_CODE, id],
+            )?;
+        }
+        Err(rusqlite::Error::QueryReturnedNoRows) => {
+            conn.execute(
+                "INSERT INTO modalities (name, is_default, created_at, code) VALUES (?1, 0, ?2, ?3)",
+                params![RADIATION_THERAPY_NAME, created_at, RADIATION_THERAPY_CODE],
+            )?;
+        }
+        Err(error) => return Err(error),
+    }
+    Ok(())
+}
+
 fn migrate_initial_admin(conn: &Connection) -> rusqlite::Result<()> {
-    let has_users: i64 =
-        conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
+    let has_users: i64 = conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))?;
     if has_users == 0 {
         return Ok(());
     }
@@ -348,9 +395,7 @@ pub fn login(user_id: &str, password: &str) -> Result<(AuthUser, String), String
     let user_id = normalize_user_id(user_id)
         .map_err(|_| "ユーザーIDまたはパスワードが正しくありません".to_string())?;
     let row = conn.query_row(
-        &format!(
-            "SELECT {USER_COLUMNS}, password_hash FROM users WHERE user_id = ?1"
-        ),
+        &format!("SELECT {USER_COLUMNS}, password_hash FROM users WHERE user_id = ?1"),
         params![user_id],
         |row| Ok((map_user(row)?, row.get::<_, String>(6)?)),
     );
@@ -403,10 +448,7 @@ pub fn user_from_token(token: &str) -> Result<AuthUser, String> {
 }
 
 pub fn token_from_headers(headers: &axum::http::HeaderMap) -> Option<String> {
-    let value = headers
-        .get(axum::http::header::COOKIE)?
-        .to_str()
-        .ok()?;
+    let value = headers.get(axum::http::header::COOKIE)?.to_str().ok()?;
     for part in value.split(';') {
         let part = part.trim();
         let Some(raw) = part.strip_prefix(SESSION_COOKIE) else {
@@ -430,13 +472,9 @@ pub fn user_from_headers(headers: &axum::http::HeaderMap) -> Result<AuthUser, St
 pub fn list_users() -> Result<Vec<AuthUser>, String> {
     let conn = open_db()?;
     let mut stmt = conn
-        .prepare(&format!(
-            "SELECT {USER_COLUMNS} FROM users ORDER BY id ASC"
-        ))
+        .prepare(&format!("SELECT {USER_COLUMNS} FROM users ORDER BY id ASC"))
         .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], map_user)
-        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], map_user).map_err(|e| e.to_string())?;
     let mut users = rows
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())?;
@@ -550,13 +588,14 @@ fn map_modality(row: &rusqlite::Row<'_>) -> rusqlite::Result<Modality> {
         id: row.get(0)?,
         name: row.get(1)?,
         is_default: row.get::<_, i32>(2)? != 0,
+        code: row.get(3)?,
     })
 }
 
 fn modalities_for_user(conn: &Connection, user_id: i32) -> Result<Vec<Modality>, String> {
     let mut stmt = conn
         .prepare(
-            "SELECT m.id, m.name, m.is_default
+            "SELECT m.id, m.name, m.is_default, m.code
              FROM user_modalities um
              JOIN modalities m ON m.id = um.modality_id
              WHERE um.user_id = ?1
@@ -619,7 +658,9 @@ fn replace_user_modalities(
 pub fn list_modalities() -> Result<Vec<Modality>, String> {
     let conn = open_db()?;
     let mut stmt = conn
-        .prepare("SELECT id, name, is_default FROM modalities ORDER BY is_default DESC, id ASC")
+        .prepare(
+            "SELECT id, name, is_default, code FROM modalities ORDER BY is_default DESC, id ASC",
+        )
         .map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([], map_modality)
@@ -655,6 +696,7 @@ pub fn create_modality(name: &str) -> Result<Modality, String> {
         id,
         name,
         is_default: false,
+        code: None,
     })
 }
 
@@ -681,11 +723,11 @@ pub fn rename_modality(id: i32, name: &str) -> Result<(), String> {
 
 pub fn delete_modality(id: i32) -> Result<(), String> {
     let conn = open_db()?;
-    let is_default: i32 = conn
+    let (is_default, code): (i32, Option<String>) = conn
         .query_row(
-            "SELECT is_default FROM modalities WHERE id = ?1",
+            "SELECT is_default, code FROM modalities WHERE id = ?1",
             params![id],
-            |row| row.get(0),
+            |row| Ok((row.get(0)?, row.get(1)?)),
         )
         .map_err(|error| match error {
             rusqlite::Error::QueryReturnedNoRows => "モダリティが見つかりません".to_string(),
@@ -693,6 +735,9 @@ pub fn delete_modality(id: i32) -> Result<(), String> {
         })?;
     if is_default != 0 {
         return Err("一般撮影は削除できません".into());
+    }
+    if code.as_deref() == Some(RADIATION_THERAPY_CODE) {
+        return Err("放射線治療は削除できません".into());
     }
     let assigned: i64 = conn
         .query_row(

@@ -3,7 +3,6 @@ import { invoke } from "@/lib/api";
 
 export function PatientRegister({ onAdded }: { onAdded: () => void }) {
   const [patientId, setPatientId] = useState("");
-  const [type, setType] = useState("ri");
   const [error, setError] = useState("");
 
   const handleSubmit = async () => {
@@ -30,7 +29,6 @@ export function PatientRegister({ onAdded }: { onAdded: () => void }) {
       // ✅ Rust呼び出し
       await invoke("add_patient", {
         patientId: normalized,
-        patientType: type,
       });
 
       // ✅ 成功時
@@ -56,11 +54,6 @@ export function PatientRegister({ onAdded }: { onAdded: () => void }) {
         onFocus={() => setError("")}
         placeholder="患者ID"
       />
-
-      <select value={type} onChange={(e) => setType(e.target.value)}>
-        <option value="ri">RI患者</option>
-        <option value="rt">治療患者</option>
-      </select>
 
       <button onClick={handleSubmit}>登録</button>
 

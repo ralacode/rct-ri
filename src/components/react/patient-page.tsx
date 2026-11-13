@@ -6,7 +6,6 @@ import { invoke } from "@/lib/api";
 type Patient = {
   id: number;
   patient_id: string;
-  patient_type: string;
 };
 
 export function PatientPage() {

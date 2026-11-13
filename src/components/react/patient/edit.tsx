@@ -9,7 +9,6 @@ import { MyInput } from "../my-input";
 export const PatientEdit = ({ patientId }: { patientId: string }) => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [newPatientId, setNewPatientId] = useState("");
-  const [patientType, setPatientType] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +26,6 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
         if (target) {
           setPatient(target);
           setNewPatientId(target.patient_id);
-          setPatientType(target.patient_type);
         } else {
           setError("患者が見つかりませんでした");
         }
@@ -58,7 +56,6 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
       await invoke("edit_patient", {
         id: patient.id,
         patientId: validation.normalizedId,
-        patientType,
       });
 
       // 更新成功後、詳細画面へ戻る
@@ -83,16 +80,6 @@ export const PatientEdit = ({ patientId }: { patientId: string }) => {
           onChange={(e) => setNewPatientId(e.target.value)}
         />
 
-        <div>
-          <label>区分: </label>
-          <select
-            value={patientType}
-            onChange={(e) => setPatientType(e.target.value)}
-          >
-            <option value="ri">RI</option>
-            <option value="rt">RT</option>
-          </select>
-        </div>
         {error && <p style={{ color: "red" }}>{error}</p>}
         <button type="submit">更新保存</button>
         <button type="button" onClick={() => window.history.back()}>

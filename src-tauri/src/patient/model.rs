@@ -1,14 +1,13 @@
 // src-tauri/src/patient/model.rs
 
-use serde::Serialize;
-use rusqlite::{Connection, Result, Error};
 use crate::db::get_db_path;
+use rusqlite::{Connection, Error, Result};
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct Patient {
     pub id: i32,
     pub patient_id: String,
-    pub patient_type: String,
     pub last_name_kanji: String,
     pub first_name_kanji: String,
     pub last_name_kana: String,
@@ -23,7 +22,6 @@ pub struct Patient {
 
 pub struct PatientFields {
     pub patient_id: String,
-    pub patient_type: String,
     pub last_name_kanji: String,
     pub first_name_kanji: String,
     pub last_name_kana: String,
@@ -37,9 +35,15 @@ pub struct PatientFields {
 
 pub fn normalize_and_validate(input: &str) -> Result<String, String> {
     let trimmed = input.trim();
-    if trimmed.is_empty() { return Err("患者IDは必須です".into()); }
-    if !trimmed.chars().all(|c| c.is_ascii_digit()) { return Err("患者IDは数字のみです".into()); }
-    if trimmed.len() > 10 { return Err("患者IDは10桁以内です".into()); }
+    if trimmed.is_empty() {
+        return Err("患者IDは必須です".into());
+    }
+    if !trimmed.chars().all(|c| c.is_ascii_digit()) {
+        return Err("患者IDは数字のみです".into());
+    }
+    if trimmed.len() > 10 {
+        return Err("患者IDは10桁以内です".into());
+    }
     Ok(format!("{:0>10}", trimmed))
 }
 
@@ -104,9 +108,7 @@ pub fn migrate_created_at_formats(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-pub fn insert(
-    p: &PatientFields,
-) -> Result<(), String> {
+pub fn insert(p: &PatientFields) -> Result<(), String> {
     let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
@@ -114,7 +116,9 @@ pub fn insert(
         .map_err(|e| e.to_string())?;
 
     let normalized_id = normalize_and_validate(&p.patient_id)?;
-    if p.birth_date.trim().is_empty() { return Err("生年月日は必須です".into()); }
+    if p.birth_date.trim().is_empty() {
+        return Err("生年月日は必須です".into());
+    }
 
     let final_created_at = normalize_created_at(p.created_at.as_deref(), true);
 
@@ -124,18 +128,17 @@ pub fn insert(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "INSERT INTO patients (patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+        "INSERT INTO patients (patient_id, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, birth_date, gender, height, weight, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         rusqlite::params![
             &normalized_id,
-            &p.patient_type,
             &p.last_name_kanji,
-            &p.first_name_kanji, 
+            &p.first_name_kanji,
             &p.last_name_kana,
             &p.first_name_kana,
             &p.birth_date,
             &p.gender,
-            p.height, // そのまま渡せるようになります
-            p.weight, // そのまま渡せるようになります
+            p.height,
+            p.weight,
             &final_created_at,
             &final_updated_at,
         ],
@@ -147,7 +150,9 @@ pub fn insert(
             crate::events::notify();
             Ok(())
         }
-        Err(Error::SqliteFailure(err, _)) if err.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE => {
+        Err(Error::SqliteFailure(err, _))
+            if err.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE =>
+        {
             Err("この患者IDは既に登録されています".into())
         }
         Err(e) => Err(e.to_string()),
@@ -159,6 +164,7 @@ pub fn delete(id: i32) -> Result<()> {
     let mut conn = Connection::open(db_path)?;
 
     conn.busy_timeout(std::time::Duration::from_secs(5))?;
+    conn.execute("PRAGMA foreign_keys = ON;", [])?;
 
     let tx = conn.transaction()?;
 
@@ -173,7 +179,6 @@ pub fn delete(id: i32) -> Result<()> {
 pub fn update(
     id: i32,
     patient_id: &str,
-    patient_type: &str,
     last_name_kanji: &str,
     first_name_kanji: &str,
     last_name_kana: &str,
@@ -184,7 +189,7 @@ pub fn update(
     weight: Option<f64>,
     created_at: &str,
 ) -> Result<(), String> {
-  	let db_path = get_db_path();
+    let db_path = get_db_path();
     let mut conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
     conn.busy_timeout(std::time::Duration::from_secs(5))
@@ -199,10 +204,9 @@ pub fn update(
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     let result = tx.execute(
-        "UPDATE patients SET patient_id = ?1, patient_type = ?2, last_name_kanji = ?3, first_name_kanji = ?4, last_name_kana = ?5, first_name_kana = ?6, birth_date = ?7, gender = ?8, height = ?9, weight = ?10, created_at = ?11, updated_at = ?12 WHERE id = ?13",
+        "UPDATE patients SET patient_id = ?1, last_name_kanji = ?2, first_name_kanji = ?3, last_name_kana = ?4, first_name_kana = ?5, birth_date = ?6, gender = ?7, height = ?8, weight = ?9, created_at = ?10, updated_at = ?11 WHERE id = ?12",
         rusqlite::params![
             &normalized_id,
-            patient_type,
             last_name_kanji,
             first_name_kanji,
             last_name_kana,
@@ -236,7 +240,7 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
 
-    let mut query = String::from("SELECT id, patient_id, patient_type, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender, created_at, updated_at FROM patients");
+    let mut query = String::from("SELECT id, patient_id, last_name_kanji, first_name_kanji, last_name_kana, first_name_kana, height, weight, birth_date, gender, created_at, updated_at FROM patients");
 
     let keyword = keyword.unwrap_or_default();
     if !keyword.is_empty() {
@@ -256,17 +260,16 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
         Ok(Patient {
             id: row.get(0)?,
             patient_id: row.get(1)?,
-            patient_type: row.get(2)?,
-            last_name_kanji: row.get(3)?,
-            first_name_kanji: row.get(4)?,
-            last_name_kana: row.get(5)?,
-            first_name_kana: row.get(6)?,
-            height: row.get(7)?,
-            weight: row.get(8)?,
-            birth_date: row.get(9)?,
-            gender: row.get(10)?,
-            created_at: row.get(11)?,
-            updated_at: row.get(12)?,
+            last_name_kanji: row.get(2)?,
+            first_name_kanji: row.get(3)?,
+            last_name_kana: row.get(4)?,
+            first_name_kana: row.get(5)?,
+            height: row.get(6)?,
+            weight: row.get(7)?,
+            birth_date: row.get(8)?,
+            gender: row.get(9)?,
+            created_at: row.get(10)?,
+            updated_at: row.get(11)?,
         })
     };
 
@@ -283,4 +286,100 @@ pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, 
         patients.push(p.map_err(|e| e.to_string())?);
     }
     Ok(patients)
+}
+
+pub fn drop_patient_type_column(conn: &Connection) -> rusqlite::Result<()> {
+    if !column_exists(conn, "patients", "patient_type")? {
+        return Ok(());
+    }
+    conn.execute("ALTER TABLE patients DROP COLUMN patient_type", [])?;
+    Ok(())
+}
+
+fn column_exists(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let names = stmt.query_map([], |row| row.get::<_, String>(1))?;
+    for name in names {
+        if name? == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::Connection;
+
+    #[test]
+    fn drops_patient_type_and_keeps_the_patient() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE patients (
+                id INTEGER PRIMARY KEY,
+                patient_id TEXT NOT NULL,
+                patient_type TEXT NOT NULL,
+                last_name_kanji TEXT NOT NULL DEFAULT ''
+            )",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO patients (patient_id, patient_type, last_name_kanji) VALUES ('0000000001', 'ri', '山田')",
+            [],
+        )
+        .unwrap();
+
+        drop_patient_type_column(&conn).unwrap();
+
+        let name: String = conn
+            .query_row(
+                "SELECT last_name_kanji FROM patients WHERE patient_id = '0000000001'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "山田");
+        assert!(!column_exists(&conn, "patients", "patient_type").unwrap());
+        drop_patient_type_column(&conn).unwrap();
+    }
+
+    #[test]
+    fn drops_patient_type_when_exam_orders_reference_patients() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute("PRAGMA foreign_keys = ON", []).unwrap();
+        conn.execute_batch(
+            "CREATE TABLE patients (
+                id INTEGER PRIMARY KEY,
+                patient_id TEXT NOT NULL UNIQUE,
+                patient_type TEXT NOT NULL,
+                last_name_kanji TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE exam_orders (
+                id INTEGER PRIMARY KEY,
+                patient_db_id INTEGER NOT NULL,
+                FOREIGN KEY (patient_db_id) REFERENCES patients (id) ON DELETE CASCADE
+            );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO patients (patient_id, patient_type, last_name_kanji) VALUES ('0000000001', 'rt', '佐藤')",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO exam_orders (patient_db_id) VALUES (1)", [])
+            .unwrap();
+
+        drop_patient_type_column(&conn).unwrap();
+
+        let name: String = conn
+            .query_row("SELECT last_name_kanji FROM patients", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(name, "佐藤");
+        let orders: i64 = conn
+            .query_row("SELECT COUNT(*) FROM exam_orders", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(orders, 1);
+    }
 }

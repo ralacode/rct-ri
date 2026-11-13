@@ -27,7 +27,6 @@ const getTodayFormatted = () => {
 export const PatientRegisterForm = () => {
   const [formData, setFormData] = useState({
     patient_id: "",
-    patient_type: "ri",
     last_name_kanji: "",
     first_name_kanji: "",
     last_name_kana: "",
@@ -241,7 +240,6 @@ export const PatientRegisterForm = () => {
       // 2. Rustコマンド呼び出し
       await invoke("add_patient", {
         patientId: idRes.normalizedId,
-        patientType: formData.patient_type,
         lastNameKanji: formData.last_name_kanji,
         firstNameKanji: formData.first_name_kanji,
         lastNameKana: formData.last_name_kana,
@@ -260,7 +258,6 @@ export const PatientRegisterForm = () => {
       // 登録成功時にフォームをリセット
       setFormData({
         patient_id: "",
-        patient_type: "ri",
         last_name_kanji: "",
         first_name_kanji: "",
         last_name_kana: "",
@@ -361,18 +358,6 @@ export const PatientRegisterForm = () => {
               value={formData.first_name_kana}
               onChange={handleChange}
             />
-          </div>
-
-          <div className="hidden">
-            <label htmlFor="patient_type">区分</label>
-            <select
-              id="patient_type"
-              value={formData.patient_type}
-              onChange={handleChange}
-            >
-              <option value="ri">ri</option>
-              <option value="rt">rt</option>
-            </select>
           </div>
 
           <div className="gender-field grid gap-1">

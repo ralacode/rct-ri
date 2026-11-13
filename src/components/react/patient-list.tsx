@@ -4,7 +4,6 @@ import { invoke } from "@/lib/api";
 type Patient = {
   id: number;
   patient_id: string;
-  patient_type: string;
 };
 
 export function PatientList({
@@ -16,7 +15,6 @@ export function PatientList({
 }) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editPatientId, setEditPatientId] = useState("");
-  const [editType, setEditType] = useState("ri");
   const [error, setError] = useState("");
   const [keyword, setKeyword] = useState("");
   const [sortDesc, setSortDesc] = useState(true);
@@ -32,7 +30,6 @@ export function PatientList({
   const startEdit = (p: Patient) => {
     setEditingId(p.id);
     setEditPatientId(p.patient_id);
-    setEditType(p.patient_type);
     setError("");
     setRefreshKey((prev) => prev + 1);
   };
@@ -44,7 +41,6 @@ export function PatientList({
       await invoke("edit_patient", {
         id,
         patientId: editPatientId,
-        patientType: editType,
       });
 
       setEditingId(null);
@@ -96,14 +92,6 @@ export function PatientList({
                 onChange={(e) => setEditPatientId(e.target.value)}
               />
 
-              <select
-                value={editType}
-                onChange={(e) => setEditType(e.target.value)}
-              >
-                <option value="ri">RI患者</option>
-                <option value="rt">治療患者</option>
-              </select>
-
               <button onClick={() => saveEdit(p.id)}>保存</button>
               <button
                 onClick={() => {
@@ -116,7 +104,7 @@ export function PatientList({
             </>
           ) : (
             <>
-              ID: {p.id} / 患者ID: {p.patient_id} / 種別: {p.patient_type}
+              ID: {p.id} / 患者ID: {p.patient_id}
               <button onClick={() => startEdit(p)}>編集</button>
               <button onClick={() => handleDelete(p.id)}>削除</button>
             </>
