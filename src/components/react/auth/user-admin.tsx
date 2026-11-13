@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ModalityPicker } from "@/components/react/auth/modality-picker";
+import { RADIATION_THERAPY_CODE } from "@/lib/treatment";
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
 import { MyInput } from "@/components/react/my-input";
@@ -44,9 +45,9 @@ export function UserAdmin() {
   const [passwordEdits, setPasswordEdits] = useState<Record<number, string>>(
     {},
   );
-  const [profileEdits, setProfileEdits] = useState<
-    Record<number, ProfileEdit>
-  >({});
+  const [profileEdits, setProfileEdits] = useState<Record<number, ProfileEdit>>(
+    {},
+  );
 
   const defaultModalityIds = (items: Modality[]) =>
     items.filter((item) => item.isDefault).map((item) => item.id);
@@ -140,7 +141,10 @@ export function UserAdmin() {
 
   const handleDelete = async (user: AuthUser) => {
     if (user.id === me?.id) {
-      showMessage("自分自身は削除できません。他の担当者に依頼してください。", true);
+      showMessage(
+        "自分自身は削除できません。他の担当者に依頼してください。",
+        true,
+      );
       return;
     }
     if (user.isInitialAdmin) {
@@ -168,7 +172,9 @@ export function UserAdmin() {
     try {
       await resetPassword(user.id, nextPassword);
       setPasswordEdits((prev) => ({ ...prev, [user.id]: "" }));
-      showMessage("パスワードを初期化しました。新しいパスワードを本人に伝えてください。");
+      showMessage(
+        "パスワードを初期化しました。新しいパスワードを本人に伝えてください。",
+      );
     } catch (error) {
       showMessage(error instanceof Error ? error.message : String(error), true);
     }
@@ -240,41 +246,53 @@ export function UserAdmin() {
           <form className="grid gap-4" onSubmit={handleAddModality}>
             <h2 className="text-lg font-semibold tracking-tight">モダリティ</h2>
             <div className="grid gap-3">
-              {modalities.map((modality) => (
-                <div
-                  key={modality.id}
-                  className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_auto] md:items-end"
-                >
-                  <MyInput
-                    id={`rename-modality-${modality.id}`}
-                    label={modality.isDefault ? "名前（削除不可）" : "名前"}
-                    value={renameEdits[modality.id] ?? modality.name}
-                    onChange={(event) =>
-                      setRenameEdits((prev) => ({
-                        ...prev,
-                        [modality.id]: event.target.value,
-                      }))
-                    }
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <MyButton
-                      type="button"
-                      onClick={() => void handleRename(modality)}
-                    >
-                      名前を変更
-                    </MyButton>
-                    {!modality.isDefault && (
+              {modalities.map((modality) => {
+                const locked =
+                  modality.isDefault ||
+                  modality.code === RADIATION_THERAPY_CODE;
+                return (
+                  <div
+                    key={modality.id}
+                    className="grid gap-2 rounded-lg border p-3 md:grid-cols-[1fr_auto] md:items-end"
+                  >
+                    <div className="grid gap-1">
+                      <MyInput
+                        id={`rename-modality-${modality.id}`}
+                        label={locked ? "名前（削除不可）" : "名前"}
+                        value={renameEdits[modality.id] ?? modality.name}
+                        onChange={(event) =>
+                          setRenameEdits((prev) => ({
+                            ...prev,
+                            [modality.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      {modality.code === RADIATION_THERAPY_CODE && (
+                        <p className="text-xs text-muted-foreground">
+                          治療依頼の作成・変更に使います。表示名を変えても、この権限は残ります。
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                       <MyButton
                         type="button"
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        onClick={() => void handleDeleteModality(modality)}
+                        onClick={() => void handleRename(modality)}
                       >
-                        削除
+                        名前を変更
                       </MyButton>
-                    )}
+                      {!locked && (
+                        <MyButton
+                          type="button"
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => void handleDeleteModality(modality)}
+                        >
+                          削除
+                        </MyButton>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
               <MyInput
@@ -337,7 +355,11 @@ export function UserAdmin() {
             onChange={setModalityIds}
             idPrefix="new-user-modality"
           />
-          <MyButton type="submit" disabled={pending} className="justify-self-start">
+          <MyButton
+            type="submit"
+            disabled={pending}
+            className="justify-self-start"
+          >
             {pending ? "追加中..." : "追加"}
           </MyButton>
         </form>
@@ -345,16 +367,15 @@ export function UserAdmin() {
 
       <Card>
         <div className="grid gap-4">
-          <h2 className="text-lg font-semibold tracking-tight">登録済みの担当者</h2>
+          <h2 className="text-lg font-semibold tracking-tight">
+            登録済みの担当者
+          </h2>
           {users.length === 0 ? (
             <p className="text-sm text-muted-foreground">担当者がいません。</p>
           ) : (
             <ul className="grid gap-3">
               {users.map((user) => (
-                <li
-                  key={user.id}
-                  className="grid gap-3 rounded-lg border p-3"
-                >
+                <li key={user.id} className="grid gap-3 rounded-lg border p-3">
                   <p className="font-medium">
                     {user.displayName}
                     {user.id === me?.id ? (
@@ -388,10 +409,8 @@ export function UserAdmin() {
                         ...prev,
                         [user.id]: {
                           userId: event.target.value,
-                          lastName:
-                            prev[user.id]?.lastName ?? user.lastName,
-                          firstName:
-                            prev[user.id]?.firstName ?? user.firstName,
+                          lastName: prev[user.id]?.lastName ?? user.lastName,
+                          firstName: prev[user.id]?.firstName ?? user.firstName,
                         },
                       }))
                     }
@@ -420,16 +439,13 @@ export function UserAdmin() {
                       label="名"
                       required
                       autoComplete="off"
-                      value={
-                        profileEdits[user.id]?.firstName ?? user.firstName
-                      }
+                      value={profileEdits[user.id]?.firstName ?? user.firstName}
                       onChange={(event) =>
                         setProfileEdits((prev) => ({
                           ...prev,
                           [user.id]: {
                             userId: prev[user.id]?.userId ?? user.userId,
-                            lastName:
-                              prev[user.id]?.lastName ?? user.lastName,
+                            lastName: prev[user.id]?.lastName ?? user.lastName,
                             firstName: event.target.value,
                           },
                         }))
@@ -500,7 +516,13 @@ export function UserAdmin() {
       </Card>
 
       {message && (
-        <p className={isError ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
+        <p
+          className={
+            isError
+              ? "text-sm text-destructive"
+              : "text-sm text-muted-foreground"
+          }
+        >
           {message}
         </p>
       )}

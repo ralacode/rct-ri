@@ -17,7 +17,10 @@ import { cn } from "@/lib/utils";
     <div class:list={["grid gap-2", "@lg:grid-flow-col"]}>
       <a
         href="/patient/register/"
-        class={cn(buttonVariants({ variant: "default", size: "lg" }), "text-base")}
+        class={cn(
+          buttonVariants({ variant: "default", size: "lg" }),
+          "text-base",
+        )}
       >
         患者登録
       </a>
@@ -29,6 +32,15 @@ import { cn } from "@/lib/utils";
         )}
       >
         検査一覧
+      </a>
+      <a
+        href="/treatment/"
+        class={cn(
+          buttonVariants({ variant: "outline", size: "lg" }),
+          "border-2 border-foreground/45 text-base",
+        )}
+      >
+        治療依頼表
       </a>
     </div>
   </div>

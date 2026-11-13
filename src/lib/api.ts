@@ -73,7 +73,9 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
         `${apiRoot()}/patients${queryString({
           keyword: args.keyword == null ? undefined : String(args.keyword),
           sortDesc:
-            args.sortDesc === undefined ? undefined : String(Boolean(args.sortDesc)),
+            args.sortDesc === undefined
+              ? undefined
+              : String(Boolean(args.sortDesc)),
         })}`,
       );
     case "add_patient":
@@ -87,7 +89,9 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
         body: JSON.stringify(args),
       });
     case "remove_patient":
-      return request<T>(`${apiRoot()}/patients/${args.id}`, { method: "DELETE" });
+      return request<T>(`${apiRoot()}/patients/${args.id}`, {
+        method: "DELETE",
+      });
     case "get_exam_orders":
       return request<T>(`${apiRoot()}/patients/${args.patientDbId}/orders`);
     case "add_exam_order":
@@ -110,7 +114,9 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
         body: JSON.stringify(args),
       });
     case "delete_exam_order_cmd":
-      return request<T>(`${apiRoot()}/exam-orders/${args.id}`, { method: "DELETE" });
+      return request<T>(`${apiRoot()}/exam-orders/${args.id}`, {
+        method: "DELETE",
+      });
     default:
       throw new Error(`未対応の API コマンドです: ${cmd}`);
   }
@@ -121,4 +127,8 @@ export async function invoke<T = unknown>(
   args: InvokeArgs = {},
 ): Promise<T> {
   return invokeViaHttp<T>(cmd, args);
+}
+
+export function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(`${apiRoot()}${path}`, init);
 }

@@ -8,12 +8,6 @@ import { cn } from "@/lib/utils";
 import { PulseAnimation } from "../pulse-animation";
 import { PatientCard } from "./patient-card";
 
-// interface Patient {
-//   id: number;
-//   patient_id: string;
-//   patient_type: string;
-// }
-
 export const PatientList = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);

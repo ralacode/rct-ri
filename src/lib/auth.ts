@@ -4,6 +4,7 @@ export type Modality = {
   id: number;
   name: string;
   isDefault: boolean;
+  code: string | null;
 };
 
 export type AuthUser = {

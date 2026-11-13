@@ -34,6 +34,11 @@ import { MyInput } from "../my-input";
 import { GenderSelect } from "../gender-select";
 import { FadeIn } from "@components/react/fade-in";
 import {
+  TreatmentRequestList,
+  TreatmentRequestOrderButton,
+  TreatmentRequestProvider,
+} from "@components/react/treatment/patient-requests";
+import {
   Dialog,
   DialogClose,
   DialogContent,
@@ -287,7 +292,6 @@ export const PatientDetail: React.FC = () => {
       await invoke("edit_patient", {
         id: patient.id,
         patientId: finalPatientId,
-        patientType: patient.patient_type,
         lastNameKanji: editLastNameKanji,
         firstNameKanji: editFirstNameKanji,
         lastNameKana: editLastNameKana,
@@ -418,6 +422,7 @@ export const PatientDetail: React.FC = () => {
   } = patient;
 
   return (
+    <TreatmentRequestProvider patientDbId={patient.id}>
     <div className={cn("grid gap-8 content-start", "@container")}>
       {/* 患者基本情報セクション */}
       <div
@@ -717,6 +722,12 @@ export const PatientDetail: React.FC = () => {
                   </div>
                 )}
 
+                {!isEditing && (
+                  <TreatmentRequestOrderButton
+                    className={cn("justify-self-end")}
+                  />
+                )}
+
                 {/* 検査登録フォーム（モーダル） */}
                 {!isEditing && (
                   <Dialog
@@ -781,7 +792,10 @@ export const PatientDetail: React.FC = () => {
                           inputClassName={cn("h-10 cursor-pointer")}
                         />
 
-                        <PediatricDoseBadge examItem={examItem} weight={weight} />
+                        <PediatricDoseBadge
+                          examItem={examItem}
+                          weight={weight}
+                        />
                       </div>
 
                       <DialogFooter className={cn("grid")}>
@@ -844,6 +858,8 @@ export const PatientDetail: React.FC = () => {
           </Card>
         </FadeIn>
       </div>
+
+      <TreatmentRequestList />
 
       {/* 検査履歴一覧 */}
       <div className={cn("grid gap-2 content-start")}>
@@ -914,5 +930,6 @@ export const PatientDetail: React.FC = () => {
         onSuccess={successfetchData}
       />
     </div>
+    </TreatmentRequestProvider>
   );
 };

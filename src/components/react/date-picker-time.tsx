@@ -27,6 +27,8 @@ interface Props {
   className?: string;
   dateText: string;
   timeText?: string;
+  inputId?: string;
+  disabledDates?: React.ComponentProps<typeof Calendar>["disabled"];
 }
 
 export const DatePickerTime: React.FC<Props> = ({
@@ -37,6 +39,8 @@ export const DatePickerTime: React.FC<Props> = ({
   className,
   dateText,
   timeText,
+  inputId = "date-required",
+  disabledDates,
 }) => {
   const [open, setOpen] = React.useState(false);
 
@@ -71,10 +75,10 @@ export const DatePickerTime: React.FC<Props> = ({
     <FieldGroup className={cn("grid gap-4", className)}>
       {/* 日にち */}
       <Field className="w-full">
-        <FieldLabel htmlFor="date-required">{dateText}</FieldLabel>
+        <FieldLabel htmlFor={inputId}>{dateText}</FieldLabel>
         <InputGroup className="h-10">
           <InputGroupInput
-            id="date-required"
+            id={inputId}
             value={displayValue}
             placeholder="日付を選択"
             className={cn("text-base!")}
@@ -107,6 +111,7 @@ export const DatePickerTime: React.FC<Props> = ({
                   month={month}
                   onMonthChange={setMonth}
                   onSelect={handleSelect}
+                  disabled={disabledDates}
                 />
               </PopoverContent>
             </Popover>
