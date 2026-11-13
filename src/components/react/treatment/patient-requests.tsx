@@ -1,4 +1,10 @@
-import { useEffect, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 import { fetchMe } from "@/lib/auth";
 import { onDataChanged } from "@/lib/live";
 import {
@@ -9,17 +15,40 @@ import {
   updateTreatmentRequest,
   type TreatmentRequest,
 } from "@/lib/treatment";
-import { formatDateTimeWithDay } from "@/lib/utils";
+import { cn, formatDateTimeWithDay } from "@/lib/utils";
+import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
 import {
   TreatmentRequestDialog,
   type TreatmentRequestDraft,
 } from "@/components/react/treatment/request-dialog";
 
-export function TreatmentRequestSection({
+type TreatmentRequestActions = {
+  requests: TreatmentRequest[];
+  canEdit: boolean;
+  error: string | null;
+  startCreate: () => void;
+  startEdit: (request: TreatmentRequest) => void;
+};
+
+const TreatmentRequestContext = createContext<TreatmentRequestActions | null>(
+  null,
+);
+
+function useTreatmentRequests() {
+  const value = useContext(TreatmentRequestContext);
+  if (!value) {
+    throw new Error("治療依頼の表示位置が正しくありません");
+  }
+  return value;
+}
+
+export function TreatmentRequestProvider({
   patientDbId,
+  children,
 }: {
   patientDbId: number;
+  children: ReactNode;
 }) {
   const [requests, setRequests] = useState<TreatmentRequest[]>([]);
   const [canEdit, setCanEdit] = useState(false);
@@ -66,46 +95,16 @@ export function TreatmentRequestSection({
   };
 
   return (
-    <div className="mt-4 grid gap-3 border-t pt-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-base font-medium">治療依頼</h3>
-        {canEdit && (
-          <MyButton onClick={() => setCreating(true)}>
-            治療依頼オーダー
-          </MyButton>
-        )}
-      </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {requests.length === 0 ? (
-        <p className="text-sm text-gray-500">
-          登録された治療依頼はありません。
-        </p>
-      ) : (
-        <div className="grid gap-2">
-          {requests.map((request) => (
-            <div
-              key={request.id}
-              className="grid gap-2 rounded-md border bg-sky-50 p-3"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  {formatDateTimeWithDay(request.requestDate)}{" "}
-                  {request.slotTime}
-                  {request.slotTime === "15:30" ? " 臨時" : ""}
-                </div>
-                {canEdit && (
-                  <MyButton onClick={() => setEditing(request)}>変更</MyButton>
-                )}
-              </div>
-              <div className="text-right text-sm">
-                <div>{request.requestingDepartment}</div>
-                <div>{request.requestingPhysician}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
+    <TreatmentRequestContext.Provider
+      value={{
+        requests,
+        canEdit,
+        error,
+        startCreate: () => setCreating(true),
+        startEdit: setEditing,
+      }}
+    >
+      {children}
       <TreatmentRequestDialog
         open={creating}
         title="治療依頼オーダー"
@@ -133,6 +132,57 @@ export function TreatmentRequestSection({
         onSubmit={saveExisting}
         onDelete={remove}
       />
+    </TreatmentRequestContext.Provider>
+  );
+}
+
+export function TreatmentRequestOrderButton({
+  className,
+}: {
+  className?: string;
+}) {
+  const { canEdit, startCreate } = useTreatmentRequests();
+  if (!canEdit) return null;
+  return (
+    <MyButton onClick={startCreate} className={className}>
+      治療依頼オーダー
+    </MyButton>
+  );
+}
+
+export function TreatmentRequestList() {
+  const { requests, canEdit, error, startEdit } = useTreatmentRequests();
+
+  return (
+    <div className="grid gap-2 content-start">
+      <h2 className="text-2xl">治療依頼</h2>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {requests.length === 0 ? (
+        <p className="text-gray-500">登録された治療依頼はありません。</p>
+      ) : (
+        <div className={cn("grid gap-4 content-start", "@lg:grid-cols-2")}>
+          {requests.map((request) => (
+            <Card key={request.id} className="grid gap-2 content-start">
+              <div className="flex flex-wrap gap-2">
+                <div>{formatDateTimeWithDay(request.requestDate)}</div>
+                <div>
+                  {request.slotTime}
+                  {request.slotTime === "15:30" ? " 臨時" : ""}
+                </div>
+              </div>
+              <div className="text-right">
+                <div>{request.requestingDepartment}</div>
+                <div>{request.requestingPhysician}</div>
+              </div>
+              {canEdit && (
+                <div className="justify-self-end">
+                  <MyButton onClick={() => startEdit(request)}>変更</MyButton>
+                </div>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

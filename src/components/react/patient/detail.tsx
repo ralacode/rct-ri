@@ -33,7 +33,11 @@ import { MyButton } from "@components/react/my-button";
 import { MyInput } from "../my-input";
 import { GenderSelect } from "../gender-select";
 import { FadeIn } from "@components/react/fade-in";
-import { TreatmentRequestSection } from "@components/react/treatment/patient-requests";
+import {
+  TreatmentRequestList,
+  TreatmentRequestOrderButton,
+  TreatmentRequestProvider,
+} from "@components/react/treatment/patient-requests";
 import {
   Dialog,
   DialogClose,
@@ -418,6 +422,7 @@ export const PatientDetail: React.FC = () => {
   } = patient;
 
   return (
+    <TreatmentRequestProvider patientDbId={patient.id}>
     <div className={cn("grid gap-8 content-start", "@container")}>
       {/* 患者基本情報セクション */}
       <div
@@ -717,6 +722,12 @@ export const PatientDetail: React.FC = () => {
                   </div>
                 )}
 
+                {!isEditing && (
+                  <TreatmentRequestOrderButton
+                    className={cn("justify-self-end")}
+                  />
+                )}
+
                 {/* 検査登録フォーム（モーダル） */}
                 {!isEditing && (
                   <Dialog
@@ -844,13 +855,11 @@ export const PatientDetail: React.FC = () => {
                 </div>
               )}
             </div>
-
-            {!isEditing && (
-              <TreatmentRequestSection patientDbId={patient.id} />
-            )}
           </Card>
         </FadeIn>
       </div>
+
+      <TreatmentRequestList />
 
       {/* 検査履歴一覧 */}
       <div className={cn("grid gap-2 content-start")}>
@@ -921,5 +930,6 @@ export const PatientDetail: React.FC = () => {
         onSuccess={successfetchData}
       />
     </div>
+    </TreatmentRequestProvider>
   );
 };
