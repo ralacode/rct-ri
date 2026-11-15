@@ -18,6 +18,7 @@ import {
 import { cn, formatDateTimeWithDay } from "@/lib/utils";
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   TreatmentRequestDialog,
   type TreatmentRequestDraft,
@@ -155,7 +156,20 @@ export function TreatmentRequestList() {
 
   return (
     <div className="grid gap-2 content-start">
-      <h2 className="text-2xl">治療依頼</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-2xl">治療依頼</h2>
+        {requests.length > 0 && (
+          <a
+            href="/treatment/"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "border-2 border-foreground/45",
+            )}
+          >
+            治療依頼表
+          </a>
+        )}
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {requests.length === 0 ? (
         <p className="text-gray-500">登録された治療依頼はありません。</p>
