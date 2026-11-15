@@ -88,7 +88,7 @@ pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn open() -> Result<Connection, String> {
+pub(crate) fn open() -> Result<Connection, String> {
     let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
@@ -127,7 +127,7 @@ pub fn normalize_weekdays(days: &[i32]) -> Result<Vec<i32>, String> {
     Ok(out)
 }
 
-fn normalize_text(raw: &str, label: &str) -> Result<String, String> {
+pub(crate) fn normalize_text(raw: &str, label: &str) -> Result<String, String> {
     let text = raw.trim().to_string();
     if text.is_empty() {
         return Err(format!("{label}を入力してください"));
@@ -404,8 +404,56 @@ pub fn create_request(
     Ok(())
 }
 
-pub fn create_request_on(
-    conn: &mut Connection,
+pub(crate) fn patient_db_id(conn: &Connection, patient_id: &str) -> Result<Option<i32>, String> {
+    conn.query_row(
+        "SELECT id FROM patients WHERE patient_id = ?1",
+        params![patient_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
+pub(crate) fn slot_occupant(
+    conn: &Connection,
+    request_date: &str,
+    slot_time: &str,
+) -> Result<Option<String>, String> {
+    let date = date_str(parse_date(request_date)?);
+    let slot = normalize_slot(slot_time)?;
+    conn.query_row(
+        "SELECT p.patient_id
+         FROM treatment_requests r
+         JOIN patients p ON p.id = r.patient_db_id
+         WHERE r.request_date = ?1 AND r.slot_time = ?2",
+        params![date, slot],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
+}
+
+/// 診療曜日と閉じ枠だけを見る。枠の占有は取り込み側で患者ごとに判断する。
+pub(crate) fn require_open_slot(
+    conn: &Connection,
+    request_date: &str,
+    slot_time: &str,
+) -> Result<(), String> {
+    let date = date_str(parse_date(request_date)?);
+    let slot = normalize_slot(slot_time)?;
+    let parsed = parse_date(&date)?;
+    let open = load_open_weekdays(conn)?;
+    if !open.contains(&weekday_number(parsed)) {
+        return Err("この曜日は診療日ではありません".into());
+    }
+    if slot_is_closed(conn, &date, &slot)? {
+        return Err("この枠は閉じています".into());
+    }
+    Ok(())
+}
+
+pub(crate) fn insert_request(
+    conn: &Connection,
     patient_db_id: i32,
     request_date: &str,
     slot_time: &str,
@@ -419,19 +467,37 @@ pub fn create_request_on(
     if !patient_exists(conn, patient_db_id)? {
         return Err("患者が見つかりません".into());
     }
-
-    let tx = conn
-        .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|e| e.to_string())?;
-    ensure_destination(&tx, &date, &slot, None, true)?;
+    ensure_destination(conn, &date, &slot, None, true)?;
     let now = now_str();
-    tx.execute(
+    conn.execute(
         "INSERT INTO treatment_requests (
             patient_db_id, request_date, slot_time, requesting_department, requesting_physician, created_at, updated_at
          ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         params![patient_db_id, date, slot, department, physician, now, now],
     )
     .map_err(|error| map_constraint(error, "この枠にはすでに依頼があります"))?;
+    Ok(())
+}
+
+pub fn create_request_on(
+    conn: &mut Connection,
+    patient_db_id: i32,
+    request_date: &str,
+    slot_time: &str,
+    requesting_department: &str,
+    requesting_physician: &str,
+) -> Result<(), String> {
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    insert_request(
+        &tx,
+        patient_db_id,
+        request_date,
+        slot_time,
+        requesting_department,
+        requesting_physician,
+    )?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -819,7 +885,9 @@ mod tests {
 
         let rows = closures_for_date(&conn, "2026-11-04").unwrap();
         assert_eq!(
-            rows.iter().map(|row| row.slot_time.as_str()).collect::<Vec<_>>(),
+            rows.iter()
+                .map(|row| row.slot_time.as_str())
+                .collect::<Vec<_>>(),
             vec!["13:30", "15:30"]
         );
         let rows = closures_for_date(&conn, "2026-11-05").unwrap();
