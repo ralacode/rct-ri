@@ -100,6 +100,42 @@ export function listPatientTreatmentRequests(patientDbId: number) {
   );
 }
 
+export type RtOrderImportRow = {
+  line: number;
+  patientId: string;
+  lastNameKanji: string;
+  firstNameKanji: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  gender: string;
+  birthDate: string;
+  height: number | null;
+  weight: number | null;
+  requestDate: string;
+  sourceTime: string;
+  slotTime: string;
+  requestingDepartment: string;
+  requestingPhysician: string;
+  status: "create" | "attach" | "skip" | "error";
+  message: string;
+};
+
+function postCsv(path: string, file: ArrayBuffer) {
+  return apiRequest<{ rows: RtOrderImportRow[] }>(path, {
+    method: "POST",
+    body: new Uint8Array(file),
+    headers: { "Content-Type": "application/octet-stream" },
+  });
+}
+
+export function previewRtOrderImport(file: ArrayBuffer) {
+  return postCsv("/rt-order-imports/preview", file);
+}
+
+export function applyRtOrderImport(file: ArrayBuffer) {
+  return postCsv("/rt-order-imports", file);
+}
+
 export function createTreatmentRequest(
   patientDbId: number,
   input: TreatmentRequestInput,

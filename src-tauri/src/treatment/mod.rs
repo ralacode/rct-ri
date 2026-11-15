@@ -1,10 +1,12 @@
+pub mod import;
 pub mod model;
 
 use crate::auth::{self, AuthUser};
+use axum::body::Bytes;
 use axum::extract::{Path, Query};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, put};
+use axum::routing::{get, post, put};
 use axum::{Extension, Json, Router};
 use serde::Deserialize;
 
@@ -60,6 +62,8 @@ pub fn routes() -> Router {
             "/patients/{id}/treatment-requests",
             get(list_patient_requests).post(create_request),
         )
+        .route("/rt-order-imports/preview", post(preview_rt_order_import))
+        .route("/rt-order-imports", post(apply_rt_order_import))
 }
 
 fn forbid_unless_editor(actor: &AuthUser) -> Option<Response> {
@@ -220,6 +224,26 @@ async fn save_remark(
     }
     match model::save_remark(&date, &body.body) {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(message) => bad(message),
+    }
+}
+
+async fn preview_rt_order_import(Extension(actor): Extension<AuthUser>, body: Bytes) -> Response {
+    if let Some(response) = forbid_unless_editor(&actor) {
+        return response;
+    }
+    match import::preview(&body) {
+        Ok(rows) => Json(serde_json::json!({ "rows": rows })).into_response(),
+        Err(message) => bad(message),
+    }
+}
+
+async fn apply_rt_order_import(Extension(actor): Extension<AuthUser>, body: Bytes) -> Response {
+    if let Some(response) = forbid_unless_editor(&actor) {
+        return response;
+    }
+    match import::apply(&body) {
+        Ok(rows) => Json(serde_json::json!({ "rows": rows })).into_response(),
         Err(message) => bad(message),
     }
 }

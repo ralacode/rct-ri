@@ -16,6 +16,11 @@ pub fn get_videos_dir() -> PathBuf {
     exe_dir().join("videos")
 }
 
+/// exe と同じ階層の ris。将来、RIS のバッチが治療依頼 CSV をここへ置く。
+pub fn get_ris_dir() -> PathBuf {
+    exe_dir().join("ris")
+}
+
 pub fn get_db_path() -> PathBuf {
     exe_dir().join("rct_local.db")
 }
@@ -86,6 +91,10 @@ pub fn init_db() -> Result<()> {
 
     init_user_db()?;
     let _ = std::fs::create_dir_all(get_videos_dir());
+    log::info!(
+        "RIS の CSV フォルダ（exe と同じ階層）: {}",
+        get_ris_dir().display()
+    );
     Ok(())
 }
 

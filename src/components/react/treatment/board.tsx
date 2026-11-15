@@ -33,6 +33,7 @@ import {
   TreatmentRequestDialog,
   type TreatmentRequestDraft,
 } from "@/components/react/treatment/request-dialog";
+import { RtOrderImport } from "@/components/react/treatment/rt-order-import";
 
 type DayColumn = {
   iso: string;
@@ -267,6 +268,12 @@ export function TreatmentBoard() {
             は臨時枠です。曜日を変えても、入っている依頼は残ります。
           </p>
         </div>
+      )}
+
+      {canEdit && (
+        <RtOrderImport
+          onImported={(requestDate) => setMonth(requestDate.slice(0, 7))}
+        />
       )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
