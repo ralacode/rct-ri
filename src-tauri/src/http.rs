@@ -32,6 +32,12 @@ struct PatientListQuery {
 }
 
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PatientIdCheckQuery {
+    patient_id: String,
+}
+
+#[derive(Deserialize)]
 struct DailyOrderQuery {
     date: String,
 }
@@ -601,6 +607,13 @@ async fn events() -> Response {
     response
 }
 
+async fn check_patient_id(Query(query): Query<PatientIdCheckQuery>) -> Response {
+    match patient_model::patient_id_registered(&query.patient_id) {
+        Ok(registered) => Json(json!({ "registered": registered })).into_response(),
+        Err(message) => (StatusCode::BAD_REQUEST, message).into_response(),
+    }
+}
+
 async fn list_patients(Query(query): Query<PatientListQuery>) -> Response {
     let keyword = query.keyword.filter(|value| !value.trim().is_empty());
     let sort_desc = query.sort_desc.unwrap_or(true);
@@ -781,6 +794,7 @@ fn protected_api() -> Router {
         .route("/events", get(events))
         .route("/events/", get(events))
         .route("/patients", get(list_patients).post(create_patient))
+        .route("/patients/check", get(check_patient_id))
         .route(
             "/patients/{id}",
             axum::routing::put(update_patient).delete(delete_patient),

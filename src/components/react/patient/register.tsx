@@ -1,5 +1,5 @@
 // src/components/react/patient/register.tsx
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@/lib/api";
 import { go } from "@/lib/nav";
 import {
@@ -42,6 +42,48 @@ export const PatientRegisterForm = () => {
   const [saveMessage, setSaveMessage] = useState("");
   const [isError, setIsError] = useState(false);
   const [lastRegistered, setLastRegistered] = useState<any>(null);
+  const [registeredId, setRegisteredId] = useState<string | null>(null);
+  const requestSeq = useRef(0);
+
+  const patientIdCheck = validatePatientId(formData.patient_id);
+  const showRegistered =
+    patientIdCheck.isValid && registeredId === patientIdCheck.normalizedId;
+
+  const lookupRegisteredId = useCallback(async (rawId: string) => {
+    const idRes = validatePatientId(rawId);
+    const seq = ++requestSeq.current;
+    if (!idRes.isValid) {
+      setRegisteredId(null);
+      return false;
+    }
+
+    try {
+      const result = await invoke<{ registered: boolean }>("check_patient_id", {
+        patientId: idRes.normalizedId,
+      });
+      if (seq !== requestSeq.current) return result.registered;
+      setRegisteredId(result.registered ? idRes.normalizedId : null);
+      return result.registered;
+    } catch {
+      if (seq === requestSeq.current) setRegisteredId(null);
+      return false;
+    }
+  }, []);
+
+  useEffect(() => {
+    const idRes = validatePatientId(formData.patient_id);
+    if (!idRes.isValid) {
+      requestSeq.current += 1;
+      setRegisteredId(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      void lookupRegisteredId(formData.patient_id);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [formData.patient_id, lookupRegisteredId]);
 
   const formatDatePicker = (value: string, prevValue: string) => {
     const numbers = value.replace(/\D/g, "");
@@ -217,6 +259,11 @@ export const PatientRegisterForm = () => {
     const idRes = validatePatientId(formData.patient_id);
     if (!idRes.isValid) return setMessage(`患者ID: ${idRes.errorMessage}`);
 
+    if (await lookupRegisteredId(formData.patient_id)) {
+      setIsError(true);
+      return setMessage("登録済みです");
+    }
+
     const lnkRes = validateKanjiName(formData.last_name_kanji);
     if (!lnkRes.isValid)
       return setMessage(`名字（漢字）: ${lnkRes.errorMessage}`);
@@ -313,14 +360,25 @@ export const PatientRegisterForm = () => {
           onSubmit={handleSubmit}
           className="grid gap-4"
         >
-          <MyInput
-            id="patient_id"
-            label="患者ID"
-            placeholder="例: 0000000123"
-            required
-            value={formData.patient_id}
-            onChange={handleChange}
-          />
+          <div className="grid gap-1">
+            <MyInput
+              id="patient_id"
+              label="患者ID"
+              placeholder="例: 0000000123"
+              required
+              value={formData.patient_id}
+              onChange={handleChange}
+              onBlur={() => {
+                void lookupRegisteredId(formData.patient_id);
+              }}
+              aria-invalid={showRegistered || undefined}
+            />
+            {showRegistered && (
+              <p className="text-sm text-red-700" role="alert">
+                登録済みです
+              </p>
+            )}
+          </div>
 
           <div className="grid grid-flow-col gap-2 justify-start">
             <MyInput
@@ -449,7 +507,7 @@ export const PatientRegisterForm = () => {
             maxLength={14}
           />
 
-          <MyButton type="submit" className="mt-4">
+          <MyButton type="submit" className="mt-4" disabled={showRegistered}>
             登録する
           </MyButton>
         </form>

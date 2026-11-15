@@ -236,6 +236,24 @@ pub fn update(
     }
 }
 
+pub fn patient_id_registered_in(conn: &Connection, patient_id: &str) -> Result<bool, String> {
+    let normalized_id = normalize_and_validate(patient_id)?;
+    let count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM patients WHERE patient_id = ?1",
+            [&normalized_id],
+            |row| row.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(count > 0)
+}
+
+pub fn patient_id_registered(patient_id: &str) -> Result<bool, String> {
+    let db_path = get_db_path();
+    let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
+    patient_id_registered_in(&conn, patient_id)
+}
+
 pub fn search(keyword: Option<String>, sort_desc: bool) -> Result<Vec<Patient>, String> {
     let db_path = get_db_path();
     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -381,5 +399,30 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM exam_orders", [], |row| row.get(0))
             .unwrap();
         assert_eq!(orders, 1);
+    }
+
+    #[test]
+    fn patient_id_registered_matches_normalized_id_only() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute(
+            "CREATE TABLE patients (
+                id INTEGER PRIMARY KEY,
+                patient_id TEXT NOT NULL UNIQUE
+            )",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO patients (patient_id) VALUES ('0000000123')",
+            [],
+        )
+        .unwrap();
+
+        assert!(patient_id_registered_in(&conn, "123").unwrap());
+        assert!(patient_id_registered_in(&conn, "0000000123").unwrap());
+        assert!(!patient_id_registered_in(&conn, "12").unwrap());
+        assert!(!patient_id_registered_in(&conn, "124").unwrap());
+        assert!(patient_id_registered_in(&conn, "").is_err());
+        assert!(patient_id_registered_in(&conn, "abc").is_err());
     }
 }

@@ -68,6 +68,12 @@ async function invokeViaHttp<T>(cmd: string, args: InvokeArgs): Promise<T> {
   switch (cmd) {
     case "get_patients":
       return request<T>(`${apiRoot()}/patients`);
+    case "check_patient_id":
+      return request<T>(
+        `${apiRoot()}/patients/check${queryString({
+          patientId: args.patientId == null ? undefined : String(args.patientId),
+        })}`,
+      );
     case "search_patients_cmd":
       return request<T>(
         `${apiRoot()}/patients${queryString({
