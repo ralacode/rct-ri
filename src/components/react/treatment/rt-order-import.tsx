@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   applyRtOrderImport,
   previewRtOrderImport,
   type RtOrderImportRow,
 } from "@/lib/treatment";
+import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<RtOrderImportRow["status"], string> = {
   create: "新規登録",
@@ -21,6 +22,14 @@ function count(rows: RtOrderImportRow[], status: RtOrderImportRow["status"]) {
   return rows.filter((row) => row.status === status).length;
 }
 
+function isCsv(file: File) {
+  return (
+    file.name.toLowerCase().endsWith(".csv") ||
+    file.type === "text/csv" ||
+    file.type === "application/vnd.ms-excel"
+  );
+}
+
 export function RtOrderImport({
   onImported,
 }: {
@@ -32,6 +41,8 @@ export function RtOrderImport({
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [applied, setApplied] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const writable =
     rows?.some((row) => row.status === "create" || row.status === "attach") ??
@@ -54,6 +65,16 @@ export function RtOrderImport({
     } finally {
       setPending(false);
     }
+  };
+
+  const take = (next: File | null | undefined) => {
+    if (pending) return;
+    if (!next) return;
+    if (!isCsv(next)) {
+      setError("CSV ファイルを選んでください。");
+      return;
+    }
+    void read(next);
   };
 
   const apply = async () => {
@@ -84,20 +105,57 @@ export function RtOrderImport({
           の臨時枠に入ります。カナはひらがなで登録します。
         </p>
       </div>
-      <label className="flex flex-wrap items-center gap-2 text-sm">
-        <span>治療依頼 CSV</span>
+      <div
+        className={cn(
+          "grid justify-items-start gap-3 rounded-lg border border-dashed p-4",
+          dragging && "border-primary bg-muted/60",
+        )}
+        onDragEnter={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={(event) => {
+          if (event.currentTarget.contains(event.relatedTarget as Node)) {
+            return;
+          }
+          setDragging(false);
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          setDragging(false);
+          const dropped = Array.from(event.dataTransfer.files);
+          take(dropped.find(isCsv) ?? dropped[0]);
+        }}
+      >
+        <p className="text-sm">
+          CSV をここにドロップするか、ボタンから選んでください。
+        </p>
+        <Button
+          type="button"
+          disabled={pending}
+          onClick={() => inputRef.current?.click()}
+        >
+          CSV を選択
+        </Button>
         <input
+          ref={inputRef}
           type="file"
           accept=".csv,text/csv"
+          className="sr-only"
           disabled={pending}
           onChange={(event) => {
-            const next = event.target.files?.[0];
+            take(event.target.files?.[0]);
             event.target.value = "";
-            if (next) void read(next);
           }}
         />
-      </label>
-      {fileName && <p className="text-xs text-muted-foreground">{fileName}</p>}
+        {fileName && (
+          <p className="text-xs text-muted-foreground">{fileName}</p>
+        )}
+      </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {rows && (
         <>
