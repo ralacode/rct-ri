@@ -26,3 +26,5 @@ pnpm-debug.log*
 docs/
 
 secret-utils.ts
+# クラウド開発用の DB（scripts/cloud-dev.sh）
+.dev-data/

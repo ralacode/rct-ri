@@ -2,6 +2,7 @@
 
 mod auth;
 mod db;
+mod dev_seed;
 mod events;
 mod exam_order;
 mod http;
@@ -9,9 +10,27 @@ mod patient;
 mod treatment;
 mod videos;
 
+#[cfg(feature = "desktop")]
 use tauri::{LogicalSize, Manager, PhysicalPosition};
+#[cfg(feature = "desktop")]
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+/// Tauri のウィンドウなしで DB と HTTP サーバーだけを起動する。
+/// クラウドのコンテナで動かし、スマホやブラウザから画面を確認するための入口。
+/// `RCT_DEV_SEED=1` のときは開発用の担当者とダミーの治療依頼を入れる。
+pub fn run_server() {
+    db::init_db().expect("DB初期化失敗");
+    eprintln!("データフォルダ: {}", db::data_dir().display());
+    if std::env::var("RCT_DEV_SEED").is_ok_and(|v| v == "1") {
+        dev_seed::seed().expect("開発用データの投入に失敗しました");
+    }
+    http::spawn_and_wait().expect("HTTP サーバーの起動に失敗しました");
+    loop {
+        std::thread::park();
+    }
+}
+
+#[cfg(feature = "desktop")]
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

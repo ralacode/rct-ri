@@ -12,21 +12,34 @@ pub fn exe_dir() -> PathBuf {
         .to_path_buf()
 }
 
+/// DB・動画・RIS フォルダを置く場所。通常は exe と同じ階層。
+/// 環境変数 `RCT_DATA_DIR` があればそちらを使う（クラウド開発用）。
+pub fn data_dir() -> PathBuf {
+    match std::env::var_os("RCT_DATA_DIR") {
+        Some(dir) if !dir.is_empty() => {
+            let dir = PathBuf::from(dir);
+            let _ = std::fs::create_dir_all(&dir);
+            dir
+        }
+        _ => exe_dir(),
+    }
+}
+
 pub fn get_videos_dir() -> PathBuf {
-    exe_dir().join("videos")
+    data_dir().join("videos")
 }
 
 /// exe と同じ階層の ris。将来、RIS のバッチが治療依頼 CSV をここへ置く。
 pub fn get_ris_dir() -> PathBuf {
-    exe_dir().join("ris")
+    data_dir().join("ris")
 }
 
 pub fn get_db_path() -> PathBuf {
-    exe_dir().join("rct_local.db")
+    data_dir().join("rct_local.db")
 }
 
 pub fn get_user_db_path() -> PathBuf {
-    exe_dir().join("user.db")
+    data_dir().join("user.db")
 }
 
 // pub fn get_connection() -> Result<Connection, String> {

@@ -1,3 +1,26 @@
+# RC Tools（rct_ri）
+
+## クラウド開発（Tauri なし・スマホで確認）
+
+画面と API は Tauri の中の HTTP サーバー（axum、8080 番）で動いています。
+Tauri のウィンドウを使わずにこのサーバーだけを起動できるので、
+Claude Code on the web などのクラウド環境で開発し、スマホのプレビューで確認できます。
+
+```bash
+./scripts/cloud-dev.sh --reset
+```
+
+- 画面を build し、`rct_server`（`--no-default-features` で Tauri を外したビルド）を起動します。
+- DB は `.dev-data/` に作られます（`RCT_DATA_DIR` で変更可能、git 管理外）。
+- 初回は開発用担当者と、`ris/rt_order/` のサンプル CSV（架空データ）を入れます。
+  - ログイン: ID `00000001` / パスワード `devpassword`
+- `src/lib/secret-utils.ts` がなければ、ダミー値の `secret-utils.example.ts` をコピーします。
+- 本物の患者データはクラウドに置かないでください。
+
+ショートカット・自動起動・ウィンドウ制御などの Tauri の機能は、Windows 実機で `pnpm tauri dev` を使って確認します。
+
+---
+
 # Astro Starter Kit: Minimal
 
 ```sh

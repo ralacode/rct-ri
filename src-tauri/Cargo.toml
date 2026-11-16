@@ -7,6 +7,8 @@ license = ""
 repository = ""
 edition = "2021"
 rust-version = "1.90"
+# Tauri CLI と `cargo run` が既定で起動するのはデスクトップ版。
+default-run = "rct_ri"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,19 +16,41 @@ rust-version = "1.90"
 name = "app_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "rct_ri"
+path = "src/main.rs"
+required-features = ["desktop"]
+
+# Tauri なしで HTTP サーバーだけを起動する（クラウド開発・スマホ確認用）。
+# 起動: cargo run --no-default-features --bin rct_server
+[[bin]]
+name = "rct_server"
+path = "src/bin/rct_server.rs"
+
+[features]
+default = ["desktop"]
+# Tauri のウィンドウ・ショートカット・自動起動。外すと webkit2gtk なしでビルドできる。
+desktop = [
+    "dep:tauri",
+    "dep:tauri-build",
+    "dep:tauri-plugin-log",
+    "dep:tauri-plugin-global-shortcut",
+    "dep:tauri-plugin-autostart",
+]
+
 [build-dependencies]
-tauri-build = { version = "2.7.4", features = [] }
+tauri-build = { version = "2.7.4", features = [], optional = true }
 
 [dependencies]
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.12.5", features = [] }
-tauri-plugin-log = "2"
+tauri = { version = "2.12.5", features = [], optional = true }
+tauri-plugin-log = { version = "2", optional = true }
 rusqlite = { version = "0.41", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
-tauri-plugin-global-shortcut = "2"
-tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = { version = "2", optional = true }
+tauri-plugin-autostart = { version = "2", optional = true }
 axum = "0.8"
 tokio = { version = "1", features = ["net", "rt-multi-thread", "macros", "time", "sync"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
