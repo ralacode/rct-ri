@@ -96,8 +96,17 @@ const closedStyle = {
     "repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(100,100,100,0.18) 7px, rgba(100,100,100,0.18) 8px)",
 };
 
+/** URL の ?month=YYYY-MM があればその月、なければ今月を最初に開く。 */
+function initialMonth(): string {
+  if (typeof window !== "undefined") {
+    const param = new URLSearchParams(window.location.search).get("month");
+    if (param && /^\d{4}-(0[1-9]|1[0-2])$/.test(param)) return param;
+  }
+  return format(new Date(), "yyyy-MM");
+}
+
 export function TreatmentBoard() {
-  const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"));
+  const [month, setMonth] = useState(initialMonth);
   const [board, setBoard] = useState<TreatmentBoard | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [weekdayDraft, setWeekdayDraft] = useState<number[] | null>(null);

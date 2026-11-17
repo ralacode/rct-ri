@@ -5,6 +5,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { format } from "date-fns";
 import { fetchMe } from "@/lib/auth";
 import { onDataChanged } from "@/lib/live";
 import {
@@ -151,16 +152,28 @@ export function TreatmentRequestOrderButton({
   );
 }
 
+/**
+ * 治療依頼表のリンク先。今日以降でいちばん近い依頼の月を開く。
+ * 今日以降の依頼がなければ、いちばん新しい依頼の月を開く。
+ */
+function treatmentBoardHref(requests: TreatmentRequest[]): string {
+  const today = format(new Date(), "yyyy-MM-dd");
+  const dates = requests.map((request) => request.requestDate.slice(0, 10));
+  const upcoming = dates.filter((date) => date >= today).sort()[0];
+  const target = upcoming ?? [...dates].sort().at(-1);
+  return target ? `/treatment/?month=${target.slice(0, 7)}` : "/treatment/";
+}
+
 export function TreatmentRequestList() {
   const { requests, canEdit, error, startEdit } = useTreatmentRequests();
 
   return (
     <div className="grid gap-2 content-start">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-2xl">治療依頼</h2>
         {requests.length > 0 && (
           <a
-            href="/treatment/"
+            href={treatmentBoardHref(requests)}
             className={cn(
               buttonVariants({ variant: "outline", size: "sm" }),
               "border-2 border-foreground/45",
