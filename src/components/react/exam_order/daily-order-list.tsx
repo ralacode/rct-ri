@@ -196,7 +196,8 @@ export const DailyOrderList: React.FC = () => {
 
   return (
     <div className={cn("relative", styles.container)}>
-      <ChevronLeft className="hidden absolute left-0 top-1/2  print:block" />
+      {/* 穴あけパンチの中心合わせ用マーク（印刷時のみ、各ページの左端・縦中央に出る） */}
+      <ChevronLeft className={styles.punch_mark} aria-hidden="true" />
 
       <div className={styles.no_print_area}>
         <label htmlFor="date-select" className={cn("hidden")}>
