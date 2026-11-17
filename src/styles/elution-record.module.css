@@ -19,6 +19,12 @@
 
 .title {
   margin: 0 0 6mm;
+  /*
+   * 上付きの質量数が行の上にはみ出すと、用紙の印字領域の上端で切れる。
+   * 行の高さと上余白を取り、上付きを見出しの枠内に収める。
+   */
+  padding-top: 2mm;
+  line-height: 1.6;
   text-align: center;
   font-size: 18pt;
   font-weight: 500;
@@ -28,7 +34,7 @@
 .title sup {
   font-size: 0.6em;
   vertical-align: 0.7em;
-  line-height: 0;
+  line-height: 1;
   margin-right: 0.05em;
 }
 
