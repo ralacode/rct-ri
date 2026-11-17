@@ -7,6 +7,7 @@ import {
   Home,
   KeyRound,
   LogOut,
+  Printer,
   Search,
   TrendingDown,
   Users,
@@ -38,6 +39,7 @@ const menuItems = [
   { name: "患者一覧", href: "/patient/list/", icon: Contact },
   { name: "患者検索", href: "/patient/search/", icon: Search },
   { name: "減衰計算", href: "/mo99-decay/", icon: TrendingDown },
+  { name: "溶出記録", href: "/generator-elution/", icon: Printer },
   { name: "動画", href: "/videos/", icon: Film },
 ] as const;
 
