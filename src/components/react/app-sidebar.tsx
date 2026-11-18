@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, LogOut, Search, Users } from "lucide-react";
+import { ChevronRight, LogIn, LogOut, Search, Users } from "lucide-react";
 
 import {
   Sidebar,
@@ -26,37 +26,58 @@ import {
   matchesMenuQuery,
   menuGroups,
   menuItems,
+  nurseMenuGroups,
+  nurseMenuItems,
+  type GuideLink,
   type MenuGroupId,
+  type MenuItem,
 } from "@/lib/sidebar-menu";
 import { cn } from "@/lib/utils";
 
-function groupOfPath(path: string): MenuGroupId | undefined {
-  return menuItems.find((item) => isCurrentPath(path, item.href))?.group;
+function groupOfPath(
+  items: readonly MenuItem[],
+  path: string,
+): MenuGroupId | undefined {
+  return items.find((item) => isCurrentPath(path, item.href, item.exact))
+    ?.group;
 }
 
 export function AppSidebar({
   currentPath,
   user,
+  nurse = false,
+  guides = [],
+  homeHref = "/",
   onLogout,
 }: {
   currentPath: string;
   user: AuthUser | null;
+  /** 看護師モードでは解説記事だけを並べる */
+  nurse?: boolean;
+  guides?: readonly GuideLink[];
+  homeHref?: string;
   onLogout: () => void;
 }) {
   const { isMobile, setOpenMobile, state, setOpen } = useSidebar();
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
+  const groups = nurse ? nurseMenuGroups : menuGroups;
+  const items = useMemo(
+    () => (nurse ? nurseMenuItems(guides) : menuItems),
+    [nurse, guides],
+  );
+
   // 小さいウインドウ（モバイル表示）ではグループを開閉できる。
   // 初期状態は現在のページが属するグループだけを開く。
   const [openGroups, setOpenGroups] = useState<Set<MenuGroupId>>(
-    () => new Set([groupOfPath(currentPath) ?? "common"]),
+    () => new Set([groupOfPath(items, currentPath) ?? "common"]),
   );
   useEffect(() => {
-    const group = groupOfPath(currentPath);
+    const group = groupOfPath(items, currentPath);
     if (!group) return;
     setOpenGroups((prev) => (prev.has(group) ? prev : new Set(prev).add(group)));
-  }, [currentPath]);
+  }, [items, currentPath]);
 
   const toggleGroup = (id: MenuGroupId) => {
     setOpenGroups((prev) => {
@@ -71,10 +92,10 @@ export function AppSidebar({
 
   const visibleGroups = useMemo(
     () =>
-      menuGroups
+      groups
         .map((group) => ({
           ...group,
-          items: menuItems.filter(
+          items: items.filter(
             (item) =>
               item.group === group.id &&
               (!item.adminOnly || user?.canManageUsers) &&
@@ -82,7 +103,7 @@ export function AppSidebar({
           ),
         }))
         .filter((group) => group.items.length > 0),
-    [query, user?.canManageUsers],
+    [groups, items, query, user?.canManageUsers],
   );
   const firstResult = visibleGroups[0]?.items[0];
 
@@ -133,7 +154,7 @@ export function AppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild tooltip={siteMeta.siteTitle}>
-                <a href="/" onClick={(event) => handleNav(event, "/")}>
+                <a href={homeHref} onClick={(event) => handleNav(event, homeHref)}>
                   <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
                     RI
                   </span>
@@ -207,7 +228,11 @@ export function AppSidebar({
                           <SidebarMenuItem key={item.href}>
                             <SidebarMenuButton
                               asChild
-                              isActive={isCurrentPath(currentPath, item.href)}
+                              isActive={isCurrentPath(
+                                currentPath,
+                                item.href,
+                                item.exact,
+                              )}
                               tooltip={item.name}
                             >
                               <a
@@ -230,19 +255,28 @@ export function AppSidebar({
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
-            {user && (
+            {(user || nurse) && (
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip={user.displayName}>
+                <SidebarMenuButton tooltip={nurse ? "看護師" : user?.displayName}>
                   <Users />
-                  <span className="truncate">{user.displayName}</span>
+                  <span className="truncate">
+                    {nurse ? "看護師" : user?.displayName}
+                  </span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
             <SidebarMenuItem>
-              <SidebarMenuButton tooltip="ログアウト" onClick={onLogout}>
-                <LogOut />
-                <span>ログアウト</span>
-              </SidebarMenuButton>
+              {nurse ? (
+                <SidebarMenuButton tooltip="ログイン画面へ戻る" onClick={onLogout}>
+                  <LogIn />
+                  <span>ログイン画面へ戻る</span>
+                </SidebarMenuButton>
+              ) : (
+                <SidebarMenuButton tooltip="ログアウト" onClick={onLogout}>
+                  <LogOut />
+                  <span>ログアウト</span>
+                </SidebarMenuButton>
+              )}
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

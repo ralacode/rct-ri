@@ -276,6 +276,29 @@ fn next_from_query(query: Option<&str>) -> Option<String> {
         .filter(|next| is_safe_next(next))
 }
 
+/// 看護師モード（パスワードなしで解説記事だけを見る）の印。フロントの `src/lib/auth.ts` と同じ名前。
+const NURSE_COOKIE: &str = "rct_role";
+const NURSE_COOKIE_VALUE: &str = "nurse";
+/// 看護師モードで見られるページ（解説記事）。
+const GUIDE_HOME: &str = "/guide/";
+
+fn is_nurse_mode(headers: &axum::http::HeaderMap) -> bool {
+    headers
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(';'))
+        .any(|part| {
+            part.trim()
+                .split_once('=')
+                .is_some_and(|(name, value)| name == NURSE_COOKIE && value == NURSE_COOKIE_VALUE)
+        })
+}
+
+fn is_guide_path(path: &str) -> bool {
+    path == "/guide" || path.starts_with(GUIDE_HOME)
+}
+
 fn auth_fail(status: StatusCode, message: String) -> Response {
     (status, message).into_response()
 }
@@ -563,6 +586,13 @@ async fn gate_pages(request: Request, next: Next) -> Response {
         return redirect_to("/setup/");
     }
     if !authenticated {
+        // 看護師モードは解説記事だけを見られる。それ以外のページは記事一覧へ戻す。
+        if is_nurse_mode(request.headers()) {
+            if is_guide_path(&path) {
+                return next.run(request).await;
+            }
+            return redirect_to(GUIDE_HOME);
+        }
         return redirect_to(&login_url_with_next(&path_and_query));
     }
     if path.starts_with("/users") {
@@ -914,6 +944,30 @@ mod login_next_tests {
             next_from_query(query).as_deref(),
             Some("/patient/detail/?id=12&tab=a")
         );
+    }
+
+    #[test]
+    fn detects_nurse_mode_cookie() {
+        let mut headers = axum::http::HeaderMap::new();
+        assert!(!is_nurse_mode(&headers));
+        headers.insert(
+            header::COOKIE,
+            HeaderValue::from_static("sidebar_state=true; rct_role=nurse"),
+        );
+        assert!(is_nurse_mode(&headers));
+        headers.insert(header::COOKIE, HeaderValue::from_static("rct_role=staff"));
+        assert!(!is_nurse_mode(&headers));
+        headers.insert(header::COOKIE, HeaderValue::from_static("xrct_role=nurse"));
+        assert!(!is_nurse_mode(&headers));
+    }
+
+    #[test]
+    fn guide_paths() {
+        assert!(is_guide_path("/guide"));
+        assert!(is_guide_path("/guide/"));
+        assert!(is_guide_path("/guide/ris-overview/"));
+        assert!(!is_guide_path("/guidex/"));
+        assert!(!is_guide_path("/patient/list/"));
     }
 
     #[test]

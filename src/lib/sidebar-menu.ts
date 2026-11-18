@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   CalendarDays,
   ClipboardList,
   Contact,
@@ -6,6 +7,7 @@ import {
   Film,
   Home,
   KeyRound,
+  LibraryBig,
   Printer,
   Search,
   TrendingDown,
@@ -13,7 +15,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type MenuGroupId = "ri" | "radiotherapy" | "common";
+export type MenuGroupId = "ri" | "radiotherapy" | "common" | "guide";
 
 export type MenuItem = {
   name: string;
@@ -24,6 +26,15 @@ export type MenuItem = {
   keywords?: readonly string[];
   /** 担当者管理権限を持つユーザーにだけ表示する */
   adminOnly?: boolean;
+  /** href と完全に一致するときだけ現在のページとして扱う */
+  exact?: boolean;
+};
+
+/** サイドバーに渡す解説記事へのリンク（ビルド時に content collection から作る） */
+export type GuideLink = {
+  title: string;
+  href: string;
+  keywords: string[];
 };
 
 export const menuGroups: readonly { id: MenuGroupId; label: string }[] = [
@@ -97,6 +108,13 @@ export const menuItems: readonly MenuItem[] = [
     keywords: ["どうが", "ビデオ", "video", "movie"],
   },
   {
+    name: "解説記事",
+    href: "/guide/",
+    icon: LibraryBig,
+    group: "common",
+    keywords: ["かいせつきじ", "解説", "記事", "ガイド", "guide", "ris", "使い方", "マニュアル"],
+  },
+  {
     name: "担当者管理",
     href: "/users/",
     icon: Users,
@@ -112,6 +130,31 @@ export const menuItems: readonly MenuItem[] = [
     keywords: ["ぱすわーどへんこう", "パスワード", "password", "アカウント"],
   },
 ];
+
+export const nurseMenuGroups: readonly { id: MenuGroupId; label: string }[] = [
+  { id: "guide", label: "解説記事" },
+];
+
+/** 看護師モードのサイドバー：記事一覧と各記事だけを並べる */
+export function nurseMenuItems(guides: readonly GuideLink[]): MenuItem[] {
+  return [
+    {
+      name: "記事一覧",
+      href: "/guide/",
+      icon: LibraryBig,
+      group: "guide",
+      keywords: ["きじいちらん", "一覧", "解説", "記事"],
+      exact: true,
+    },
+    ...guides.map((guide) => ({
+      name: guide.title,
+      href: guide.href,
+      icon: BookOpen,
+      group: "guide" as const,
+      keywords: guide.keywords,
+    })),
+  ];
+}
 
 /** 全角/半角・大文字/小文字・カタカナ/ひらがなの違いを吸収して比較用文字列にする */
 export function normalizeForSearch(value: string) {
@@ -132,7 +175,12 @@ export function matchesMenuQuery(item: MenuItem, query: string) {
   );
 }
 
-export function isCurrentPath(path: string | undefined, href: string) {
+export function isCurrentPath(
+  path: string | undefined,
+  href: string,
+  exact = false,
+) {
   if (!path) return false;
+  if (exact) return path === href;
   return path === href || (href !== "/" && path.startsWith(href));
 }

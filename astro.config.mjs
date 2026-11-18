@@ -3,6 +3,7 @@ import { defineConfig } from "astro/config";
 import http from "node:http";
 import path from "node:path";
 
+import mdx from "@astrojs/mdx";
 import react from "@astrojs/react";
 
 import tailwindcss from "@tailwindcss/vite";
@@ -113,5 +114,5 @@ export default defineConfig({
   build: {
     format: "directory",
   },
-  integrations: [react()],
+  integrations: [react(), mdx()],
 });
