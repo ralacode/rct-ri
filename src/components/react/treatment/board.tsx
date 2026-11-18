@@ -293,7 +293,7 @@ export function TreatmentBoard() {
       {board &&
         weeks.map((week) => (
           <div key={week[0]?.iso} className="overflow-x-auto">
-            <table className="w-full min-w-[720px] border-collapse text-sm">
+            <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
               <thead>
                 <tr>
                   <th className="w-24 border bg-muted/40 p-2" />
@@ -380,6 +380,7 @@ export function TreatmentBoard() {
                         <Textarea
                           value={remarkValue(day.iso)}
                           rows={3}
+                          className="max-h-48 overflow-y-auto break-words whitespace-pre-wrap"
                           aria-label={`${day.month}/${day.day} の備考`}
                           onChange={(event) =>
                             setRemarkDrafts((prev) => ({
@@ -390,7 +391,7 @@ export function TreatmentBoard() {
                           onBlur={() => commitRemark(day.iso)}
                         />
                       ) : (
-                        <p className="min-h-16 whitespace-pre-wrap text-sm">
+                        <p className="min-h-16 max-h-48 overflow-y-auto break-words whitespace-pre-wrap text-sm">
                           {remarkValue(day.iso) || "—"}
                         </p>
                       )}
