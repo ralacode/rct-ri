@@ -24,7 +24,13 @@ export type AuthStatus = {
   user: AuthUser | null;
 };
 
+/** ログイン中の画面を見ている人の種類。看護師はパスワードなしで解説記事だけを見られる。 */
+export type Viewer = "staff" | "nurse";
+
 const AUTH_PAGES = ["/login/", "/setup/"];
+// 看護師モードの印。サーバーのセッションは作らず、解説記事（静的ページ）だけを見せる。
+const NURSE_COOKIE = "rct_role";
+export const GUIDE_HOME = "/guide/";
 // ログイン状態はサーバーの HttpOnly Cookie（全タブ共有）で判定する。
 // ここではタブ間でログイン・ログアウトを即時に伝えるためだけに localStorage を使う。
 const AUTH_EVENT_KEY = "rct_auth_event";
@@ -68,10 +74,11 @@ export function watchSession() {
   if (typeof window === "undefined") return () => {};
   let stopped = false;
   const toLogin = () => {
-    if (!stopped && !isAuthPage()) go(loginUrl());
+    if (!stopped && !isNurseMode() && !isAuthPage()) go(loginUrl());
   };
   const check = async () => {
-    if (stopped || document.visibilityState === "hidden") return;
+    if (stopped || isNurseMode() || document.visibilityState === "hidden")
+      return;
     try {
       const status = await fetchAuthStatus();
       if (!status.authenticated) toLogin();
@@ -95,6 +102,25 @@ export function watchSession() {
     document.removeEventListener("visibilitychange", onVisible);
     window.removeEventListener("focus", onVisible);
   };
+}
+
+export function isNurseMode() {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((row) => row === `${NURSE_COOKIE}=nurse`);
+}
+
+export function enterNurseMode() {
+  document.cookie = `${NURSE_COOKIE}=nurse; path=/; SameSite=Lax`;
+}
+
+export function exitNurseMode() {
+  document.cookie = `${NURSE_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
+}
+
+export function isGuidePath(pathname = window.location.pathname) {
+  return pathname === "/guide" || pathname.startsWith(GUIDE_HOME);
 }
 
 function apiUrl(path: string) {
@@ -195,6 +221,7 @@ export async function login(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
+  exitNurseMode();
   broadcastAuthEvent("login");
   return user;
 }
@@ -318,32 +345,42 @@ export function isAuthPage(pathname = window.location.pathname) {
   );
 }
 
-export async function redirectForAuthStatus(status: AuthStatus) {
+/**
+ * 認証状態に応じて必要ならページを移動する。
+ * このページをそのまま見せてよいときは見ている人の種類を、移動したときは null を返す。
+ */
+export async function redirectForAuthStatus(
+  status: AuthStatus,
+): Promise<Viewer | null> {
   const path = window.location.pathname;
   if (status.needsSetup && !path.startsWith("/setup")) {
     go("/setup/");
-    return false;
+    return null;
   }
-  if (!status.needsSetup && !status.authenticated && !isAuthPage(path)) {
-    go(loginUrl());
-    return false;
+  if (status.authenticated) {
+    // 職員としてログインしていれば看護師モードの印は不要。
+    if (isNurseMode()) exitNurseMode();
+    if (isAuthPage(path)) {
+      go(nextPathAfterLogin());
+      return null;
+    }
+    if (path.startsWith("/users") && !status.user?.canManageUsers) {
+      go("/account/");
+      return null;
+    }
+    return "staff";
   }
-  if (status.authenticated && isAuthPage(path)) {
-    go(nextPathAfterLogin());
-    return false;
+  if (isAuthPage(path)) return null;
+  if (!status.needsSetup && isNurseMode()) {
+    if (isGuidePath(path)) return "nurse";
+    go(GUIDE_HOME);
+    return null;
   }
-  if (
-    status.authenticated &&
-    path.startsWith("/users") &&
-    !status.user?.canManageUsers
-  ) {
-    go("/account/");
-    return false;
-  }
-  return status.authenticated;
+  if (!status.needsSetup) go(loginUrl());
+  return null;
 }
 
 export async function requireAuthenticatedPage() {
   const status = await fetchAuthStatus();
-  return redirectForAuthStatus(status);
+  return (await redirectForAuthStatus(status)) === "staff";
 }

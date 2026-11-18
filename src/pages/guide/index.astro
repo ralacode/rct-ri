@@ -1,0 +1,46 @@
+---
+import Layout from "@layouts/layout.astro";
+import { getSortedGuides, guideHref } from "@lib/guides";
+
+const guides = await getSortedGuides();
+const dateFormat = new Intl.DateTimeFormat("ja-JP", { dateStyle: "medium" });
+---
+
+<Layout pageTitle="解説記事">
+  <div class="mx-auto grid w-full max-w-3xl content-start gap-4 py-4">
+    <div class="grid gap-1">
+      <h2 class="text-2xl font-semibold tracking-tight">解説記事</h2>
+      <p class="text-sm text-muted-foreground">
+        RIS（放射線部門システム）の使い方や検査の流れを解説しています。
+      </p>
+    </div>
+    {
+      guides.length === 0 ? (
+        <p class="text-sm text-muted-foreground">記事はまだありません。</p>
+      ) : (
+        <ul class="grid gap-3">
+          {guides.map((guide) => (
+            <li>
+              <a
+                href={guideHref(guide.id)}
+                class="block rounded-lg border bg-card p-4 transition-colors hover:bg-accent"
+              >
+                <p class="font-semibold">{guide.data.title}</p>
+                {guide.data.description && (
+                  <p class="mt-1 text-sm text-muted-foreground">
+                    {guide.data.description}
+                  </p>
+                )}
+                {guide.data.updatedAt && (
+                  <p class="mt-2 text-xs text-muted-foreground">
+                    更新日 {dateFormat.format(guide.data.updatedAt)}
+                  </p>
+                )}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
+</Layout>

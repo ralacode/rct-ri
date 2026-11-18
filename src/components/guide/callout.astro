@@ -1,0 +1,32 @@
+---
+// MDX 記事の中で使う注意書きボックス。
+// 例: <Callout type="warning" title="注意">本文</Callout>
+interface Props {
+  type?: "info" | "warning" | "tip";
+  title?: string;
+}
+
+const { type = "info", title } = Astro.props;
+
+const styles = {
+  info: "border-sky-300 bg-sky-50 text-sky-950",
+  warning: "border-amber-300 bg-amber-50 text-amber-950",
+  tip: "border-emerald-300 bg-emerald-50 text-emerald-950",
+} as const;
+
+const defaultTitles = {
+  info: "メモ",
+  warning: "注意",
+  tip: "ポイント",
+} as const;
+---
+
+<aside
+  class:list={[
+    "not-prose my-6 rounded-lg border-l-4 px-4 py-3 text-sm leading-relaxed",
+    styles[type],
+  ]}
+>
+  <p class="mb-1 font-semibold">{title ?? defaultTitles[type]}</p>
+  <div class="[&_p]:my-1"><slot /></div>
+</aside>
