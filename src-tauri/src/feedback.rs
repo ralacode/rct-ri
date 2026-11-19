@@ -1,13 +1,13 @@
-// RIS についての質問・要望。看護師（パスワードなし）と職員の両方が投稿・閲覧でき、
-// 担当者管理で「回答できる」に指定された職員だけが回答を書ける。
+// RIS についての質問・要望。ログインした職員（看護師を含む）が投稿・閲覧でき、
+// 担当者管理で「回答できる」に指定された人だけが回答を書ける。
 // データは exe 横の feedback.db（業務データ・担当者データとは別ファイル）に置く。
 
-use crate::auth::{self, AuthUser};
+use crate::auth::AuthUser;
 use crate::db::get_feedback_db_path;
 use axum::extract::Path;
-use axum::http::{HeaderMap, StatusCode};
+use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{get, put};
+use axum::routing::{delete, get, put};
 use axum::{Extension, Json, Router};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
@@ -15,23 +15,26 @@ use std::time::Duration;
 
 const MAX_BODY_CHARS: usize = 2000;
 const MAX_ANSWER_CHARS: usize = 4000;
-const MAX_SHORT_CHARS: usize = 50;
 const KINDS: &[&str] = &["question", "request", "other"];
 
+/// 画面に返す投稿。投稿者のアカウントは返さず、見ている人から見た可否だけを付ける。
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FeedbackItem {
     pub id: i64,
     pub kind: String,
     pub body: String,
-    /// nurse / staff
-    pub submitter_role: String,
-    pub submitter_name: String,
-    pub department: String,
+    /// 匿名の投稿では空
+    pub author_name: String,
+    pub anonymous: bool,
     pub answer: String,
     pub answered_by: String,
     pub answered_at: Option<String>,
     pub created_at: String,
+    /// 見ている人が投稿した
+    pub is_mine: bool,
+    /// 見ている人が削除できる
+    pub can_delete: bool,
 }
 
 #[derive(Deserialize)]
@@ -40,9 +43,7 @@ pub struct NewFeedback {
     pub kind: String,
     pub body: String,
     #[serde(default)]
-    pub submitter_name: String,
-    #[serde(default)]
-    pub department: String,
+    pub anonymous: bool,
 }
 
 #[derive(Deserialize)]
@@ -51,29 +52,62 @@ struct AnswerRequest {
     answer: String,
 }
 
-/// 投稿・閲覧している人。職員のセッションがあればそちらを優先する。
-enum Viewer {
-    Nurse,
-    Staff(AuthUser),
+struct StoredItem {
+    id: i64,
+    kind: String,
+    body: String,
+    author_id: Option<i32>,
+    author_name: String,
+    anonymous: bool,
+    answer: String,
+    answered_by: String,
+    answered_at: Option<String>,
+    created_at: String,
 }
 
-fn viewer_from_headers(headers: &HeaderMap) -> Option<Viewer> {
-    if let Ok(user) = auth::user_from_headers(headers) {
-        return Some(Viewer::Staff(user));
+impl StoredItem {
+    fn is_mine(&self, viewer: &AuthUser) -> bool {
+        self.author_id == Some(viewer.id)
     }
-    crate::http::is_nurse_mode(headers).then_some(Viewer::Nurse)
+
+    /// 本人は回答が付く前だけ、管理者はいつでも削除できる。
+    fn can_delete(&self, viewer: &AuthUser) -> bool {
+        viewer.can_manage() || (self.is_mine(viewer) && self.answer.is_empty())
+    }
+
+    fn view(self, viewer: &AuthUser) -> FeedbackItem {
+        let is_mine = self.is_mine(viewer);
+        let can_delete = self.can_delete(viewer);
+        FeedbackItem {
+            id: self.id,
+            kind: self.kind,
+            body: self.body,
+            author_name: if self.anonymous {
+                String::new()
+            } else {
+                self.author_name
+            },
+            anonymous: self.anonymous,
+            answer: self.answer,
+            answered_by: self.answered_by,
+            answered_at: self.answered_at,
+            created_at: self.created_at,
+            is_mine,
+            can_delete,
+        }
+    }
 }
 
 pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
+    migrate_from_nurse_mode(conn)?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS feedback (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT NOT NULL,
             body TEXT NOT NULL,
-            submitter_role TEXT NOT NULL,
-            submitter_name TEXT NOT NULL DEFAULT '',
-            department TEXT NOT NULL DEFAULT '',
-            account_user_id TEXT,
+            author_id INTEGER,
+            author_name TEXT NOT NULL DEFAULT '',
+            anonymous INTEGER NOT NULL DEFAULT 0,
             answer TEXT NOT NULL DEFAULT '',
             answered_by TEXT NOT NULL DEFAULT '',
             answered_at TEXT,
@@ -83,6 +117,47 @@ pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
         [],
     )?;
     Ok(())
+}
+
+/// 看護師モード（パスワードなし）時代の表（所属・投稿者区分あり）を、今の形へ移す。
+/// 投稿者のアカウントは分からないので author_id は空（管理者だけが削除できる）。
+/// 名前が空だった投稿は匿名として扱う。
+fn migrate_from_nurse_mode(conn: &Connection) -> rusqlite::Result<()> {
+    let has_old_column: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM pragma_table_info('feedback') WHERE name = 'submitter_role'",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_old_column == 0 {
+        return Ok(());
+    }
+    conn.execute_batch(
+        "BEGIN;
+         ALTER TABLE feedback RENAME TO feedback_old;
+         CREATE TABLE feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL,
+            body TEXT NOT NULL,
+            author_id INTEGER,
+            author_name TEXT NOT NULL DEFAULT '',
+            anonymous INTEGER NOT NULL DEFAULT 0,
+            answer TEXT NOT NULL DEFAULT '',
+            answered_by TEXT NOT NULL DEFAULT '',
+            answered_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+         );
+         INSERT INTO feedback (
+            id, kind, body, author_id, author_name, anonymous,
+            answer, answered_by, answered_at, created_at, updated_at
+         )
+         SELECT id, kind, body, NULL, submitter_name,
+                CASE WHEN submitter_name = '' THEN 1 ELSE 0 END,
+                answer, answered_by, answered_at, created_at, updated_at
+         FROM feedback_old;
+         DROP TABLE feedback_old;
+         COMMIT;",
+    )
 }
 
 fn open_db() -> Result<Connection, String> {
@@ -95,24 +170,17 @@ fn now_str() -> String {
     chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
-fn short_text(raw: &str, label: &str) -> Result<String, String> {
-    let value = raw.trim().to_string();
-    if value.chars().count() > MAX_SHORT_CHARS {
-        return Err(format!(
-            "{label}は{MAX_SHORT_CHARS}文字以内で入力してください"
-        ));
-    }
-    Ok(value)
-}
+const ITEM_COLUMNS: &str = "id, kind, body, author_id, author_name, anonymous, \
+     answer, answered_by, answered_at, created_at";
 
-fn map_item(row: &rusqlite::Row<'_>) -> rusqlite::Result<FeedbackItem> {
-    Ok(FeedbackItem {
+fn map_item(row: &rusqlite::Row<'_>) -> rusqlite::Result<StoredItem> {
+    Ok(StoredItem {
         id: row.get(0)?,
         kind: row.get(1)?,
         body: row.get(2)?,
-        submitter_role: row.get(3)?,
-        submitter_name: row.get(4)?,
-        department: row.get(5)?,
+        author_id: row.get(3)?,
+        author_name: row.get(4)?,
+        anonymous: row.get::<_, i32>(5)? != 0,
         answer: row.get(6)?,
         answered_by: row.get(7)?,
         answered_at: row.get(8)?,
@@ -120,21 +188,7 @@ fn map_item(row: &rusqlite::Row<'_>) -> rusqlite::Result<FeedbackItem> {
     })
 }
 
-const ITEM_COLUMNS: &str = "id, kind, body, submitter_role, submitter_name, department, \
-     answer, answered_by, answered_at, created_at";
-
-pub fn list(conn: &Connection) -> Result<Vec<FeedbackItem>, String> {
-    let mut stmt = conn
-        .prepare(&format!(
-            "SELECT {ITEM_COLUMNS} FROM feedback ORDER BY created_at DESC, id DESC"
-        ))
-        .map_err(|e| e.to_string())?;
-    let rows = stmt.query_map([], map_item).map_err(|e| e.to_string())?;
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())
-}
-
-fn find(conn: &Connection, id: i64) -> Result<FeedbackItem, String> {
+fn find(conn: &Connection, id: i64) -> Result<StoredItem, String> {
     conn.query_row(
         &format!("SELECT {ITEM_COLUMNS} FROM feedback WHERE id = ?1"),
         params![id],
@@ -146,15 +200,27 @@ fn find(conn: &Connection, id: i64) -> Result<FeedbackItem, String> {
     })
 }
 
-/// 投稿を保存する。職員が投稿したときは、名前が空ならアカウント名を入れる。
+pub fn list(conn: &Connection, viewer: &AuthUser) -> Result<Vec<FeedbackItem>, String> {
+    let mut stmt = conn
+        .prepare(&format!(
+            "SELECT {ITEM_COLUMNS} FROM feedback ORDER BY created_at DESC, id DESC"
+        ))
+        .map_err(|e| e.to_string())?;
+    let rows = stmt.query_map([], map_item).map_err(|e| e.to_string())?;
+    rows.map(|row| row.map(|item| item.view(viewer)))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+/// 投稿を保存する。匿名でも投稿者のアカウントは記録し（削除の判定に使う）、画面には出さない。
 pub fn insert(
     conn: &Connection,
     input: &NewFeedback,
-    staff: Option<&AuthUser>,
+    author: &AuthUser,
 ) -> Result<FeedbackItem, String> {
     let kind = input.kind.trim();
     if !KINDS.contains(&kind) {
-        return Err("種別を選んでください".into());
+        return Err("種類を選んでください".into());
     }
     let body = input.body.trim();
     if body.is_empty() {
@@ -163,32 +229,26 @@ pub fn insert(
     if body.chars().count() > MAX_BODY_CHARS {
         return Err(format!("内容は{MAX_BODY_CHARS}文字以内で入力してください"));
     }
-    let mut submitter_name = short_text(&input.submitter_name, "名前")?;
-    let department = short_text(&input.department, "所属")?;
-    if submitter_name.is_empty() {
-        if let Some(user) = staff {
-            submitter_name = user.display_name.clone();
-        }
-    }
-    let role = if staff.is_some() { "staff" } else { "nurse" };
     let now = now_str();
     conn.execute(
         "INSERT INTO feedback (
-            kind, body, submitter_role, submitter_name, department,
-            account_user_id, created_at, updated_at
-         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?7)",
+            kind, body, author_id, author_name, anonymous, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6)",
         params![
             kind,
             body,
-            role,
-            submitter_name,
-            department,
-            staff.map(|user| user.user_id.clone()),
+            author.id,
+            if input.anonymous {
+                ""
+            } else {
+                author.display_name.as_str()
+            },
+            input.anonymous as i32,
             now
         ],
     )
     .map_err(|e| e.to_string())?;
-    find(conn, conn.last_insert_rowid())
+    Ok(find(conn, conn.last_insert_rowid())?.view(author))
 }
 
 /// 回答を書く（空にすると回答を取り消す）。
@@ -221,37 +281,52 @@ pub fn answer(
     if updated == 0 {
         return Err("投稿が見つかりません".into());
     }
-    find(conn, id)
+    Ok(find(conn, id)?.view(responder))
+}
+
+pub enum DeleteError {
+    NotFound,
+    Forbidden(String),
+    Other(String),
+}
+
+pub fn remove(conn: &Connection, id: i64, actor: &AuthUser) -> Result<(), DeleteError> {
+    let item = find(conn, id).map_err(|message| {
+        if message == "投稿が見つかりません" {
+            DeleteError::NotFound
+        } else {
+            DeleteError::Other(message)
+        }
+    })?;
+    if !item.can_delete(actor) {
+        let message = if item.is_mine(actor) {
+            "回答が付いた投稿は削除できません"
+        } else {
+            "削除できるのは投稿した本人と管理者だけです"
+        };
+        return Err(DeleteError::Forbidden(message.into()));
+    }
+    conn.execute("DELETE FROM feedback WHERE id = ?1", params![id])
+        .map_err(|e| DeleteError::Other(e.to_string()))?;
+    Ok(())
 }
 
 fn fail(status: StatusCode, message: String) -> Response {
     (status, message).into_response()
 }
 
-fn forbidden_viewer() -> Response {
-    fail(
-        StatusCode::UNAUTHORIZED,
-        "ログイン画面から入り直してください".into(),
-    )
-}
-
-async fn list_handler(headers: HeaderMap) -> Response {
-    if viewer_from_headers(&headers).is_none() {
-        return forbidden_viewer();
-    }
-    match open_db().and_then(|conn| list(&conn)) {
+async fn list_handler(Extension(viewer): Extension<AuthUser>) -> Response {
+    match open_db().and_then(|conn| list(&conn, &viewer)) {
         Ok(items) => Json(items).into_response(),
         Err(message) => fail(StatusCode::INTERNAL_SERVER_ERROR, message),
     }
 }
 
-async fn create_handler(headers: HeaderMap, Json(body): Json<NewFeedback>) -> Response {
-    let staff = match viewer_from_headers(&headers) {
-        Some(Viewer::Staff(user)) => Some(user),
-        Some(Viewer::Nurse) => None,
-        None => return forbidden_viewer(),
-    };
-    match open_db().and_then(|conn| insert(&conn, &body, staff.as_ref())) {
+async fn create_handler(
+    Extension(author): Extension<AuthUser>,
+    Json(body): Json<NewFeedback>,
+) -> Response {
+    match open_db().and_then(|conn| insert(&conn, &body, &author)) {
         Ok(item) => {
             crate::events::notify();
             Json(item).into_response()
@@ -280,14 +355,28 @@ async fn answer_handler(
     }
 }
 
-/// 看護師モードでも使う API（ハンドラ内で看護師 Cookie か職員セッションを確認する）。
-pub fn public_routes() -> Router {
-    Router::new().route("/feedback", get(list_handler).post(create_handler))
+async fn delete_handler(Path(id): Path<i64>, Extension(actor): Extension<AuthUser>) -> Response {
+    let conn = match open_db() {
+        Ok(conn) => conn,
+        Err(message) => return fail(StatusCode::INTERNAL_SERVER_ERROR, message),
+    };
+    match remove(&conn, id, &actor) {
+        Ok(()) => {
+            crate::events::notify();
+            StatusCode::NO_CONTENT.into_response()
+        }
+        Err(DeleteError::NotFound) => fail(StatusCode::NOT_FOUND, "投稿が見つかりません".into()),
+        Err(DeleteError::Forbidden(message)) => fail(StatusCode::FORBIDDEN, message),
+        Err(DeleteError::Other(message)) => fail(StatusCode::INTERNAL_SERVER_ERROR, message),
+    }
 }
 
 /// 職員のログインが必要な API。
-pub fn protected_routes() -> Router {
-    Router::new().route("/feedback/{id}/answer", put(answer_handler))
+pub fn routes() -> Router {
+    Router::new()
+        .route("/feedback", get(list_handler).post(create_handler))
+        .route("/feedback/{id}", delete(delete_handler))
+        .route("/feedback/{id}/answer", put(answer_handler))
 }
 
 #[cfg(test)]
@@ -300,83 +389,174 @@ mod tests {
         conn
     }
 
-    fn staff(can_answer: bool) -> AuthUser {
+    fn user(id: i32, name: &str) -> AuthUser {
         AuthUser {
-            id: 1,
-            user_id: "00000001".into(),
-            last_name: "山田".into(),
-            first_name: "太郎".into(),
-            display_name: "山田 太郎".into(),
+            id,
+            user_id: format!("{id:08}"),
+            last_name: name.into(),
+            first_name: String::new(),
+            display_name: name.into(),
             is_initial_admin: false,
             can_manage_users: false,
-            can_answer_feedback: can_answer,
+            can_answer_feedback: false,
             modalities: Vec::new(),
         }
     }
 
-    fn input(kind: &str, body: &str, name: &str) -> NewFeedback {
+    fn admin() -> AuthUser {
+        let mut admin = user(99, "管理者");
+        admin.can_manage_users = true;
+        admin
+    }
+
+    fn input(body: &str, anonymous: bool) -> NewFeedback {
         NewFeedback {
-            kind: kind.into(),
+            kind: "question".into(),
             body: body.into(),
-            submitter_name: name.into(),
-            department: String::new(),
+            anonymous,
         }
     }
 
     #[test]
-    fn nurse_post_is_anonymous_unless_named() {
-        let conn = conn();
-        let item = insert(&conn, &input("question", "  検査予約の見方は？ ", ""), None).unwrap();
-        assert_eq!(item.submitter_role, "nurse");
-        assert_eq!(item.submitter_name, "");
-        assert_eq!(item.body, "検査予約の見方は？");
-    }
-
-    #[test]
-    fn staff_post_uses_account_name_by_default() {
+    fn named_post_shows_account_name() {
         let conn = conn();
         let item = insert(
             &conn,
-            &input("request", "一覧を印刷したい", ""),
-            Some(&staff(false)),
+            &input("  検査予約の見方は？ ", false),
+            &user(1, "山田"),
         )
         .unwrap();
-        assert_eq!(item.submitter_role, "staff");
-        assert_eq!(item.submitter_name, "山田 太郎");
+        assert_eq!(item.body, "検査予約の見方は？");
+        assert_eq!(item.author_name, "山田");
+        assert!(!item.anonymous);
+        assert!(item.is_mine);
+    }
+
+    #[test]
+    fn anonymous_post_hides_name_but_owner_is_known() {
+        let conn = conn();
+        let author = user(1, "山田");
+        let item = insert(&conn, &input("匿名の質問", true), &author).unwrap();
+        assert!(item.anonymous);
+        assert_eq!(item.author_name, "");
+
+        let mine = &list(&conn, &author).unwrap()[0];
+        assert!(mine.is_mine && mine.can_delete);
+        let others = &list(&conn, &user(2, "佐藤")).unwrap()[0];
+        assert!(!others.is_mine && !others.can_delete);
+        assert_eq!(others.author_name, "");
+        // DB にも名前は残さない
+        let stored: String = conn
+            .query_row("SELECT author_name FROM feedback", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(stored, "");
     }
 
     #[test]
     fn rejects_invalid_input() {
         let conn = conn();
-        assert!(insert(&conn, &input("question", "   ", ""), None).is_err());
-        assert!(insert(&conn, &input("unknown", "内容", ""), None).is_err());
+        let author = user(1, "山田");
+        assert!(insert(&conn, &input("   ", false), &author).is_err());
+        let mut unknown = input("内容", false);
+        unknown.kind = "unknown".into();
+        assert!(insert(&conn, &unknown, &author).is_err());
         let long = "あ".repeat(MAX_BODY_CHARS + 1);
-        assert!(insert(&conn, &input("other", &long, ""), None).is_err());
-        let long_name = "あ".repeat(MAX_SHORT_CHARS + 1);
-        assert!(insert(&conn, &input("other", "内容", &long_name), None).is_err());
+        assert!(insert(&conn, &input(&long, false), &author).is_err());
+    }
+
+    #[test]
+    fn owner_can_delete_only_before_answer() {
+        let conn = conn();
+        let author = user(1, "山田");
+        let responder = user(3, "回答者");
+        let first = insert(&conn, &input("1件目", false), &author).unwrap();
+        assert!(matches!(
+            remove(&conn, first.id, &user(2, "佐藤")),
+            Err(DeleteError::Forbidden(_))
+        ));
+        assert!(remove(&conn, first.id, &author).is_ok());
+        assert!(matches!(
+            remove(&conn, first.id, &author),
+            Err(DeleteError::NotFound)
+        ));
+
+        let second = insert(&conn, &input("2件目", true), &author).unwrap();
+        answer(&conn, second.id, "回答です", &responder).unwrap();
+        assert!(!list(&conn, &author).unwrap()[0].can_delete);
+        assert!(matches!(
+            remove(&conn, second.id, &author),
+            Err(DeleteError::Forbidden(_))
+        ));
+        // 回答を取り消せば、本人がまた削除できる
+        answer(&conn, second.id, "", &responder).unwrap();
+        assert!(list(&conn, &author).unwrap()[0].can_delete);
+    }
+
+    #[test]
+    fn admin_can_delete_any_post() {
+        let conn = conn();
+        let item = insert(&conn, &input("不適切な投稿", true), &user(1, "山田")).unwrap();
+        answer(&conn, item.id, "回答", &user(3, "回答者")).unwrap();
+        assert!(list(&conn, &admin()).unwrap()[0].can_delete);
+        assert!(remove(&conn, item.id, &admin()).is_ok());
+        assert!(list(&conn, &admin()).unwrap().is_empty());
     }
 
     #[test]
     fn answer_and_clear() {
         let conn = conn();
-        let item = insert(&conn, &input("question", "質問", ""), None).unwrap();
-        let answered = answer(&conn, item.id, " こうします ", &staff(true)).unwrap();
+        let item = insert(&conn, &input("質問", false), &user(1, "山田")).unwrap();
+        let answered = answer(&conn, item.id, " こうします ", &user(3, "回答者")).unwrap();
         assert_eq!(answered.answer, "こうします");
-        assert_eq!(answered.answered_by, "山田 太郎");
+        assert_eq!(answered.answered_by, "回答者");
         assert!(answered.answered_at.is_some());
-        let cleared = answer(&conn, item.id, "", &staff(true)).unwrap();
+        let cleared = answer(&conn, item.id, "", &user(3, "回答者")).unwrap();
         assert_eq!(cleared.answer, "");
-        assert_eq!(cleared.answered_by, "");
         assert!(cleared.answered_at.is_none());
-        assert!(answer(&conn, 999, "x", &staff(true)).is_err());
+        assert!(answer(&conn, 999, "x", &user(3, "回答者")).is_err());
     }
 
     #[test]
     fn list_is_newest_first() {
         let conn = conn();
-        let first = insert(&conn, &input("question", "1件目", ""), None).unwrap();
-        let second = insert(&conn, &input("question", "2件目", ""), None).unwrap();
-        let ids: Vec<i64> = list(&conn).unwrap().iter().map(|item| item.id).collect();
+        let author = user(1, "山田");
+        let first = insert(&conn, &input("1件目", false), &author).unwrap();
+        let second = insert(&conn, &input("2件目", false), &author).unwrap();
+        let ids: Vec<i64> = list(&conn, &author)
+            .unwrap()
+            .iter()
+            .map(|item| item.id)
+            .collect();
         assert_eq!(ids, vec![second.id, first.id]);
+    }
+
+    #[test]
+    fn migrates_nurse_mode_table() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL, body TEXT NOT NULL,
+                submitter_role TEXT NOT NULL,
+                submitter_name TEXT NOT NULL DEFAULT '',
+                department TEXT NOT NULL DEFAULT '',
+                account_user_id TEXT,
+                answer TEXT NOT NULL DEFAULT '', answered_by TEXT NOT NULL DEFAULT '',
+                answered_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+             );
+             INSERT INTO feedback (kind, body, submitter_role, submitter_name, created_at, updated_at)
+             VALUES ('question', '名前なし', 'nurse', '', '2026-11-19 10:00:00', '2026-11-19 10:00:00'),
+                    ('request', '名前あり', 'staff', '田中', '2026-11-19 11:00:00', '2026-11-19 11:00:00');",
+        )
+        .unwrap();
+        init_tables(&conn).unwrap();
+        init_tables(&conn).unwrap();
+        let items = list(&conn, &user(1, "山田")).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].author_name, "田中");
+        assert!(!items[0].anonymous);
+        assert!(items[1].anonymous);
+        assert!(!items[0].can_delete);
+        assert!(list(&conn, &admin()).unwrap()[0].can_delete);
     }
 }

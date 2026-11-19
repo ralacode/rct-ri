@@ -1,18 +1,14 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AppSidebar } from "@/components/react/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
-  exitNurseMode,
   fetchAuthStatus,
-  isNurseMode,
   loginUrl,
   logout,
-  NURSE_HOME,
   redirectForAuthStatus,
   watchSession,
   type AuthUser,
-  type Viewer,
 } from "@/lib/auth";
 import { siteMeta } from "@/lib/constants";
 import { startLiveUpdates } from "@/lib/live";
@@ -29,12 +25,6 @@ export function AppShell({
   const [open, setOpen] = useState(defaultOpen);
   const [openMobile, setOpenMobile] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [viewer, setViewer] = useState<Viewer | null>(null);
-
-  // 看護師モードは Cookie で分かるので、職員用メニューが一瞬見えないよう描画前に切り替える。
-  useLayoutEffect(() => {
-    if (isNurseMode()) setViewer("nurse");
-  }, []);
 
   useEffect(() => {
     const match = document.cookie
@@ -66,13 +56,8 @@ export function AppShell({
         if (cancelled) return;
         const result = await redirectForAuthStatus(status);
         if (cancelled || !result) return;
-        setViewer(result);
-        if (result === "staff" && status.user) {
-          setUser(status.user);
-          startLiveUpdates();
-        } else {
-          setUser(null);
-        }
+        setUser(result);
+        startLiveUpdates();
       } catch {
         if (!cancelled) go(loginUrl());
       }
@@ -87,15 +72,7 @@ export function AppShell({
 
   useEffect(() => watchSession(), []);
 
-  const nurse = viewer === "nurse";
-  const homeHref = nurse ? NURSE_HOME : "/";
-
   const handleLogout = async () => {
-    if (nurse) {
-      exitNurseMode();
-      go("/login/");
-      return;
-    }
     try {
       await logout();
     } finally {
@@ -114,18 +91,16 @@ export function AppShell({
       <AppSidebar
         currentPath={path}
         user={user}
-        nurse={nurse}
-        homeHref={homeHref}
         onLogout={() => void handleLogout()}
       />
       <header className="flex h-12 items-center gap-2 border-b px-2 [grid-area:header] print:hidden">
         <SidebarTrigger />
-        <a href={homeHref} className="truncate font-bold">
+        <a href="/" className="truncate font-bold">
           {siteMeta.siteTitle}
         </a>
-        {(user || nurse) && (
+        {user && (
           <span className="ml-auto truncate text-sm text-muted-foreground">
-            {nurse ? "看護師" : user?.displayName}
+            {user.displayName}
           </span>
         )}
       </header>

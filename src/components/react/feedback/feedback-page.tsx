@@ -2,18 +2,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
-import { MyInput } from "@/components/react/my-input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { fetchAuthStatus, type AuthUser } from "@/lib/auth";
+import { fetchMe, type AuthUser } from "@/lib/auth";
 import {
   answerFeedback,
   createFeedback,
+  deleteFeedback,
   FEEDBACK_ANSWER_MAX,
   FEEDBACK_BODY_MAX,
   FEEDBACK_KINDS,
-  FEEDBACK_SHORT_MAX,
   feedbackKindLabel,
   listFeedback,
   type FeedbackItem,
@@ -22,16 +21,27 @@ import {
 import { onDataChanged } from "@/lib/live";
 import { cn } from "@/lib/utils";
 
-type Filter = "all" | "open" | "answered";
+type Filter = "all" | "open" | "answered" | "mine";
 
 const FILTERS: readonly { value: Filter; label: string }[] = [
   { value: "all", label: "すべて" },
   { value: "open", label: "未回答" },
   { value: "answered", label: "回答済み" },
+  { value: "mine", label: "自分の投稿" },
 ];
 
-// 看護師モードはサーバーの更新通知（職員専用）を受け取れないので、定期的に読み直す。
-const NURSE_REFRESH_MS = 60 * 1000;
+function matchesFilter(item: FeedbackItem, filter: Filter) {
+  switch (filter) {
+    case "all":
+      return true;
+    case "open":
+      return !item.answer;
+    case "answered":
+      return Boolean(item.answer);
+    case "mine":
+      return item.isMine;
+  }
+}
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -41,12 +51,6 @@ function formatDateTime(value: string | null) {
   if (!value) return "";
   // "YYYY-MM-DD HH:MM:SS" → "YYYY/MM/DD HH:MM"
   return value.slice(0, 16).replaceAll("-", "/");
-}
-
-function submitterText(item: FeedbackItem) {
-  const role = item.submitterRole === "nurse" ? "看護師" : "職員";
-  const who = [item.department, item.submitterName].filter(Boolean).join(" ");
-  return who ? `${role}・${who}` : `${role}（名前なし）`;
 }
 
 export function FeedbackPage() {
@@ -68,59 +72,32 @@ export function FeedbackPage() {
   }, []);
 
   useEffect(() => {
-    let stop = () => {};
-    let cancelled = false;
-    void (async () => {
-      let staff: AuthUser | null = null;
-      try {
-        const status = await fetchAuthStatus();
-        staff = status.authenticated ? status.user : null;
-      } catch {
-        // 認証状態が取れなくても一覧の読み込みは試す。
-      }
-      if (cancelled) return;
-      setUser(staff);
-      await load();
-      if (cancelled) return;
-      if (staff) {
-        stop = onDataChanged(() => void load());
-      } else {
-        const timer = window.setInterval(() => {
-          if (document.visibilityState === "visible") void load();
-        }, NURSE_REFRESH_MS);
-        const onVisible = () => {
-          if (document.visibilityState === "visible") void load();
-        };
-        document.addEventListener("visibilitychange", onVisible);
-        stop = () => {
-          window.clearInterval(timer);
-          document.removeEventListener("visibilitychange", onVisible);
-        };
-      }
-    })();
-    return () => {
-      cancelled = true;
-      stop();
-    };
+    void fetchMe()
+      .then(setUser)
+      .catch(() => setUser(null));
+    void load();
+    return onDataChanged(() => void load());
   }, [load]);
 
   const replaceItem = (next: FeedbackItem) =>
     setItems((prev) => prev.map((item) => (item.id === next.id ? next : item)));
 
-  const counts = useMemo(() => {
-    const answered = items.filter((item) => item.answer).length;
-    return { all: items.length, answered, open: items.length - answered };
-  }, [items]);
+  const removeItem = (id: number) =>
+    setItems((prev) => prev.filter((item) => item.id !== id));
+
+  const counts = useMemo(
+    () =>
+      Object.fromEntries(
+        FILTERS.map(({ value }) => [
+          value,
+          items.filter((item) => matchesFilter(item, value)).length,
+        ]),
+      ) as Record<Filter, number>,
+    [items],
+  );
 
   const visibleItems = useMemo(
-    () =>
-      items.filter((item) =>
-        filter === "all"
-          ? true
-          : filter === "answered"
-            ? Boolean(item.answer)
-            : !item.answer,
-      ),
+    () => items.filter((item) => matchesFilter(item, filter)),
     [items, filter],
   );
 
@@ -137,7 +114,7 @@ export function FeedbackPage() {
       </div>
 
       <FeedbackForm
-        staff={user}
+        user={user}
         onCreated={(item) => {
           setItems((prev) => [item, ...prev]);
           setFilter("all");
@@ -150,7 +127,7 @@ export function FeedbackPage() {
             みんなの質問・要望
           </h3>
           <div
-            className="flex gap-1 rounded-lg border p-1"
+            className="flex flex-wrap gap-1 rounded-lg border p-1"
             role="group"
             aria-label="表示する投稿"
           >
@@ -188,6 +165,7 @@ export function FeedbackPage() {
                   item={item}
                   canAnswer={Boolean(user?.canAnswerFeedback)}
                   onAnswered={replaceItem}
+                  onDeleted={removeItem}
                 />
               </li>
             ))}
@@ -199,16 +177,15 @@ export function FeedbackPage() {
 }
 
 function FeedbackForm({
-  staff,
+  user,
   onCreated,
 }: {
-  staff: AuthUser | null;
+  user: AuthUser | null;
   onCreated: (item: FeedbackItem) => void;
 }) {
   const [kind, setKind] = useState<FeedbackKind>("question");
   const [body, setBody] = useState("");
-  const [department, setDepartment] = useState("");
-  const [name, setName] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [isError, setIsError] = useState(false);
@@ -223,12 +200,7 @@ function FeedbackForm({
     setPending(true);
     setMessage("");
     try {
-      const item = await createFeedback({
-        kind,
-        body,
-        department,
-        submitterName: name,
-      });
+      const item = await createFeedback({ kind, body, anonymous });
       setBody("");
       setIsError(false);
       setMessage("送信しました。ありがとうございます。");
@@ -292,27 +264,21 @@ function FeedbackForm({
             {body.length} / {FEEDBACK_BODY_MAX}
           </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <MyInput
-            id="feedback-department"
-            label="所属・病棟（任意）"
-            autoComplete="off"
-            maxLength={FEEDBACK_SHORT_MAX}
-            placeholder="例：5階東病棟"
-            value={department}
-            onChange={(event) => setDepartment(event.target.value)}
-          />
-          <MyInput
-            id="feedback-name"
-            label="名前（任意）"
-            autoComplete="off"
-            maxLength={FEEDBACK_SHORT_MAX}
-            placeholder={
-              staff ? `空欄なら ${staff.displayName}` : "空欄でも送れます"
-            }
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-          />
+        <div className="grid gap-1">
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="size-4"
+              checked={anonymous}
+              onChange={(event) => setAnonymous(event.target.checked)}
+            />
+            匿名で投稿する
+          </label>
+          <p className="text-xs text-muted-foreground">
+            {anonymous
+              ? "一覧に名前は表示されません。自分の投稿として、回答が付く前なら削除できます。"
+              : `一覧に「${user?.displayName ?? "あなたの名前"}」と表示されます。`}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <MyButton type="submit" disabled={pending}>
@@ -339,10 +305,12 @@ function FeedbackCard({
   item,
   canAnswer,
   onAnswered,
+  onDeleted,
 }: {
   item: FeedbackItem;
   canAnswer: boolean;
   onAnswered: (item: FeedbackItem) => void;
+  onDeleted: (id: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.answer);
@@ -368,7 +336,26 @@ function FeedbackCard({
     }
   };
 
+  const remove = async () => {
+    const what = item.isMine ? "この投稿" : "この投稿（他の人の投稿）";
+    if (
+      !window.confirm(`${what}を削除しますか？\n削除すると元に戻せません。`)
+    ) {
+      return;
+    }
+    setPending(true);
+    setError("");
+    try {
+      await deleteFeedback(item.id);
+      onDeleted(item.id);
+    } catch (deleteError) {
+      setError(errorText(deleteError));
+      setPending(false);
+    }
+  };
+
   const answerId = `feedback-answer-${item.id}`;
+  const author = item.anonymous ? "匿名" : item.authorName || "名前なし";
 
   return (
     <Card>
@@ -387,12 +374,17 @@ function FeedbackCard({
           >
             {item.answer ? "回答済み" : "未回答"}
           </span>
-          <span>{submitterText(item)}</span>
+          <span>{author}</span>
+          {item.isMine && (
+            <span className="rounded-md bg-accent px-2 py-0.5 font-medium text-accent-foreground">
+              自分の投稿
+            </span>
+          )}
           <time className="ml-auto tabular-nums" dateTime={item.createdAt}>
             {formatDateTime(item.createdAt)}
           </time>
         </header>
-        <p className="text-base whitespace-pre-wrap break-words">{item.body}</p>
+        <p className="text-base break-words whitespace-pre-wrap">{item.body}</p>
 
         {item.answer && !editing && (
           <div className="grid gap-1 rounded-lg border-l-4 border-primary bg-muted/50 p-3">
@@ -400,7 +392,7 @@ function FeedbackCard({
               回答：{item.answeredBy}
               {item.answeredAt && `（${formatDateTime(item.answeredAt)}）`}
             </p>
-            <p className="text-sm whitespace-pre-wrap break-words">
+            <p className="text-sm break-words whitespace-pre-wrap">
               {item.answer}
             </p>
           </div>
@@ -453,16 +445,36 @@ function FeedbackCard({
           </div>
         )}
 
-        {canAnswer && !editing && (
-          <div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={startEdit}
-            >
-              {item.answer ? "回答を編集" : "回答する"}
-            </Button>
+        {!editing && (canAnswer || item.canDelete || item.isMine) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {canAnswer && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={startEdit}
+              >
+                {item.answer ? "回答を編集" : "回答する"}
+              </Button>
+            )}
+            {item.canDelete ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="ml-auto text-destructive hover:text-destructive"
+                disabled={pending}
+                onClick={() => void remove()}
+              >
+                削除
+              </Button>
+            ) : (
+              item.isMine && (
+                <span className="ml-auto text-xs text-muted-foreground">
+                  回答が付いたため削除できません
+                </span>
+              )
+            )}
           </div>
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}

@@ -13,6 +13,10 @@ pub const SESSION_COOKIE: &str = "rct_session";
 pub const DEFAULT_MODALITY_NAME: &str = "一般撮影";
 pub const RADIATION_THERAPY_CODE: &str = "radiation_therapy";
 pub const RADIATION_THERAPY_NAME: &str = "放射線治療";
+pub const RI_CODE: &str = "ri";
+pub const RI_NAME: &str = "RI";
+/// RI として扱う既存モダリティの名前（手で作られていた場合に引き継ぐ）。
+const RI_NAME_ALIASES: &[&str] = &[RI_NAME, "核医学"];
 const SESSION_HOURS: i64 = 12;
 const MIN_PASSWORD_LEN: usize = 8;
 
@@ -40,10 +44,29 @@ pub struct Modality {
     pub code: Option<String>,
 }
 
-pub fn can_edit_treatment(user: &AuthUser) -> bool {
+pub fn has_modality_code(user: &AuthUser, code: &str) -> bool {
     user.modalities
         .iter()
-        .any(|modality| modality.code.as_deref() == Some(RADIATION_THERAPY_CODE))
+        .any(|modality| modality.code.as_deref() == Some(code))
+}
+
+pub fn can_edit_treatment(user: &AuthUser) -> bool {
+    has_modality_code(user, RADIATION_THERAPY_CODE)
+}
+
+/// RI のページ（検査一覧・減衰計算・溶出記録）を使える。
+pub fn is_ri_member(user: &AuthUser) -> bool {
+    has_modality_code(user, RI_CODE)
+}
+
+/// 放射線治療のページ（治療依頼表）を使える。
+pub fn is_radiotherapy_member(user: &AuthUser) -> bool {
+    has_modality_code(user, RADIATION_THERAPY_CODE)
+}
+
+/// 患者のページ（登録・一覧・検索・詳細）を使える。RI か放射線治療に所属する人。
+pub fn can_use_patients(user: &AuthUser) -> bool {
+    is_ri_member(user) || is_radiotherapy_member(user)
 }
 
 impl AuthUser {
@@ -90,6 +113,38 @@ pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
     );
     migrate_initial_admin(conn)?;
     init_modality_tables(conn)?;
+    assign_core_modalities_to_initial_admin_once(conn)?;
+    Ok(())
+}
+
+/// 初期管理者を一般撮影・RI・放射線治療に所属させる（既存環境のアップデート時に1回だけ）。
+/// その後に担当者管理で外した場合は、次の起動で戻さない。
+fn assign_core_modalities_to_initial_admin_once(conn: &Connection) -> rusqlite::Result<()> {
+    const KEY: &str = "initial_admin_core_modalities";
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
+        [],
+    )?;
+    let done: i64 = conn.query_row(
+        "SELECT COUNT(*) FROM app_meta WHERE key = ?1",
+        params![KEY],
+        |row| row.get(0),
+    )?;
+    if done > 0 {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT OR IGNORE INTO user_modalities (user_id, modality_id)
+         SELECT u.id, m.id
+         FROM users u
+         JOIN modalities m ON m.is_default = 1 OR m.code IN (?1, ?2)
+         WHERE u.is_initial_admin = 1",
+        params![RI_CODE, RADIATION_THERAPY_CODE],
+    )?;
+    conn.execute(
+        "INSERT INTO app_meta (key, value) VALUES (?1, '1')",
+        params![KEY],
+    )?;
     Ok(())
 }
 
@@ -125,7 +180,14 @@ fn init_modality_tables(conn: &Connection) -> rusqlite::Result<()> {
          ON modalities(code) WHERE code IS NOT NULL",
         [],
     )?;
-    seed_radiation_therapy(conn, &created_at)?;
+    seed_coded_modality(
+        conn,
+        RADIATION_THERAPY_CODE,
+        RADIATION_THERAPY_NAME,
+        &[RADIATION_THERAPY_NAME],
+        &created_at,
+    )?;
+    seed_coded_modality(conn, RI_CODE, RI_NAME, RI_NAME_ALIASES, &created_at)?;
     conn.execute(
         "INSERT OR IGNORE INTO user_modalities (user_id, modality_id)
          SELECT u.id, m.id
@@ -139,34 +201,45 @@ fn init_modality_tables(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn seed_radiation_therapy(conn: &Connection, created_at: &str) -> rusqlite::Result<()> {
+/// システムが印（code）で見分けるモダリティを用意する。
+/// 同じ印のものがなければ、別名の既存モダリティに印を付けるか、新しく作る。
+fn seed_coded_modality(
+    conn: &Connection,
+    code: &str,
+    name: &str,
+    aliases: &[&str],
+    created_at: &str,
+) -> rusqlite::Result<()> {
     let coded: i64 = conn.query_row(
         "SELECT COUNT(*) FROM modalities WHERE code = ?1",
-        params![RADIATION_THERAPY_CODE],
+        params![code],
         |row| row.get(0),
     )?;
     if coded > 0 {
         return Ok(());
     }
-    match conn.query_row(
-        "SELECT id FROM modalities WHERE name = ?1",
-        params![RADIATION_THERAPY_NAME],
-        |row| row.get::<_, i32>(0),
-    ) {
-        Ok(id) => {
-            conn.execute(
-                "UPDATE modalities SET code = ?1 WHERE id = ?2",
-                params![RADIATION_THERAPY_CODE, id],
-            )?;
+    for alias in aliases {
+        let existing = conn.query_row(
+            "SELECT id FROM modalities WHERE name = ?1 AND code IS NULL AND is_default = 0",
+            params![alias],
+            |row| row.get::<_, i32>(0),
+        );
+        match existing {
+            Ok(id) => {
+                conn.execute(
+                    "UPDATE modalities SET code = ?1 WHERE id = ?2",
+                    params![code, id],
+                )?;
+                return Ok(());
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => {}
+            Err(error) => return Err(error),
         }
-        Err(rusqlite::Error::QueryReturnedNoRows) => {
-            conn.execute(
-                "INSERT INTO modalities (name, is_default, created_at, code) VALUES (?1, 0, ?2, ?3)",
-                params![RADIATION_THERAPY_NAME, created_at, RADIATION_THERAPY_CODE],
-            )?;
-        }
-        Err(error) => return Err(error),
     }
+    conn.execute(
+        "INSERT INTO modalities (name, is_default, created_at, code) VALUES (?1, 0, ?2, ?3)",
+        params![name, created_at, code],
+    )?;
     Ok(())
 }
 
@@ -823,6 +896,9 @@ pub fn delete_modality(id: i32) -> Result<(), String> {
     if code.as_deref() == Some(RADIATION_THERAPY_CODE) {
         return Err("放射線治療は削除できません".into());
     }
+    if code.as_deref() == Some(RI_CODE) {
+        return Err("RI は削除できません".into());
+    }
     let assigned: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM user_modalities WHERE modality_id = ?1",
@@ -1015,5 +1091,90 @@ mod tests {
         assert_eq!(modalities.len(), 1);
         assert!(modalities[0].is_default);
         assert_ne!(modalities[0].code.as_deref(), Some(RADIATION_THERAPY_CODE));
+    }
+
+    fn modality_codes_of(conn: &Connection, user_id: i32) -> Vec<Option<String>> {
+        let mut stmt = conn
+            .prepare(
+                "SELECT m.code FROM user_modalities um
+                 JOIN modalities m ON m.id = um.modality_id
+                 WHERE um.user_id = ?1 ORDER BY m.id",
+            )
+            .unwrap();
+        stmt.query_map(params![user_id], |row| row.get(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap()
+    }
+
+    #[test]
+    fn ri_modality_is_seeded_once() {
+        let conn = test_db();
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM modalities WHERE code = ?1",
+                params![RI_CODE],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, RI_NAME);
+        // 再初期化しても増えない
+        init_tables(&conn).unwrap();
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM modalities WHERE code = ?1",
+                params![RI_CODE],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn existing_nuclear_medicine_modality_becomes_ri() {
+        let conn = test_db();
+        conn.execute("DELETE FROM modalities WHERE code = ?1", params![RI_CODE])
+            .unwrap();
+        conn.execute(
+            "INSERT INTO modalities (name, is_default, created_at) VALUES ('核医学', 0, '')",
+            [],
+        )
+        .unwrap();
+        seed_coded_modality(&conn, RI_CODE, RI_NAME, RI_NAME_ALIASES, "").unwrap();
+        let name: String = conn
+            .query_row(
+                "SELECT name FROM modalities WHERE code = ?1",
+                params![RI_CODE],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(name, "核医学");
+    }
+
+    #[test]
+    fn existing_initial_admin_gets_core_modalities_once() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute("PRAGMA foreign_keys = ON;", []).unwrap();
+        init_tables(&conn).unwrap();
+        // アップデート前の状態：初期管理者は一般撮影だけ、移行済みの印もない
+        let modality = default_modality_id(&conn);
+        let user = insert_user(&conn, "12345678", "password1", "山田", "太郎", true).unwrap();
+        write_user_modalities(&conn, user.id, &[modality]).unwrap();
+        conn.execute("DELETE FROM app_meta", []).unwrap();
+
+        init_tables(&conn).unwrap();
+        let codes = modality_codes_of(&conn, user.id);
+        assert_eq!(codes.len(), 3);
+        assert!(codes.contains(&Some(RI_CODE.to_string())));
+        assert!(codes.contains(&Some(RADIATION_THERAPY_CODE.to_string())));
+
+        // 担当者管理で RI を外したら、次の起動で戻さない
+        conn.execute(
+            "DELETE FROM user_modalities WHERE modality_id = (SELECT id FROM modalities WHERE code = ?1)",
+            params![RI_CODE],
+        )
+        .unwrap();
+        init_tables(&conn).unwrap();
+        assert_eq!(modality_codes_of(&conn, user.id).len(), 2);
     }
 }

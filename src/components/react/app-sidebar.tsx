@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronRight, LogIn, LogOut, Search, Users } from "lucide-react";
+import { ChevronRight, LogOut, Search, Users } from "lucide-react";
 
 import {
   Sidebar,
@@ -26,11 +26,10 @@ import {
   matchesMenuQuery,
   menuGroups,
   menuItems,
-  nurseMenuGroups,
-  nurseMenuItems,
   type MenuGroupId,
   type MenuItem,
 } from "@/lib/sidebar-menu";
+import { hasAccess } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 
 function groupOfPath(
@@ -44,23 +43,22 @@ function groupOfPath(
 export function AppSidebar({
   currentPath,
   user,
-  nurse = false,
-  homeHref = "/",
   onLogout,
 }: {
   currentPath: string;
   user: AuthUser | null;
-  /** 看護師モードでは看護師向けのページだけを並べる */
-  nurse?: boolean;
-  homeHref?: string;
   onLogout: () => void;
 }) {
   const { isMobile, setOpenMobile, state, setOpen } = useSidebar();
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const groups = nurse ? nurseMenuGroups : menuGroups;
-  const items = nurse ? nurseMenuItems : menuItems;
+  const groups = menuGroups;
+  // 担当モダリティで使えない項目は最初から出さない（グループが空になれば見出しも出ない）。
+  const items = useMemo(
+    () => menuItems.filter((item) => hasAccess(user, item.access)),
+    [user],
+  );
 
   // 小さいウインドウ（モバイル表示）ではグループを開閉できる。
   // 初期状態は現在のページが属するグループだけを開く。
@@ -148,9 +146,9 @@ export function AppSidebar({
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton size="lg" asChild tooltip={siteMeta.siteTitle}>
-                <a href={homeHref} onClick={(event) => handleNav(event, homeHref)}>
+                <a href="/" onClick={(event) => handleNav(event, "/")}>
                   <span className="flex size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
-                    RI
+                    RCT
                   </span>
                   <span className="truncate font-semibold group-data-[collapsible=icon]:hidden">
                     {siteMeta.siteTitle}
@@ -249,28 +247,19 @@ export function AppSidebar({
         </SidebarContent>
         <SidebarFooter className="border-t border-sidebar-border">
           <SidebarMenu>
-            {(user || nurse) && (
+            {user && (
               <SidebarMenuItem>
-                <SidebarMenuButton tooltip={nurse ? "看護師" : user?.displayName}>
+                <SidebarMenuButton tooltip={user.displayName}>
                   <Users />
-                  <span className="truncate">
-                    {nurse ? "看護師" : user?.displayName}
-                  </span>
+                  <span className="truncate">{user.displayName}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             )}
             <SidebarMenuItem>
-              {nurse ? (
-                <SidebarMenuButton tooltip="ログイン画面へ戻る" onClick={onLogout}>
-                  <LogIn />
-                  <span>ログイン画面へ戻る</span>
-                </SidebarMenuButton>
-              ) : (
-                <SidebarMenuButton tooltip="ログアウト" onClick={onLogout}>
-                  <LogOut />
-                  <span>ログアウト</span>
-                </SidebarMenuButton>
-              )}
+              <SidebarMenuButton tooltip="ログアウト" onClick={onLogout}>
+                <LogOut />
+                <span>ログアウト</span>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
         </SidebarFooter>

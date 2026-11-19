@@ -1,4 +1,4 @@
 export const siteMeta = {
-  siteTitle: "RCT RI",
+  siteTitle: "RCT",
   siteLocale: "ja_JP",
 } as const;

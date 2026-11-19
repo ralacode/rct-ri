@@ -1,4 +1,4 @@
-// 質問・要望（看護師・職員が投稿し、指定された職員が回答する）の API。
+// 質問・要望（ログインした担当者が投稿し、指定された担当者が回答する）の API。
 
 export type FeedbackKind = "question" | "request" | "other";
 
@@ -6,20 +6,23 @@ export type FeedbackItem = {
   id: number;
   kind: FeedbackKind;
   body: string;
-  submitterRole: "nurse" | "staff";
-  submitterName: string;
-  department: string;
+  /** 匿名の投稿では空 */
+  authorName: string;
+  anonymous: boolean;
   answer: string;
   answeredBy: string;
   answeredAt: string | null;
   createdAt: string;
+  /** 自分が投稿した */
+  isMine: boolean;
+  /** 自分が削除できる（本人は回答が付く前だけ、管理者はいつでも） */
+  canDelete: boolean;
 };
 
 export type NewFeedback = {
   kind: FeedbackKind;
   body: string;
-  submitterName: string;
-  department: string;
+  anonymous: boolean;
 };
 
 export const FEEDBACK_KINDS: readonly { value: FeedbackKind; label: string }[] =
@@ -35,7 +38,6 @@ export function feedbackKindLabel(kind: FeedbackKind) {
 
 export const FEEDBACK_BODY_MAX = 2000;
 export const FEEDBACK_ANSWER_MAX = 4000;
-export const FEEDBACK_SHORT_MAX = 50;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
@@ -50,6 +52,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await response.text();
     throw new Error(text || response.statusText || `HTTP ${response.status}`);
   }
+  if (response.status === 204) return undefined as T;
   return (await response.json()) as T;
 }
 
@@ -69,4 +72,8 @@ export function answerFeedback(id: number, answer: string) {
     method: "PUT",
     body: JSON.stringify({ answer }),
   });
+}
+
+export function deleteFeedback(id: number) {
+  return request<void>(`/feedback/${id}`, { method: "DELETE" });
 }

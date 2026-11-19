@@ -1,13 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { Card } from "@/components/react/card";
-import { Button } from "@/components/ui/button";
 import { MyButton } from "@/components/react/my-button";
 import { MyInput } from "@/components/react/my-input";
 import {
-  enterNurseMode,
   fetchAuthStatus,
-  NURSE_HOME,
   login,
   nextPathAfterLogin,
   onAuthEvent,
@@ -49,12 +46,6 @@ export function LoginForm() {
     }
   };
 
-  const handleNurse = () => {
-    // 看護師はパスワードなしで質問・要望ページだけを使える。
-    enterNurseMode();
-    go(NURSE_HOME);
-  };
-
   return (
     <Card className="w-full">
       <form className="grid gap-4" autoComplete="off" onSubmit={handleSubmit}>
@@ -91,20 +82,6 @@ export function LoginForm() {
           {pending ? "確認中..." : "ログイン"}
         </MyButton>
       </form>
-      <div className="mt-6 grid gap-2 border-t pt-6">
-        <p className="text-sm text-muted-foreground">
-          看護師の方は、パスワードなしで RIS への質問・要望を送れます。
-        </p>
-        <Button
-          type="button"
-          variant="outline"
-          size="lg"
-          className="h-11 text-base"
-          onClick={handleNurse}
-        >
-          看護師はこちら
-        </Button>
-      </div>
     </Card>
   );
 }
