@@ -15,6 +15,8 @@ export type AuthUser = {
   displayName: string;
   isInitialAdmin: boolean;
   canManageUsers: boolean;
+  /** 質問・要望に回答できる（担当者管理で指定する） */
+  canAnswerFeedback: boolean;
   modalities: Modality[];
 };
 
@@ -24,13 +26,16 @@ export type AuthStatus = {
   user: AuthUser | null;
 };
 
-/** ログイン中の画面を見ている人の種類。看護師はパスワードなしで解説記事だけを見られる。 */
+/** ログイン中の画面を見ている人の種類。看護師はパスワードなしで質問・要望ページだけを使える。 */
 export type Viewer = "staff" | "nurse";
 
 const AUTH_PAGES = ["/login/", "/setup/"];
-// 看護師モードの印。サーバーのセッションは作らず、解説記事（静的ページ）だけを見せる。
+// 看護師モードの印。サーバーのセッションは作らず、質問・要望ページだけを見せる。
+// サーバー側（src-tauri/src/http.rs の NURSE_PAGES）と同じページを並べる。
 const NURSE_COOKIE = "rct_role";
-export const GUIDE_HOME = "/guide/";
+export const NURSE_HOME = "/feedback/";
+/** 看護師モードで見られるページ。解説記事を公開するときは "/guide/" を足す。 */
+const NURSE_PAGES = [NURSE_HOME];
 // ログイン状態はサーバーの HttpOnly Cookie（全タブ共有）で判定する。
 // ここではタブ間でログイン・ログアウトを即時に伝えるためだけに localStorage を使う。
 const AUTH_EVENT_KEY = "rct_auth_event";
@@ -119,8 +124,10 @@ export function exitNurseMode() {
   document.cookie = `${NURSE_COOKIE}=; path=/; max-age=0; SameSite=Lax`;
 }
 
-export function isGuidePath(pathname = window.location.pathname) {
-  return pathname === "/guide" || pathname.startsWith(GUIDE_HOME);
+export function isNursePath(pathname = window.location.pathname) {
+  return NURSE_PAGES.some(
+    (page) => pathname === page.replace(/\/$/, "") || pathname.startsWith(page),
+  );
 }
 
 function apiUrl(path: string) {
@@ -290,6 +297,16 @@ export async function changeOwnPassword(password: string): Promise<void> {
   });
 }
 
+export async function setFeedbackPermission(
+  id: number,
+  canAnswerFeedback: boolean,
+): Promise<void> {
+  await authRequest<void>(`/users/${id}/feedback-permission`, {
+    method: "PUT",
+    body: JSON.stringify({ canAnswerFeedback }),
+  });
+}
+
 export async function setManagePermission(
   id: number,
   canManageUsers: boolean,
@@ -372,8 +389,8 @@ export async function redirectForAuthStatus(
   }
   if (isAuthPage(path)) return null;
   if (!status.needsSetup && isNurseMode()) {
-    if (isGuidePath(path)) return "nurse";
-    go(GUIDE_HOME);
+    if (isNursePath(path)) return "nurse";
+    go(NURSE_HOME);
     return null;
   }
   if (!status.needsSetup) go(loginUrl());

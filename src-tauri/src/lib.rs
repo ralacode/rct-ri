@@ -4,6 +4,7 @@ mod auth;
 mod db;
 mod events;
 mod exam_order;
+mod feedback;
 mod http;
 mod patient;
 mod treatment;

@@ -3,7 +3,6 @@
 
 import { AppShell } from "@/components/react/app-shell";
 import Meta from "@components/meta.astro";
-import { getGuideLinks } from "@lib/guides";
 import { siteMeta } from "@lib/constants";
 import { getPageTitle } from "@lib/utils";
 import { ClientRouter } from "astro:transitions";
@@ -17,8 +16,6 @@ const { pageTitle } = Astro.props;
 
 const title = getPageTitle(pageTitle);
 const currentPath = Astro.url.pathname;
-// 解説記事のリンクはビルド時に content collection から作り、サイドバーへ渡す。
-const guides = await getGuideLinks();
 ---
 
 <!doctype html>
@@ -30,7 +27,7 @@ const guides = await getGuideLinks();
   <body
     class="grid h-svh overflow-hidden grid-cols-[auto_1fr] grid-rows-[auto_1fr] [grid-template-areas:'sidebar_header'_'sidebar_main'] print:block print:h-auto print:overflow-visible"
   >
-    <AppShell client:load currentPath={currentPath} guides={guides} />
+    <AppShell client:load currentPath={currentPath} />
     <main
       id="main-scroll-area"
       class="@container min-h-0 overflow-x-hidden overflow-y-auto px-2 pb-2 [grid-area:main] md:px-6 md:pb-6 print:col-span-full print:overflow-visible print:bg-white print:p-0"

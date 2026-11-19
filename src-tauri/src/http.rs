@@ -160,6 +160,12 @@ struct ManagePermissionRequest {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct FeedbackPermissionRequest {
+    can_answer_feedback: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ReplaceExamOrderRequest {
     exam_date: String,
     exam_time: String,
@@ -276,13 +282,15 @@ fn next_from_query(query: Option<&str>) -> Option<String> {
         .filter(|next| is_safe_next(next))
 }
 
-/// 看護師モード（パスワードなしで解説記事だけを見る）の印。フロントの `src/lib/auth.ts` と同じ名前。
+/// 看護師モード（パスワードなしで質問・要望ページだけを使う）の印。フロントの `src/lib/auth.ts` と同じ名前。
 const NURSE_COOKIE: &str = "rct_role";
 const NURSE_COOKIE_VALUE: &str = "nurse";
-/// 看護師モードで見られるページ（解説記事）。
-const GUIDE_HOME: &str = "/guide/";
+/// 看護師モードの最初のページ（質問・要望）。
+const NURSE_HOME: &str = "/feedback/";
+/// 看護師モードで見られるページ。解説記事を公開するときは "/guide/" を足す。
+const NURSE_PAGES: &[&str] = &[NURSE_HOME];
 
-fn is_nurse_mode(headers: &axum::http::HeaderMap) -> bool {
+pub(crate) fn is_nurse_mode(headers: &axum::http::HeaderMap) -> bool {
     headers
         .get_all(header::COOKIE)
         .iter()
@@ -295,8 +303,10 @@ fn is_nurse_mode(headers: &axum::http::HeaderMap) -> bool {
         })
 }
 
-fn is_guide_path(path: &str) -> bool {
-    path == "/guide" || path.starts_with(GUIDE_HOME)
+fn is_nurse_path(path: &str) -> bool {
+    NURSE_PAGES
+        .iter()
+        .any(|page| path == page.trim_end_matches('/') || path.starts_with(page))
 }
 
 fn auth_fail(status: StatusCode, message: String) -> Response {
@@ -536,6 +546,17 @@ async fn set_manage_permission(
     empty_ok(auth::set_manage_users(id, body.can_manage_users))
 }
 
+async fn set_feedback_permission(
+    Path(id): Path<i32>,
+    Extension(actor): Extension<AuthUser>,
+    Json(body): Json<FeedbackPermissionRequest>,
+) -> Response {
+    if let Some(response) = forbid_unless_manager(&actor) {
+        return response;
+    }
+    empty_ok(auth::set_answer_feedback(id, body.can_answer_feedback))
+}
+
 async fn require_auth(mut request: Request, next: Next) -> Response {
     match auth::user_from_headers(request.headers()) {
         Ok(user) => {
@@ -586,12 +607,12 @@ async fn gate_pages(request: Request, next: Next) -> Response {
         return redirect_to("/setup/");
     }
     if !authenticated {
-        // 看護師モードは解説記事だけを見られる。それ以外のページは記事一覧へ戻す。
+        // 看護師モードは質問・要望ページだけを見られる。それ以外のページはそこへ戻す。
         if is_nurse_mode(request.headers()) {
-            if is_guide_path(&path) {
+            if is_nurse_path(&path) {
                 return next.run(request).await;
             }
-            return redirect_to(GUIDE_HOME);
+            return redirect_to(NURSE_HOME);
         }
         return redirect_to(&login_url_with_next(&path_and_query));
     }
@@ -805,6 +826,7 @@ fn public_api() -> Router {
         .route("/auth/login", post(auth_login))
         .route("/auth/logout", post(auth_logout))
         .route("/auth/modalities", get(public_modalities))
+        .merge(crate::feedback::public_routes())
 }
 
 fn protected_api() -> Router {
@@ -815,6 +837,10 @@ fn protected_api() -> Router {
         .route("/users/{id}", put(update_user).delete(delete_user))
         .route("/users/{id}/password", put(reset_user_password))
         .route("/users/{id}/manage-permission", put(set_manage_permission))
+        .route(
+            "/users/{id}/feedback-permission",
+            put(set_feedback_permission),
+        )
         .route("/users/{id}/modalities", put(set_user_modalities))
         .route("/modalities", get(list_modalities).post(create_modality))
         .route(
@@ -842,6 +868,7 @@ fn protected_api() -> Router {
         )
         .merge(crate::treatment::routes())
         .merge(crate::videos::routes())
+        .merge(crate::feedback::protected_routes())
         .layer(middleware::from_fn(require_auth))
 }
 
@@ -962,12 +989,12 @@ mod login_next_tests {
     }
 
     #[test]
-    fn guide_paths() {
-        assert!(is_guide_path("/guide"));
-        assert!(is_guide_path("/guide/"));
-        assert!(is_guide_path("/guide/ris-overview/"));
-        assert!(!is_guide_path("/guidex/"));
-        assert!(!is_guide_path("/patient/list/"));
+    fn nurse_paths() {
+        assert!(is_nurse_path("/feedback"));
+        assert!(is_nurse_path("/feedback/"));
+        assert!(!is_nurse_path("/feedbackx/"));
+        assert!(!is_nurse_path("/guide/"));
+        assert!(!is_nurse_path("/patient/list/"));
     }
 
     #[test]

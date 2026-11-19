@@ -29,6 +29,11 @@ pub fn get_user_db_path() -> PathBuf {
     exe_dir().join("user.db")
 }
 
+/// 質問・要望（看護師・職員の投稿と回答）。業務データとは別ファイルにする。
+pub fn get_feedback_db_path() -> PathBuf {
+    exe_dir().join("feedback.db")
+}
+
 // pub fn get_connection() -> Result<Connection, String> {
 //     let db_path = get_db_path();
 //     let conn = Connection::open(db_path).map_err(|e| e.to_string())?;
@@ -90,6 +95,7 @@ pub fn init_db() -> Result<()> {
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
 
     init_user_db()?;
+    init_feedback_db()?;
     let _ = std::fs::create_dir_all(get_videos_dir());
     log::info!(
         "RIS の CSV フォルダ（exe と同じ階層）: {}",
@@ -104,6 +110,13 @@ fn init_user_db() -> Result<()> {
     conn.execute("PRAGMA foreign_keys = ON;", [])?;
     crate::auth::init_tables(&conn)?;
     crate::videos::init_tables(&conn)?;
+    Ok(())
+}
+
+fn init_feedback_db() -> Result<()> {
+    let conn = Connection::open(get_feedback_db_path())?;
+    conn.query_row("PRAGMA journal_mode = WAL;", [], |_| Ok(()))?;
+    crate::feedback::init_tables(&conn)?;
     Ok(())
 }
 

@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   CalendarDays,
   ClipboardList,
   Contact,
@@ -7,7 +6,7 @@ import {
   Film,
   Home,
   KeyRound,
-  LibraryBig,
+  MessageCircleQuestion,
   Printer,
   Search,
   TrendingDown,
@@ -15,7 +14,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type MenuGroupId = "ri" | "radiotherapy" | "common" | "guide";
+export type MenuGroupId = "ri" | "radiotherapy" | "common" | "nurse";
 
 export type MenuItem = {
   name: string;
@@ -107,12 +106,13 @@ export const menuItems: readonly MenuItem[] = [
     group: "common",
     keywords: ["どうが", "ビデオ", "video", "movie"],
   },
+  // 解説記事（/guide/）は記事がそろうまでメニューに出さない。
   {
-    name: "解説記事",
-    href: "/guide/",
-    icon: LibraryBig,
+    name: "質問・要望",
+    href: "/feedback/",
+    icon: MessageCircleQuestion,
     group: "common",
-    keywords: ["かいせつきじ", "解説", "記事", "ガイド", "guide", "ris", "使い方", "マニュアル"],
+    keywords: ["しつもん", "ようぼう", "質問", "要望", "ris", "feedback", "回答"],
   },
   {
     name: "担当者管理",
@@ -132,29 +132,19 @@ export const menuItems: readonly MenuItem[] = [
 ];
 
 export const nurseMenuGroups: readonly { id: MenuGroupId; label: string }[] = [
-  { id: "guide", label: "解説記事" },
+  { id: "nurse", label: "看護師" },
 ];
 
-/** 看護師モードのサイドバー：記事一覧と各記事だけを並べる */
-export function nurseMenuItems(guides: readonly GuideLink[]): MenuItem[] {
-  return [
-    {
-      name: "記事一覧",
-      href: "/guide/",
-      icon: LibraryBig,
-      group: "guide",
-      keywords: ["きじいちらん", "一覧", "解説", "記事"],
-      exact: true,
-    },
-    ...guides.map((guide) => ({
-      name: guide.title,
-      href: guide.href,
-      icon: BookOpen,
-      group: "guide" as const,
-      keywords: guide.keywords,
-    })),
-  ];
-}
+/** 看護師モードのサイドバー。解説記事を公開するときはここに記事一覧を足す。 */
+export const nurseMenuItems: readonly MenuItem[] = [
+  {
+    name: "質問・要望",
+    href: "/feedback/",
+    icon: MessageCircleQuestion,
+    group: "nurse",
+    keywords: ["しつもん", "ようぼう", "質問", "要望", "ris"],
+  },
+];
 
 /** 全角/半角・大文字/小文字・カタカナ/ひらがなの違いを吸収して比較用文字列にする */
 export function normalizeForSearch(value: string) {

@@ -28,7 +28,6 @@ import {
   menuItems,
   nurseMenuGroups,
   nurseMenuItems,
-  type GuideLink,
   type MenuGroupId,
   type MenuItem,
 } from "@/lib/sidebar-menu";
@@ -46,15 +45,13 @@ export function AppSidebar({
   currentPath,
   user,
   nurse = false,
-  guides = [],
   homeHref = "/",
   onLogout,
 }: {
   currentPath: string;
   user: AuthUser | null;
-  /** 看護師モードでは解説記事だけを並べる */
+  /** 看護師モードでは看護師向けのページだけを並べる */
   nurse?: boolean;
-  guides?: readonly GuideLink[];
   homeHref?: string;
   onLogout: () => void;
 }) {
@@ -63,10 +60,7 @@ export function AppSidebar({
   const searchRef = useRef<HTMLInputElement>(null);
 
   const groups = nurse ? nurseMenuGroups : menuGroups;
-  const items = useMemo(
-    () => (nurse ? nurseMenuItems(guides) : menuItems),
-    [nurse, guides],
-  );
+  const items = nurse ? nurseMenuItems : menuItems;
 
   // 小さいウインドウ（モバイル表示）ではグループを開閉できる。
   // 初期状態は現在のページが属するグループだけを開く。

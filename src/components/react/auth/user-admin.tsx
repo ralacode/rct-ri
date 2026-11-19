@@ -15,6 +15,7 @@ import {
   listUsers,
   renameModality,
   resetPassword,
+  setFeedbackPermission,
   setManagePermission,
   setUserModalities,
   updateUser,
@@ -188,6 +189,23 @@ export function UserAdmin() {
         canManageUsers
           ? "ユーザー管理権限を付与しました"
           : "ユーザー管理権限を外しました",
+      );
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : String(error), true);
+    }
+  };
+
+  const handleFeedbackPermission = async (
+    user: AuthUser,
+    canAnswerFeedback: boolean,
+  ) => {
+    try {
+      await setFeedbackPermission(user.id, canAnswerFeedback);
+      await load();
+      showMessage(
+        canAnswerFeedback
+          ? `${user.displayName} が質問・要望に回答できるようにしました`
+          : `${user.displayName} の回答権限を外しました`,
       );
     } catch (error) {
       showMessage(error instanceof Error ? error.message : String(error), true);
@@ -392,6 +410,11 @@ export function UserAdmin() {
                         ユーザー管理可
                       </span>
                     ) : null}
+                    {user.canAnswerFeedback ? (
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        質問・要望に回答可
+                      </span>
+                    ) : null}
                   </p>
                   <MyInput
                     id={`edit-staff-id-${user.id}`}
@@ -464,6 +487,16 @@ export function UserAdmin() {
                       ユーザーを管理する
                     </label>
                   )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={user.canAnswerFeedback}
+                      onChange={(event) =>
+                        void handleFeedbackPermission(user, event.target.checked)
+                      }
+                    />
+                    質問・要望に回答する
+                  </label>
                   <ModalityPicker
                     modalities={modalities}
                     selectedIds={(user.modalities ?? []).map((item) => item.id)}

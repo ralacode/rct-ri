@@ -8,6 +8,7 @@ import {
   isNurseMode,
   loginUrl,
   logout,
+  NURSE_HOME,
   redirectForAuthStatus,
   watchSession,
   type AuthUser,
@@ -16,16 +17,13 @@ import {
 import { siteMeta } from "@/lib/constants";
 import { startLiveUpdates } from "@/lib/live";
 import { go } from "@/lib/nav";
-import type { GuideLink } from "@/lib/sidebar-menu";
 
 export function AppShell({
   currentPath = "",
   defaultOpen = true,
-  guides = [],
 }: {
   currentPath?: string;
   defaultOpen?: boolean;
-  guides?: GuideLink[];
 }) {
   const [path, setPath] = useState(currentPath);
   const [open, setOpen] = useState(defaultOpen);
@@ -90,7 +88,7 @@ export function AppShell({
   useEffect(() => watchSession(), []);
 
   const nurse = viewer === "nurse";
-  const homeHref = nurse ? "/guide/" : "/";
+  const homeHref = nurse ? NURSE_HOME : "/";
 
   const handleLogout = async () => {
     if (nurse) {
@@ -117,7 +115,6 @@ export function AppShell({
         currentPath={path}
         user={user}
         nurse={nurse}
-        guides={guides}
         homeHref={homeHref}
         onLogout={() => void handleLogout()}
       />
