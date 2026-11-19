@@ -4,7 +4,7 @@
 use crate::db::get_user_db_path;
 use cookie::{Cookie, SameSite};
 use rand::RngCore;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, TransactionBehavior};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::time::Duration;
@@ -375,17 +375,42 @@ pub fn setup_first_admin(
     first_name: &str,
     modality_ids: &[i32],
 ) -> Result<(AuthUser, String), String> {
-    let conn = open_db()?;
-    let count: i64 = conn
+    let mut conn = open_db()?;
+    setup_first_admin_in(
+        &mut conn,
+        user_id,
+        password,
+        last_name,
+        first_name,
+        modality_ids,
+    )
+}
+
+// 入力チェックを先に済ませ、ユーザー・担当モダリティ・セッションを1トランザクションで作る。
+// 途中で失敗したら何も残さない（アカウントだけ作られて初期設定に戻れなくなるのを防ぐ）。
+fn setup_first_admin_in(
+    conn: &mut Connection,
+    user_id: &str,
+    password: &str,
+    last_name: &str,
+    first_name: &str,
+    modality_ids: &[i32],
+) -> Result<(AuthUser, String), String> {
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(|e| e.to_string())?;
+    let count: i64 = tx
         .query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
         .map_err(|e| e.to_string())?;
     if count > 0 {
         return Err("初期管理者はすでに作成済みです".into());
     }
-    let user = insert_user(&conn, user_id, password, last_name, first_name, true)?;
-    replace_user_modalities(&conn, user.id, modality_ids)?;
-    let user = with_modalities(&conn, user)?;
-    let token = create_session(&conn, user.id)?;
+    let modality_ids = validate_modality_ids(&tx, modality_ids)?;
+    let user = insert_user(&tx, user_id, password, last_name, first_name, true)?;
+    write_user_modalities(&tx, user.id, &modality_ids)?;
+    let user = with_modalities(&tx, user)?;
+    let token = create_session(&tx, user.id)?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok((user, token))
 }
 
@@ -491,10 +516,32 @@ pub fn create_user(
     first_name: &str,
     modality_ids: &[i32],
 ) -> Result<AuthUser, String> {
-    let conn = open_db()?;
-    let user = insert_user(&conn, user_id, password, last_name, first_name, false)?;
-    replace_user_modalities(&conn, user.id, modality_ids)?;
-    with_modalities(&conn, user)
+    let mut conn = open_db()?;
+    create_user_in(
+        &mut conn,
+        user_id,
+        password,
+        last_name,
+        first_name,
+        modality_ids,
+    )
+}
+
+fn create_user_in(
+    conn: &mut Connection,
+    user_id: &str,
+    password: &str,
+    last_name: &str,
+    first_name: &str,
+    modality_ids: &[i32],
+) -> Result<AuthUser, String> {
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let modality_ids = validate_modality_ids(&tx, modality_ids)?;
+    let user = insert_user(&tx, user_id, password, last_name, first_name, false)?;
+    write_user_modalities(&tx, user.id, &modality_ids)?;
+    let user = with_modalities(&tx, user)?;
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(user)
 }
 
 pub fn update_user(
@@ -619,6 +666,12 @@ fn replace_user_modalities(
     user_id: i32,
     modality_ids: &[i32],
 ) -> Result<(), String> {
+    let modality_ids = validate_modality_ids(conn, modality_ids)?;
+    write_user_modalities(conn, user_id, &modality_ids)
+}
+
+// 重複を除き、1つ以上あること・すべて存在することを確かめる。書き込みはしない。
+fn validate_modality_ids(conn: &Connection, modality_ids: &[i32]) -> Result<Vec<i32>, String> {
     let mut unique = Vec::new();
     for id in modality_ids {
         if !unique.contains(id) {
@@ -640,12 +693,20 @@ fn replace_user_modalities(
             return Err("存在しないモダリティが含まれています".into());
         }
     }
+    Ok(unique)
+}
+
+fn write_user_modalities(
+    conn: &Connection,
+    user_id: i32,
+    modality_ids: &[i32],
+) -> Result<(), String> {
     conn.execute(
         "DELETE FROM user_modalities WHERE user_id = ?1",
         params![user_id],
     )
     .map_err(|e| e.to_string())?;
-    for id in unique {
+    for id in modality_ids {
         conn.execute(
             "INSERT INTO user_modalities (user_id, modality_id) VALUES (?1, ?2)",
             params![user_id, id],
@@ -810,4 +871,126 @@ pub fn clear_session_cookie() -> String {
         .max_age(cookie::time::Duration::seconds(0))
         .build()
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_db() -> Connection {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute("PRAGMA foreign_keys = ON;", []).unwrap();
+        init_tables(&conn).unwrap();
+        conn
+    }
+
+    fn count_users(conn: &Connection) -> i64 {
+        conn.query_row("SELECT COUNT(*) FROM users", [], |row| row.get(0))
+            .unwrap()
+    }
+
+    fn default_modality_id(conn: &Connection) -> i32 {
+        conn.query_row(
+            "SELECT id FROM modalities WHERE is_default = 1",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn setup_without_modality_leaves_no_account() {
+        let mut conn = test_db();
+        let error = setup_first_admin_in(&mut conn, "12345678", "password1", "山田", "太郎", &[])
+            .err()
+            .unwrap();
+        assert_eq!(error, "担当モダリティは1つ以上選んでください");
+        assert_eq!(count_users(&conn), 0);
+
+        let modality = default_modality_id(&conn);
+        let (user, _token) = setup_first_admin_in(
+            &mut conn,
+            "12345678",
+            "password1",
+            "山田",
+            "太郎",
+            &[modality],
+        )
+        .unwrap();
+        assert!(user.is_initial_admin);
+        assert_eq!(user.modalities.len(), 1);
+        assert_eq!(count_users(&conn), 1);
+    }
+
+    #[test]
+    fn setup_with_unknown_modality_leaves_no_account() {
+        let mut conn = test_db();
+        let error =
+            setup_first_admin_in(&mut conn, "12345678", "password1", "山田", "太郎", &[9999])
+                .err()
+                .unwrap();
+        assert_eq!(error, "存在しないモダリティが含まれています");
+        assert_eq!(count_users(&conn), 0);
+    }
+
+    #[test]
+    fn setup_is_rejected_once_admin_exists() {
+        let mut conn = test_db();
+        let modality = default_modality_id(&conn);
+        setup_first_admin_in(
+            &mut conn,
+            "12345678",
+            "password1",
+            "山田",
+            "太郎",
+            &[modality],
+        )
+        .unwrap();
+        let error = setup_first_admin_in(
+            &mut conn,
+            "87654321",
+            "password1",
+            "佐藤",
+            "花子",
+            &[modality],
+        )
+        .err()
+        .unwrap();
+        assert!(error.contains("すでに"));
+        assert_eq!(count_users(&conn), 1);
+    }
+
+    #[test]
+    fn create_user_without_modality_leaves_no_account() {
+        let mut conn = test_db();
+        let error = create_user_in(&mut conn, "12345678", "password1", "山田", "太郎", &[])
+            .err()
+            .unwrap();
+        assert_eq!(error, "担当モダリティは1つ以上選んでください");
+        assert_eq!(count_users(&conn), 0);
+    }
+
+    // 修正前のバグで「担当モダリティなしの初期管理者」だけが残った DB も、
+    // 起動時の init_tables で既定モダリティが割り当てられて使える状態に戻る。
+    #[test]
+    fn startup_assigns_default_modality_to_admin_without_one() {
+        let conn = test_db();
+        conn.execute(
+            "INSERT INTO users (
+                user_id, password_hash, last_name, first_name,
+                is_initial_admin, can_manage_users, created_at
+             ) VALUES ('12345678', 'x', '山田', '太郎', 1, 1, '2026-01-01 00:00:00')",
+            [],
+        )
+        .unwrap();
+        let id = conn.last_insert_rowid() as i32;
+        assert!(modalities_for_user(&conn, id).unwrap().is_empty());
+
+        init_tables(&conn).unwrap();
+
+        let modalities = modalities_for_user(&conn, id).unwrap();
+        assert_eq!(modalities.len(), 1);
+        assert!(modalities[0].is_default);
+        assert_ne!(modalities[0].code.as_deref(), Some(RADIATION_THERAPY_CODE));
+    }
 }
