@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { ModalityPicker } from "@/components/react/auth/modality-picker";
-import { RADIATION_THERAPY_CODE } from "@/lib/treatment";
+import { RADIATION_THERAPY_CODE, RI_CODE } from "@/lib/permissions";
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
 import { MyInput } from "@/components/react/my-input";
@@ -268,7 +268,8 @@ export function UserAdmin() {
               {modalities.map((modality) => {
                 const locked =
                   modality.isDefault ||
-                  modality.code === RADIATION_THERAPY_CODE;
+                  modality.code === RADIATION_THERAPY_CODE ||
+                  modality.code === RI_CODE;
                 return (
                   <div
                     key={modality.id}
@@ -288,7 +289,12 @@ export function UserAdmin() {
                       />
                       {modality.code === RADIATION_THERAPY_CODE && (
                         <p className="text-xs text-muted-foreground">
-                          治療依頼の作成・変更に使います。表示名を変えても、この権限は残ります。
+                          治療依頼表・患者のページを使えるようになり、治療依頼の作成・変更もできます。表示名を変えても、この権限は残ります。
+                        </p>
+                      )}
+                      {modality.code === RI_CODE && (
+                        <p className="text-xs text-muted-foreground">
+                          検査一覧・減衰計算・溶出記録・患者のページを使えるようになります。表示名を変えても、この権限は残ります。
                         </p>
                       )}
                     </div>

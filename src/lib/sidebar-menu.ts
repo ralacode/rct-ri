@@ -14,7 +14,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export type MenuGroupId = "ri" | "radiotherapy" | "common" | "nurse";
+import type { Access } from "@/lib/permissions";
+
+export type MenuGroupId = "ri" | "radiotherapy" | "common";
 
 export type MenuItem = {
   name: string;
@@ -25,6 +27,8 @@ export type MenuItem = {
   keywords?: readonly string[];
   /** 担当者管理権限を持つユーザーにだけ表示する */
   adminOnly?: boolean;
+  /** 担当モダリティで表示を絞る（省略時は全員に表示） */
+  access?: Access;
   /** href と完全に一致するときだけ現在のページとして扱う */
   exact?: boolean;
 };
@@ -48,6 +52,7 @@ export const menuItems: readonly MenuItem[] = [
     href: "/exam_order/daily-list/",
     icon: ClipboardList,
     group: "ri",
+    access: "ri",
     keywords: ["けんさいちらん", "検査", "オーダー", "order"],
   },
   {
@@ -55,6 +60,7 @@ export const menuItems: readonly MenuItem[] = [
     href: "/mo99-decay/",
     icon: TrendingDown,
     group: "ri",
+    access: "ri",
     keywords: ["げんすいけいさん", "減衰", "mo99", "mo-99", "tc99m", "99mtc"],
   },
   {
@@ -62,6 +68,7 @@ export const menuItems: readonly MenuItem[] = [
     href: "/generator-elution/",
     icon: Printer,
     group: "ri",
+    access: "ri",
     keywords: ["ようしゅつきろく", "溶出", "ジェネレータ", "generator", "mo99", "tc99m", "99mtc"],
   },
   {
@@ -69,6 +76,7 @@ export const menuItems: readonly MenuItem[] = [
     href: "/treatment/",
     icon: CalendarDays,
     group: "radiotherapy",
+    access: "radiotherapy",
     keywords: ["ちりょういらいひょう", "治療", "依頼", "放射線治療", "照射"],
   },
   {
@@ -84,6 +92,7 @@ export const menuItems: readonly MenuItem[] = [
     icon: ContactRound,
     group: "common",
     keywords: ["かんじゃとうろく", "患者", "登録", "patient"],
+    access: "patients",
   },
   {
     name: "患者一覧",
@@ -91,6 +100,7 @@ export const menuItems: readonly MenuItem[] = [
     icon: Contact,
     group: "common",
     keywords: ["かんじゃいちらん", "患者", "patient"],
+    access: "patients",
   },
   {
     name: "患者検索",
@@ -98,6 +108,7 @@ export const menuItems: readonly MenuItem[] = [
     icon: Search,
     group: "common",
     keywords: ["かんじゃけんさく", "患者", "検索", "patient"],
+    access: "patients",
   },
   {
     name: "動画",
@@ -128,21 +139,6 @@ export const menuItems: readonly MenuItem[] = [
     icon: KeyRound,
     group: "common",
     keywords: ["ぱすわーどへんこう", "パスワード", "password", "アカウント"],
-  },
-];
-
-export const nurseMenuGroups: readonly { id: MenuGroupId; label: string }[] = [
-  { id: "nurse", label: "看護師" },
-];
-
-/** 看護師モードのサイドバー。解説記事を公開するときはここに記事一覧を足す。 */
-export const nurseMenuItems: readonly MenuItem[] = [
-  {
-    name: "質問・要望",
-    href: "/feedback/",
-    icon: MessageCircleQuestion,
-    group: "nurse",
-    keywords: ["しつもん", "ようぼう", "質問", "要望", "ris"],
   },
 ];
 

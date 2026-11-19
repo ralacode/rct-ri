@@ -282,31 +282,22 @@ fn next_from_query(query: Option<&str>) -> Option<String> {
         .filter(|next| is_safe_next(next))
 }
 
-/// 看護師モード（パスワードなしで質問・要望ページだけを使う）の印。フロントの `src/lib/auth.ts` と同じ名前。
-const NURSE_COOKIE: &str = "rct_role";
-const NURSE_COOKIE_VALUE: &str = "nurse";
-/// 看護師モードの最初のページ（質問・要望）。
-const NURSE_HOME: &str = "/feedback/";
-/// 看護師モードで見られるページ。解説記事を公開するときは "/guide/" を足す。
-const NURSE_PAGES: &[&str] = &[NURSE_HOME];
-
-pub(crate) fn is_nurse_mode(headers: &axum::http::HeaderMap) -> bool {
-    headers
-        .get_all(header::COOKIE)
+/// モダリティで使える人を絞るページ。どれにも当てはまらないページは、ログインした人なら誰でも使える。
+fn page_allowed(path: &str, user: &AuthUser) -> bool {
+    let under = |prefix: &str| path == prefix.trim_end_matches('/') || path.starts_with(prefix);
+    if ["/exam_order/", "/mo99-decay/", "/generator-elution/"]
         .iter()
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(|value| value.split(';'))
-        .any(|part| {
-            part.trim()
-                .split_once('=')
-                .is_some_and(|(name, value)| name == NURSE_COOKIE && value == NURSE_COOKIE_VALUE)
-        })
-}
-
-fn is_nurse_path(path: &str) -> bool {
-    NURSE_PAGES
-        .iter()
-        .any(|page| path == page.trim_end_matches('/') || path.starts_with(page))
+        .any(|prefix| under(prefix))
+    {
+        return auth::is_ri_member(user);
+    }
+    if under("/treatment/") {
+        return auth::is_radiotherapy_member(user);
+    }
+    if under("/patient/") {
+        return auth::can_use_patients(user);
+    }
+    true
 }
 
 fn auth_fail(status: StatusCode, message: String) -> Response {
@@ -583,7 +574,8 @@ async fn gate_pages(request: Request, next: Next) -> Response {
     }
 
     let needs_setup = auth::user_count().unwrap_or(0) == 0;
-    let authenticated = auth::user_from_headers(request.headers()).is_ok();
+    let user = auth::user_from_headers(request.headers()).ok();
+    let authenticated = user.is_some();
 
     if path.starts_with("/setup") {
         if needs_setup {
@@ -606,22 +598,15 @@ async fn gate_pages(request: Request, next: Next) -> Response {
     if needs_setup {
         return redirect_to("/setup/");
     }
-    if !authenticated {
-        // 看護師モードは質問・要望ページだけを見られる。それ以外のページはそこへ戻す。
-        if is_nurse_mode(request.headers()) {
-            if is_nurse_path(&path) {
-                return next.run(request).await;
-            }
-            return redirect_to(NURSE_HOME);
-        }
+    let Some(user) = user else {
         return redirect_to(&login_url_with_next(&path_and_query));
+    };
+    if path.starts_with("/users") && !user.can_manage() {
+        return redirect_to("/account/");
     }
-    if path.starts_with("/users") {
-        if let Ok(user) = auth::user_from_headers(request.headers()) {
-            if !user.can_manage() {
-                return redirect_to("/account/");
-            }
-        }
+    // 担当モダリティで使えないページは、ホームへ戻す。
+    if !page_allowed(&path, &user) {
+        return redirect_to("/");
     }
     next.run(request).await
 }
@@ -786,10 +771,10 @@ async fn help_page() -> Html<&'static str> {
 <html lang="ja">
   <head>
     <meta charset="utf-8" />
-    <title>RC Tools API</title>
+    <title>RCT API</title>
   </head>
   <body>
-    <h1>RC Tools は起動しています</h1>
+    <h1>RCT は起動しています</h1>
     <p>API: <a href="/api/health">/api/health</a></p>
     <p>画面ファイル（dist）が見つかりません。exe と同じ階層に dist フォルダ（中に index.html）を置いてください。</p>
   </body>
@@ -826,7 +811,6 @@ fn public_api() -> Router {
         .route("/auth/login", post(auth_login))
         .route("/auth/logout", post(auth_logout))
         .route("/auth/modalities", get(public_modalities))
-        .merge(crate::feedback::public_routes())
 }
 
 fn protected_api() -> Router {
@@ -868,7 +852,7 @@ fn protected_api() -> Router {
         )
         .merge(crate::treatment::routes())
         .merge(crate::videos::routes())
-        .merge(crate::feedback::protected_routes())
+        .merge(crate::feedback::routes())
         .layer(middleware::from_fn(require_auth))
 }
 
@@ -908,7 +892,7 @@ async fn bind_and_serve(
 
     log::info!("HTTP server listening on http://0.0.0.0:{HTTP_PORT}");
     eprintln!(
-        "RC Tools HTTP: {}  （他端末は http://<このPCのIP>:{HTTP_PORT}/ ）",
+        "RCT HTTP: {}  （他端末は http://<このPCのIP>:{HTTP_PORT}/ ）",
         local_ui_url()
     );
     let _ = ready.send(Ok(()));
@@ -973,28 +957,54 @@ mod login_next_tests {
         );
     }
 
-    #[test]
-    fn detects_nurse_mode_cookie() {
-        let mut headers = axum::http::HeaderMap::new();
-        assert!(!is_nurse_mode(&headers));
-        headers.insert(
-            header::COOKIE,
-            HeaderValue::from_static("sidebar_state=true; rct_role=nurse"),
-        );
-        assert!(is_nurse_mode(&headers));
-        headers.insert(header::COOKIE, HeaderValue::from_static("rct_role=staff"));
-        assert!(!is_nurse_mode(&headers));
-        headers.insert(header::COOKIE, HeaderValue::from_static("xrct_role=nurse"));
-        assert!(!is_nurse_mode(&headers));
+    fn user_with(codes: &[&str]) -> AuthUser {
+        AuthUser {
+            id: 1,
+            user_id: "12345678".into(),
+            last_name: "山田".into(),
+            first_name: "太郎".into(),
+            display_name: "山田 太郎".into(),
+            is_initial_admin: false,
+            can_manage_users: false,
+            can_answer_feedback: false,
+            modalities: codes
+                .iter()
+                .enumerate()
+                .map(|(i, code)| auth::Modality {
+                    id: i as i32 + 10,
+                    name: code.to_string(),
+                    is_default: false,
+                    code: Some(code.to_string()),
+                })
+                .collect(),
+        }
     }
 
     #[test]
-    fn nurse_paths() {
-        assert!(is_nurse_path("/feedback"));
-        assert!(is_nurse_path("/feedback/"));
-        assert!(!is_nurse_path("/feedbackx/"));
-        assert!(!is_nurse_path("/guide/"));
-        assert!(!is_nurse_path("/patient/list/"));
+    fn pages_follow_modalities() {
+        let general = user_with(&[]);
+        let ri = user_with(&[auth::RI_CODE]);
+        let rt = user_with(&[auth::RADIATION_THERAPY_CODE]);
+
+        for path in [
+            "/exam_order/daily-list/",
+            "/mo99-decay/",
+            "/generator-elution/",
+        ] {
+            assert!(page_allowed(path, &ri), "{path}");
+            assert!(!page_allowed(path, &rt), "{path}");
+            assert!(!page_allowed(path, &general), "{path}");
+        }
+        assert!(page_allowed("/treatment/", &rt));
+        assert!(!page_allowed("/treatment/", &ri));
+        for path in ["/patient/list/", "/patient/123/", "/patient/search/"] {
+            assert!(page_allowed(path, &ri), "{path}");
+            assert!(page_allowed(path, &rt), "{path}");
+            assert!(!page_allowed(path, &general), "{path}");
+        }
+        for path in ["/", "/feedback/", "/videos/", "/account/", "/patientx/"] {
+            assert!(page_allowed(path, &general), "{path}");
+        }
     }
 
     #[test]

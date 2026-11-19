@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "RC Tools",
+        "title": "RCT",
         "width": 800,
         "height": 600,
         "x": 0,

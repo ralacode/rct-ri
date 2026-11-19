@@ -11,6 +11,7 @@ import {
   type Modality,
 } from "@/lib/auth";
 import { go } from "@/lib/nav";
+import { RADIATION_THERAPY_CODE, RI_CODE } from "@/lib/permissions";
 
 export function SetupForm() {
   const [userId, setUserId] = useState("");
@@ -31,7 +32,17 @@ export function SetupForm() {
     void listPublicModalities()
       .then((items) => {
         setModalities(items);
-        setModalityIds(items.filter((item) => item.isDefault).map((item) => item.id));
+        // 初期管理者は一般撮影・RI・放射線治療に所属させておく（あとで担当者管理で変えられる）。
+        setModalityIds(
+          items
+            .filter(
+              (item) =>
+                item.isDefault ||
+                item.code === RI_CODE ||
+                item.code === RADIATION_THERAPY_CODE,
+            )
+            .map((item) => item.id),
+        );
       })
       .catch((error) => {
         setMessage(error instanceof Error ? error.message : String(error));
