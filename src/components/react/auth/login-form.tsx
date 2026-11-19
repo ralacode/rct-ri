@@ -7,7 +7,7 @@ import { MyInput } from "@/components/react/my-input";
 import {
   enterNurseMode,
   fetchAuthStatus,
-  GUIDE_HOME,
+  NURSE_HOME,
   login,
   nextPathAfterLogin,
   onAuthEvent,
@@ -50,9 +50,9 @@ export function LoginForm() {
   };
 
   const handleNurse = () => {
-    // 看護師はパスワードなしで解説記事だけを見られる。
+    // 看護師はパスワードなしで質問・要望ページだけを使える。
     enterNurseMode();
-    go(GUIDE_HOME);
+    go(NURSE_HOME);
   };
 
   return (
@@ -93,7 +93,7 @@ export function LoginForm() {
       </form>
       <div className="mt-6 grid gap-2 border-t pt-6">
         <p className="text-sm text-muted-foreground">
-          看護師の方は、パスワードなしで解説記事を閲覧できます。
+          看護師の方は、パスワードなしで RIS への質問・要望を送れます。
         </p>
         <Button
           type="button"

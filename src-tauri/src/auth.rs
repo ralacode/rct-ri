@@ -26,6 +26,8 @@ pub struct AuthUser {
     pub display_name: String,
     pub is_initial_admin: bool,
     pub can_manage_users: bool,
+    /// 質問・要望（feedback）に回答できる。担当者管理で付与する。
+    pub can_answer_feedback: bool,
     pub modalities: Vec<Modality>,
 }
 
@@ -80,6 +82,10 @@ pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
     );
     let _ = conn.execute(
         "ALTER TABLE users ADD COLUMN can_manage_users INTEGER NOT NULL DEFAULT 0",
+        [],
+    );
+    let _ = conn.execute(
+        "ALTER TABLE users ADD COLUMN can_answer_feedback INTEGER NOT NULL DEFAULT 0",
         [],
     );
     migrate_initial_admin(conn)?;
@@ -287,13 +293,15 @@ fn map_user(row: &rusqlite::Row<'_>) -> rusqlite::Result<AuthUser> {
         first_name,
         is_initial_admin,
         can_manage_users: is_initial_admin || stored_can_manage,
+        can_answer_feedback: row.get::<_, i32>(6)? != 0,
         modalities: Vec::new(),
     })
 }
 
-const USER_COLUMNS: &str = "id, user_id, last_name, first_name, is_initial_admin, can_manage_users";
-const USER_COLUMNS_JOINED: &str =
-    "u.id, u.user_id, u.last_name, u.first_name, u.is_initial_admin, u.can_manage_users";
+const USER_COLUMNS: &str =
+    "id, user_id, last_name, first_name, is_initial_admin, can_manage_users, can_answer_feedback";
+const USER_COLUMNS_JOINED: &str = "u.id, u.user_id, u.last_name, u.first_name, \
+     u.is_initial_admin, u.can_manage_users, u.can_answer_feedback";
 
 pub fn user_count() -> Result<i64, String> {
     let conn = open_db()?;
@@ -351,6 +359,7 @@ fn insert_user(
         first_name,
         is_initial_admin,
         can_manage_users: is_initial_admin,
+        can_answer_feedback: false,
         modalities: Vec::new(),
     })
 }
@@ -422,7 +431,7 @@ pub fn login(user_id: &str, password: &str) -> Result<(AuthUser, String), String
     let row = conn.query_row(
         &format!("SELECT {USER_COLUMNS}, password_hash FROM users WHERE user_id = ?1"),
         params![user_id],
-        |row| Ok((map_user(row)?, row.get::<_, String>(6)?)),
+        |row| Ok((map_user(row)?, row.get::<_, String>(7)?)),
     );
     let (user, password_hash) = match row {
         Ok(value) => value,
@@ -622,6 +631,20 @@ pub fn set_manage_users(id: i32, can_manage: bool) -> Result<(), String> {
         .execute(
             "UPDATE users SET can_manage_users = ?1 WHERE id = ?2",
             params![if can_manage { 1 } else { 0 }, id],
+        )
+        .map_err(|e| e.to_string())?;
+    if updated == 0 {
+        return Err("担当者が見つかりません".into());
+    }
+    Ok(())
+}
+
+pub fn set_answer_feedback(id: i32, can_answer: bool) -> Result<(), String> {
+    let conn = open_db()?;
+    let updated = conn
+        .execute(
+            "UPDATE users SET can_answer_feedback = ?1 WHERE id = ?2",
+            params![if can_answer { 1 } else { 0 }, id],
         )
         .map_err(|e| e.to_string())?;
     if updated == 0 {
