@@ -121,6 +121,7 @@ export function UserAdmin() {
       await load();
       showMessage("担当者を追加しました");
     } catch (error) {
+      setUserId(nextUserId);
       showMessage(error instanceof Error ? error.message : String(error), true);
     } finally {
       setPending(false);

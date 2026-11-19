@@ -64,6 +64,7 @@ export function SetupForm() {
       setConfirm("");
       go("/");
     } catch (error) {
+      setUserId(nextUserId);
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
       setPending(false);
@@ -139,7 +140,7 @@ export function SetupForm() {
           onChange={(event) => setConfirm(event.target.value)}
         />
         {message && <p className="text-sm text-destructive">{message}</p>}
-        <MyButton type="submit" disabled={pending}>
+        <MyButton type="submit" disabled={pending || modalities.length === 0}>
           {pending ? "作成中..." : "作成してログイン"}
         </MyButton>
       </form>
