@@ -79,6 +79,7 @@ const TABLE_MAX_WEIGHT_KG =
 // 検査名に薬剤名が含まれないが、その薬剤を使う当院のオーダー名
 const EXAM_ITEM_DRUG_ALIASES: Record<string, PediatricDoseDrug> = {
   "腎レノグラム ラシックス負荷": "DTPA",
+  "腎レノグラム 負荷無": "DTPA",
 };
 
 /** 検査名から対象薬剤（DMSA / DTPA）を判定する。対象外なら null。 */

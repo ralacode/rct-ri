@@ -53,6 +53,13 @@ const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
       <span>ラシックス負荷</span>
     </>
   ),
+  "腎レノグラム 負荷無": (
+    <>
+      <span>腎レノグラム</span>
+      <br />
+      <span>負荷無</span>
+    </>
+  ),
   "心筋シンチ Tl 運動負荷": (
     <>
       <span>心筋シンチ Tl</span>
