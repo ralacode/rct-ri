@@ -72,6 +72,14 @@ export const menuItems: readonly MenuItem[] = [
     keywords: ["ようしゅつきろく", "溶出", "ジェネレータ", "generator", "mo99", "tc99m", "99mtc"],
   },
   {
+    name: "作業内容記録",
+    href: "/ri-room-record/",
+    icon: Printer,
+    group: "ri",
+    access: "ri",
+    keywords: ["さぎょうないようきろく", "作業内容", "使用室", "入室", "退室", "汚染", "放射性同位元素", "ri"],
+  },
+  {
     name: "治療依頼表",
     href: "/treatment/",
     icon: CalendarDays,
