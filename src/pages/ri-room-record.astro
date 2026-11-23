@@ -1,0 +1,18 @@
+---
+import { RiRoomRecordPrint } from "@/components/react/ri-room-record/ri-room-record-print";
+import Layout from "@/layouts/layout.astro";
+import { cn } from "@/lib/utils";
+---
+
+<Layout pageTitle="放射性同位元素使用室作業内容記録">
+  <div class={cn("grid gap-4 print:block")}>
+    <h1
+      class={cn(
+        "justify-self-center text-2xl font-semibold tracking-tight print:hidden",
+      )}
+    >
+      放射性同位元素使用室作業内容記録 印刷
+    </h1>
+    <RiRoomRecordPrint client:load />
+  </div>
+</Layout>

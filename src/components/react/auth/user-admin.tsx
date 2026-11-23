@@ -294,7 +294,7 @@ export function UserAdmin() {
                       )}
                       {modality.code === RI_CODE && (
                         <p className="text-xs text-muted-foreground">
-                          検査一覧・減衰計算・溶出記録・患者のページを使えるようになります。表示名を変えても、この権限は残ります。
+                          検査一覧・減衰計算・溶出記録・作業内容記録・患者のページを使えるようになります。表示名を変えても、この権限は残ります。
                         </p>
                       )}
                     </div>

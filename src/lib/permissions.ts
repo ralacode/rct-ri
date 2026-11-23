@@ -44,6 +44,7 @@ const PAGE_ACCESS: readonly { prefix: string; access: Access }[] = [
   { prefix: "/exam_order/", access: "ri" },
   { prefix: "/mo99-decay/", access: "ri" },
   { prefix: "/generator-elution/", access: "ri" },
+  { prefix: "/ri-room-record/", access: "ri" },
   { prefix: "/treatment/", access: "radiotherapy" },
   { prefix: "/patient/", access: "patients" },
 ];
