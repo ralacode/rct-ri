@@ -43,6 +43,12 @@ const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
     return_time: "5分",
     leave: "標識後静置（室温放置　2～5分）",
   },
+  "腎レノグラム 負荷無": {
+    kit_name: "テクネDTPAキット",
+    base_target_amount: "74 ～ 555 MBq / 2 ～ 9 mL",
+    return_time: "5分",
+    leave: "標識後静置（室温放置　2～5分）",
+  },
 };
 
 export const ProcedurePage: React.FC<ProcedurePageProps> = ({
