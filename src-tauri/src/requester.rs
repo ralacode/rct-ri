@@ -140,6 +140,7 @@ pub fn create_tables(conn: &Connection) -> rusqlite::Result<()> {
 /// テーブルを作り、初めて作ったときだけ既存の記録から名前を取り込む。
 /// 2回目以降の起動では取り込まないので、一覧から削除した名前が勝手に戻ることはない。
 pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
+    normalize_history(conn)?;
     let new_departments = !table_exists(conn, Kind::Department.table())?;
     let new_physicians = !table_exists(conn, Kind::Physician.table())?;
     create_tables(conn)?;
@@ -148,6 +149,36 @@ pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
     }
     if new_physicians {
         seed(conn, Kind::Physician, &[])?;
+    }
+    Ok(())
+}
+
+/// 既存のオーダー・治療依頼の依頼科・依頼医を、保存時と同じ表記にそろえる。
+/// 毎回の起動で呼ぶが、すでにそろっている行は書き換えない。
+fn normalize_history(conn: &Connection) -> rusqlite::Result<()> {
+    for table in ["exam_orders", "treatment_requests"] {
+        if !table_exists(conn, table)? {
+            continue;
+        }
+        for kind in [Kind::Department, Kind::Physician] {
+            let column = kind.history_column();
+            let rows = {
+                let mut stmt = conn.prepare(&format!(
+                    "SELECT DISTINCT {column} FROM {table} WHERE {column} != ''"
+                ))?;
+                let names = stmt.query_map([], |row| row.get::<_, String>(0))?;
+                names.collect::<rusqlite::Result<Vec<_>>>()?
+            };
+            for raw in rows {
+                let name = normalize_name(&raw);
+                if name != raw {
+                    conn.execute(
+                        &format!("UPDATE {table} SET {column} = ?1 WHERE {column} = ?2"),
+                        params![name, raw],
+                    )?;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -493,6 +524,16 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![("佐藤 花子", 3), ("山田 太郎", 2)]
         );
+
+        // 既存の記録の表記もそろう
+        let raw: Vec<String> = conn
+            .prepare("SELECT requesting_physician FROM exam_orders")
+            .unwrap()
+            .query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap();
+        assert_eq!(raw, vec!["山田 太郎", "山田 太郎", "", "佐藤 花子"]);
 
         let departments = names(&conn, Kind::Department);
         assert_eq!(departments[0], "外科");

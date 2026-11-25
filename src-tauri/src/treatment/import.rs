@@ -649,7 +649,8 @@ mod tests {
         assert_eq!(rows[2].first_name_kana, "いちろう");
         assert_eq!(rows[3].request_date, "2026-11-25");
         assert_eq!(rows[3].slot_time, "13:30");
-        assert_eq!(rows[0].requesting_physician, "竹下　卓志");
+        // 依頼医の全角スペースは半角1つにそろえる
+        assert_eq!(rows[0].requesting_physician, "竹下 卓志");
     }
 
     #[test]

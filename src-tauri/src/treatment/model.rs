@@ -127,8 +127,9 @@ pub fn normalize_weekdays(days: &[i32]) -> Result<Vec<i32>, String> {
     Ok(out)
 }
 
+/// 依頼科・依頼医の表記をそろえる（前後の空白を除き、続く空白は全角も含めて半角1つにする）。
 pub(crate) fn normalize_text(raw: &str, label: &str) -> Result<String, String> {
-    let text = raw.trim().to_string();
+    let text = crate::requester::normalize_name(raw);
     if text.is_empty() {
         return Err(format!("{label}を入力してください"));
     }
@@ -827,6 +828,15 @@ mod tests {
             names(Kind::Physician),
             vec![("依頼医A".to_string(), 1), ("依頼医 B".to_string(), 1)]
         );
+        // 治療依頼の本体も同じ表記で保存される
+        let stored: String = conn
+            .query_row(
+                "SELECT requesting_physician FROM treatment_requests WHERE id = ?1",
+                params![id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(stored, "依頼医 B");
     }
 
     #[test]
