@@ -574,6 +574,7 @@ mod tests {
         )
         .unwrap();
         init_tables(&conn).unwrap();
+        crate::requester::create_tables(&conn).unwrap();
         conn
     }
 

@@ -3,12 +3,11 @@ import { invoke } from "@/lib/api";
 import type { ExamOrder } from "@/types/exam_order";
 import {
   cn,
-  DEPARTMENTS,
   EXAM_ITEMS,
   normalizeToDbDateFormat,
   normalizeToDisplayDateFormat,
 } from "@/lib/utils";
-import { PHYSICIAN } from "@/lib/secret-utils";
+import { useRequesterOptions } from "@/lib/requesters";
 import {
   Dialog,
   DialogClose,
@@ -46,6 +45,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
   onSuccess,
 }) => {
   const baseId = useId();
+  const { departments, physicians } = useRequesterOptions();
   const [examDate, setExamDate] = useState("");
   const [examTime, setExamTime] = useState("10:30");
   const [examItem, setExamItem] = useState("");
@@ -155,7 +155,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               placeholder="依頼科を入力..."
               value={dept}
               onChange={(e) => setDept(e.target.value)}
-              options={DEPARTMENTS}
+              options={departments}
               inputClassName={cn("h-10 cursor-pointer")}
             />
             <DatalistInput
@@ -165,7 +165,7 @@ export const EditOrderModal: React.FC<EditOrderModalProps> = ({
               placeholder="依頼医を入力..."
               value={physician}
               onChange={(e) => setPhysician(e.target.value)}
-              options={PHYSICIAN}
+              options={physicians}
               inputClassName={cn("h-10 cursor-pointer")}
             />
             <DatalistInput

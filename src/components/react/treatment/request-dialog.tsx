@@ -21,10 +21,9 @@ import {
   TREATMENT_SLOTS,
 } from "@/lib/treatment";
 import type { SlotClosure, TreatmentRequestInput } from "@/lib/treatment";
-import { PHYSICIAN } from "@/lib/secret-utils";
+import { useRequesterOptions } from "@/lib/requesters";
 import {
   cn,
-  DEPARTMENTS,
   normalizeToDbDateFormat,
   normalizeToDisplayDateFormat,
 } from "@/lib/utils";
@@ -48,6 +47,7 @@ export function TreatmentRequestDialog({
   onSubmit: (input: TreatmentRequestDraft) => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
+  const { departments, physicians } = useRequesterOptions();
   const [date, setDate] = useState("");
   const [slot, setSlot] = useState<string>(TREATMENT_SLOTS[0].value);
   const [department, setDepartment] = useState("");
@@ -229,7 +229,7 @@ export function TreatmentRequestDialog({
             placeholder="依頼科を入力..."
             value={department}
             onChange={(event) => setDepartment(event.target.value)}
-            options={DEPARTMENTS}
+            options={departments}
             inputClassName="h-10"
           />
           <DatalistInput
@@ -239,7 +239,7 @@ export function TreatmentRequestDialog({
             placeholder="依頼医を入力..."
             value={physician}
             onChange={(event) => setPhysician(event.target.value)}
-            options={PHYSICIAN}
+            options={physicians}
             inputClassName="h-10"
           />
           <p className="text-sm text-muted-foreground">

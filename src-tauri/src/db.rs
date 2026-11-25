@@ -94,6 +94,9 @@ pub fn init_db() -> Result<()> {
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_mbq REAL", []);
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
 
+    // 依頼科・依頼医の一覧。初めて作るときは既存のオーダー・治療依頼から名前を取り込む。
+    crate::requester::init_tables(&conn)?;
+
     init_user_db()?;
     init_feedback_db()?;
     let _ = std::fs::create_dir_all(get_videos_dir());

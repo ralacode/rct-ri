@@ -88,6 +88,7 @@ pub fn insert_order(
         ],
     )
     .map_err(|e| e.to_string())?;
+    crate::requester::record(&tx, requesting_department, requesting_physician)?;
 
     tx.commit().map_err(|e| e.to_string())?;
     crate::events::notify();
@@ -306,6 +307,7 @@ pub fn update_order(
     if changed == 0 {
         return Err("検査オーダーが見つかりません".into());
     }
+    crate::requester::record(&tx, requesting_department, requesting_physician)?;
 
     tx.commit().map_err(|e| e.to_string())?;
     crate::events::notify();
