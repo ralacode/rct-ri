@@ -1,0 +1,68 @@
+name: Windows ビルド
+
+# main に push されたとき / 手動実行 / v* タグを打ったときにビルドする
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write # タグ時に Release を作るため
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # .gitignore されている secret-utils.ts を GitHub Secrets から復元する
+      - name: secret-utils.ts を作成
+        shell: bash
+        env:
+          SECRET_UTILS_TS: ${{ secrets.SECRET_UTILS_TS }}
+        run: |
+          if [ -z "$SECRET_UTILS_TS" ]; then
+            echo "::error::リポジトリの Secrets に SECRET_UTILS_TS を登録してください"
+            exit 1
+          fi
+          printf '%s\n' "$SECRET_UTILS_TS" > src/lib/secret-utils.ts
+
+      - uses: pnpm/action-setup@v4 # package.json の packageManager からバージョンを読む
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: pnpm install --frozen-lockfile
+
+      # beforeBuildCommand (pnpm build) で dist も生成される。インストーラーは作らない
+      - run: pnpm tauri build --no-bundle
+
+      - name: rct_ri.exe と dist をまとめる
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force out/rct_ri | Out-Null
+          Copy-Item src-tauri/target/release/rct_ri.exe out/rct_ri/
+          Copy-Item -Recurse dist out/rct_ri/dist
+          Compress-Archive -Path out/rct_ri/* -DestinationPath rct_ri.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rct_ri-${{ github.sha }}
+          path: out/rct_ri
+          retention-days: 30
+
+      - name: Release を作成（タグ時のみ）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rct_ri.zip
+          generate_release_notes: true
