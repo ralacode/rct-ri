@@ -50,3 +50,40 @@ export function useFacilityName() {
 
   return name;
 }
+
+// ---- DB の自動バックアップ（担当者管理権限が必要） ----
+
+export type BackupEntry = { name: string; at: string };
+
+export type BackupStatus = {
+  /** バックアップ先のフォルダ。未設定なら null（自動バックアップしない）。 */
+  dir: string | null;
+  /** バックアップを取る時刻（例："9:00"） */
+  times: string[];
+  /** 残すバックアップの数 */
+  keep: number;
+  nextAt: string | null;
+  lastAt: string | null;
+  lastOk: boolean | null;
+  lastMessage: string | null;
+  /** バックアップ先を開けたか（外付け HDD が外れていると false） */
+  dirAvailable: boolean;
+  /** バックアップ先にあるバックアップ（新しい順） */
+  backups: BackupEntry[];
+};
+
+export function getBackupStatus(): Promise<BackupStatus> {
+  return apiRequest<BackupStatus>("/settings/backup");
+}
+
+/** バックアップ先を保存する。空欄なら自動バックアップを止める。 */
+export function saveBackupDir(dir: string): Promise<BackupStatus> {
+  return apiRequest<BackupStatus>("/settings/backup/dir", {
+    method: "PUT",
+    body: JSON.stringify({ dir }),
+  });
+}
+
+export function runBackupNow(): Promise<BackupStatus> {
+  return apiRequest<BackupStatus>("/settings/backup/run", { method: "POST" });
+}

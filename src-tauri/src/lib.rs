@@ -1,6 +1,7 @@
 // src-tauri/src/lib.rs
 
 mod auth;
+mod backup;
 mod db;
 mod events;
 mod exam_order;
@@ -21,6 +22,7 @@ pub fn run() {
         .setup(|app| {
             db::init_db().expect("DB初期化失敗");
             treatment::watch::spawn(db::get_rt_order_dir());
+            backup::spawn();
             http::spawn_and_wait().map_err(|error| {
                 Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>
             })?;
