@@ -1,43 +1,127 @@
-# Astro Starter Kit: Minimal
+# RCT（RI 業務支援アプリ）
 
-```sh
-npm create astro@latest -- --template minimal
+RI 検査室・放射線治療の業務を効率化するデスクトップアプリです。
+1 台の PC で起動したアプリが院内 LAN 向けの Web サーバーを兼ね、ほかの端末からはブラウザで同じ画面を使えます。
+
+## 主な機能
+
+| 区分 | 機能 |
+| --- | --- |
+| RI | 検査一覧（日ごとの検査オーダー・放射性医薬品使用記録簿の印刷・標識手順書）、減衰計算、ジェネレータ溶出記録の印刷、放射性同位元素使用室の作業内容記録の印刷 |
+| 放射線治療 | 治療依頼表（枠ごとの治療依頼、RIS の CSV 取り込み） |
+| 共通 | 患者の登録・一覧・検索、動画、質問・要望 |
+| 管理 | 担当者管理、依頼科・依頼医の管理、設定（施設名） |
+
+- 担当者ごとに「担当モダリティ」（RI・放射線治療・一般撮影）を割り当て、使えるページを絞ります。
+- 担当者管理・依頼科と依頼医の管理・設定は、担当者管理権限を持つ人だけが使えます。
+
+## 構成
+
+- **画面**：Astro（静的出力）＋ React、Tailwind CSS（`src/`）
+- **アプリ本体**：Tauri 2（Rust、`src-tauri/`）
+  - 起動すると Axum の HTTP サーバーをポート `8080` で立ち上げ、ビルド済みの画面（`dist/`）と API（`/api/...`）を配信します。
+  - アプリのウィンドウも `http://127.0.0.1:8080/` を表示します。
+  - ほかの端末からは `http://<アプリを起動した PC の IP>:8080/` で使えます。
+- **データ**：SQLite（rusqlite）。ファイルは実行ファイル（exe）と同じフォルダに作られます。
+
+### データファイル
+
+| ファイル・フォルダ | 内容 |
+| --- | --- |
+| `rct_local.db` | 業務データ（患者・検査オーダー・治療依頼）と設定（施設名） |
+| `requesters.db` | 依頼科・依頼医の一覧（入力候補） |
+| `user.db` | 担当者・ログインセッション・担当モダリティ、動画のタイトルと視聴状況 |
+| `feedback.db` | 質問・要望 |
+| `videos/` | 動画ファイル |
+| `ris/` | RIS から受け取る CSV の置き場所 |
+
+バックアップでは、`.db` ファイルをすべて（WAL モードのため、`-wal`・`-shm` ファイルがあればそれも）まとめて保存してください。
+
+## 初めて使うとき
+
+アプリを起動してブラウザ（またはアプリのウィンドウ）で開くと、初期設定が始まります。
+
+1. **初期管理者の作成**（初期設定 1 / 2）：最初の担当者アカウントを作ります。
+2. **施設名の登録**（初期設定 2 / 2）：帳票に印字する施設名を登録します。
+
+施設名を登録するまでアプリは使えません。施設名は、あとからサイドバーの「設定」で変更できます。
+
+### 依頼科・依頼医
+
+検査オーダーや治療依頼の依頼科・依頼医は、入力中に候補が表示されます。
+
+- 一覧にない名前で保存すると、自動で一覧に追加されます。
+- 名前の前後の空白は取り除かれ、続く空白（全角を含む）は半角 1 つにまとめられます。
+- 打ち間違いなどは、サイドバーの「依頼科・依頼医」で修正・削除できます。
+- 一覧の名前を変えたり削除したりしても、これまでのオーダーに記録された名前は変わりません。
+
+## 開発
+
+### 必要なもの
+
+- Node.js 22.23.4 以上、pnpm 11
+- Rust（stable）
+- Tauri 2 の前提ソフト（OS ごとに異なります。[Tauri の Prerequisites](https://v2.tauri.app/start/prerequisites/) を参照）
+
+### セットアップ
+
+```bash
+pnpm install
 ```
 
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
+### アプリを起動する（開発用）
 
-## 🚀 Project Structure
+```bash
+pnpm tauri dev
+```
 
-Inside of your Astro project, you'll see the following folders and files:
+- 最初に画面をビルド（`dist/`）してから、Astro の開発サーバー（`http://localhost:4321`）とアプリを起動します。
+- アプリのウィンドウは、ビルド済みの画面を `http://127.0.0.1:8080/` で表示します。
+- 画面を編集しながら確認するときは、ブラウザで `http://localhost:4321` を開きます。`/api` へのリクエストは、起動中のアプリ（ポート `8080`）へ転送されます。
+- 開発中のデータファイルは `src-tauri/target/debug/` に作られます。
+
+### テスト
+
+Rust のテストは、先に画面をビルドしてから実行します（Tauri のビルドに `dist/` が必要なため）。
+
+```bash
+pnpm build
+```
+
+```bash
+cd src-tauri && cargo test --lib
+```
+
+### 配布用にビルドする
+
+```bash
+pnpm tauri build
+```
+
+- 実行ファイルと同じフォルダ（またはその `dist/`）に、ビルド済みの画面（`index.html` を含む `dist`）を置いてください。
+- 見つからない場合は、起動中であることだけを示す簡易ページが表示されます。
+- リリースビルドでは、OS の起動時にアプリが自動で起動するよう登録されます。
+
+## ディレクトリ構成
 
 ```text
 /
-├── public/
-├── src/
-│   └── pages/
-│       └── index.astro
-└── package.json
+├── src/                  画面（Astro・React）
+│   ├── pages/            ページ（ルーティング）
+│   ├── components/react/ 画面の部品
+│   └── lib/              API 呼び出し・権限・共通処理
+├── src-tauri/            アプリ本体（Rust）
+│   └── src/
+│       ├── http.rs       HTTP サーバー・ページと API のアクセス制御
+│       ├── db.rs         データファイルの場所と初期化
+│       ├── auth.rs       担当者・ログイン・担当モダリティ
+│       ├── settings.rs   設定（施設名）
+│       ├── requester.rs  依頼科・依頼医の一覧
+│       ├── patient/      患者
+│       ├── exam_order/   検査オーダー
+│       ├── treatment/    治療依頼・RIS の CSV 取り込み
+│       ├── videos.rs     動画
+│       └── feedback.rs   質問・要望
+├── ris/                  RIS の CSV のサンプル（テスト用）
+└── public/               静的ファイル
 ```
-
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
-
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
-
-Any static assets, like images, can be placed in the `public/` directory.
-
-## 🧞 Commands
-
-All commands are run from the root of the project, from a terminal:
-
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
-
-## 👀 Want to learn more?
-
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
