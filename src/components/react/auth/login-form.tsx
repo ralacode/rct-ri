@@ -59,6 +59,7 @@ export function LoginForm() {
           id="staff-login-id"
           name="rct-no-store"
           label="ユーザーID"
+          autoFocus
           required
           inputMode="numeric"
           autoComplete="off"
