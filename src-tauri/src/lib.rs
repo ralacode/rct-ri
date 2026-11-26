@@ -7,6 +7,7 @@ mod exam_order;
 mod feedback;
 mod http;
 mod patient;
+mod requester;
 mod treatment;
 mod videos;
 

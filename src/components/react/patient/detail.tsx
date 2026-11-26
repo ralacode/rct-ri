@@ -7,7 +7,6 @@ import type { Patient } from "@/types/patient";
 import {
   calculateAge,
   cn,
-  DEPARTMENTS,
   EXAM_ITEMS,
   examTimeSlots,
   formatDateString,
@@ -20,7 +19,7 @@ import {
   validateKanjiName,
   validatePatientId,
 } from "@lib/utils";
-import { PHYSICIAN } from "@/lib/secret-utils";
+import { useRequesterOptions } from "@/lib/requesters";
 import type { ExamOrder } from "@/types/exam_order";
 import { DatalistInput } from "../datalist-input";
 import { DeleteOrderButton } from "@components/react/exam_order/delete-order-button";
@@ -52,6 +51,7 @@ import { format, isFuture, isValid, parse } from "date-fns";
 import { DatePickerTime } from "../date-picker-time";
 
 export const PatientDetail: React.FC = () => {
+  const { departments, physicians } = useRequesterOptions();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [orders, setOrders] = useState<ExamOrder[]>([]);
   const [newExamDate, setNewExamDate] = useState(() => {
@@ -767,7 +767,7 @@ export const PatientDetail: React.FC = () => {
                           placeholder="依頼科を入力..."
                           value={dept}
                           onChange={(e) => setDept(e.target.value)}
-                          options={DEPARTMENTS}
+                          options={departments}
                           inputClassName={cn("h-10 cursor-pointer")}
                         />
                         <DatalistInput
@@ -777,7 +777,7 @@ export const PatientDetail: React.FC = () => {
                           placeholder="依頼医を入力..."
                           value={pys}
                           onChange={(e) => setPys(e.target.value)}
-                          options={PHYSICIAN}
+                          options={physicians}
                           inputClassName={cn("h-10 cursor-pointer")}
                         />
 

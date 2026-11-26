@@ -348,7 +348,10 @@ export async function redirectForAuthStatus(
       go(nextPathAfterLogin());
       return null;
     }
-    if (path.startsWith("/users") && !status.user.canManageUsers) {
+    if (
+      (path.startsWith("/users") || path.startsWith("/requesters")) &&
+      !status.user.canManageUsers
+    ) {
       go("/account/");
       return null;
     }

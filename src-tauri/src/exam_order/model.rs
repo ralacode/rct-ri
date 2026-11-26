@@ -67,6 +67,10 @@ pub fn insert_order(
     // 現在の日本時間を取得して文字列にする (例: "2024-05-20 14:30:05")
     let now = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
+    // 依頼科・依頼医は候補一覧と同じ表記にそろえて保存する
+    let requesting_department = crate::requester::normalize_name(requesting_department);
+    let requesting_physician = crate::requester::normalize_name(requesting_physician);
+
     let tx = conn.transaction().map_err(|e| e.to_string())?;
 
     // SQLの created_at に明示的に Rust で生成した時間を入れます
@@ -77,8 +81,8 @@ pub fn insert_order(
             exam_date.to_string(),
             exam_time.to_string(),
             exam_item.to_string(),
-            requesting_department.to_string(),
-            requesting_physician.to_string(),
+            requesting_department,
+            requesting_physician,
             dosage_mbq,
             dosage_ml,
             remain_mbq,
@@ -88,6 +92,7 @@ pub fn insert_order(
         ],
     )
     .map_err(|e| e.to_string())?;
+    crate::requester::record(&tx, &requesting_department, &requesting_physician)?;
 
     tx.commit().map_err(|e| e.to_string())?;
     crate::events::notify();
@@ -271,6 +276,9 @@ pub fn update_order(
         .map_err(|e| e.to_string())?;
 
     let injection_time = injection_time.filter(|value| !value.trim().is_empty());
+    // 依頼科・依頼医は候補一覧と同じ表記にそろえて保存する
+    let requesting_department = crate::requester::normalize_name(requesting_department);
+    let requesting_physician = crate::requester::normalize_name(requesting_physician);
 
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     let changed = tx
@@ -291,8 +299,8 @@ pub fn update_order(
                 exam_date,
                 exam_time,
                 exam_item,
-                requesting_department,
-                requesting_physician,
+                &requesting_department,
+                &requesting_physician,
                 dosage_mbq,
                 dosage_ml,
                 remain_mbq,
@@ -306,6 +314,7 @@ pub fn update_order(
     if changed == 0 {
         return Err("検査オーダーが見つかりません".into());
     }
+    crate::requester::record(&tx, &requesting_department, &requesting_physician)?;
 
     tx.commit().map_err(|e| e.to_string())?;
     crate::events::notify();

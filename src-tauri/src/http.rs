@@ -601,7 +601,7 @@ async fn gate_pages(request: Request, next: Next) -> Response {
     let Some(user) = user else {
         return redirect_to(&login_url_with_next(&path_and_query));
     };
-    if path.starts_with("/users") && !user.can_manage() {
+    if (path.starts_with("/users") || path.starts_with("/requesters")) && !user.can_manage() {
         return redirect_to("/account/");
     }
     // 担当モダリティで使えないページは、ホームへ戻す。
@@ -851,6 +851,7 @@ fn protected_api() -> Router {
                 .delete(delete_exam_order),
         )
         .merge(crate::treatment::routes())
+        .merge(crate::requester::routes())
         .merge(crate::videos::routes())
         .merge(crate::feedback::routes())
         .layer(middleware::from_fn(require_auth))

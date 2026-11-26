@@ -9,6 +9,7 @@ import {
   MessageCircleQuestion,
   Printer,
   Search,
+  Stethoscope,
   TrendingDown,
   Users,
   type LucideIcon,
@@ -139,6 +140,14 @@ export const menuItems: readonly MenuItem[] = [
     icon: Users,
     group: "common",
     keywords: ["たんとうしゃかんり", "ユーザー", "user", "アカウント"],
+    adminOnly: true,
+  },
+  {
+    name: "依頼科・依頼医",
+    href: "/requesters/",
+    icon: Stethoscope,
+    group: "common",
+    keywords: ["いらいか", "いらいい", "依頼科", "依頼医", "診療科", "医師", "先生", "doctor"],
     adminOnly: true,
   },
   {
