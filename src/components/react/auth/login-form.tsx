@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Card } from "@/components/react/card";
 import { MyButton } from "@/components/react/my-button";
@@ -16,6 +16,7 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [pending, setPending] = useState(false);
+  const userIdRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     void fetchAuthStatus().then((status) => {
@@ -41,6 +42,8 @@ export function LoginForm() {
       go(nextPathAfterLogin());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
+      // ID 欄は空になっているので、すぐ入力し直せるようカーソルを戻す。
+      userIdRef.current?.focus();
     } finally {
       setPending(false);
     }
@@ -59,6 +62,7 @@ export function LoginForm() {
           id="staff-login-id"
           name="rct-no-store"
           label="ユーザーID"
+          ref={userIdRef}
           autoFocus
           required
           inputMode="numeric"
