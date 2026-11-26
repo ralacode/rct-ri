@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { AppSidebar } from "@/components/react/app-sidebar";
+import { ThemeToggle } from "@/components/react/theme/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   fetchAuthStatus,
@@ -98,11 +99,14 @@ export function AppShell({
         <a href="/" className="truncate font-bold">
           {siteMeta.siteTitle}
         </a>
-        {user && (
-          <span className="ml-auto truncate text-sm text-muted-foreground">
-            {user.displayName}
-          </span>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {user && (
+            <span className="truncate text-sm text-muted-foreground">
+              {user.displayName}
+            </span>
+          )}
+          <ThemeToggle />
+        </div>
       </header>
     </SidebarProvider>
   );
