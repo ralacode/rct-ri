@@ -9,6 +9,7 @@ import {
   MessageCircleQuestion,
   Printer,
   Search,
+  Settings,
   Stethoscope,
   TrendingDown,
   Users,
@@ -148,6 +149,14 @@ export const menuItems: readonly MenuItem[] = [
     icon: Stethoscope,
     group: "common",
     keywords: ["いらいか", "いらいい", "依頼科", "依頼医", "診療科", "医師", "先生", "doctor"],
+    adminOnly: true,
+  },
+  {
+    name: "設定",
+    href: "/settings/",
+    icon: Settings,
+    group: "common",
+    keywords: ["せってい", "設定", "施設名", "しせつめい", "病院名", "settings"],
     adminOnly: true,
   },
   {

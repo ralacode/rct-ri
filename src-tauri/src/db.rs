@@ -25,6 +25,11 @@ pub fn get_db_path() -> PathBuf {
     exe_dir().join("rct_local.db")
 }
 
+/// 依頼科・依頼医の一覧（入力候補）。業務データとは別ファイルにする。
+pub fn get_requesters_db_path() -> PathBuf {
+    exe_dir().join("requesters.db")
+}
+
 pub fn get_user_db_path() -> PathBuf {
     exe_dir().join("user.db")
 }
@@ -94,8 +99,12 @@ pub fn init_db() -> Result<()> {
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_mbq REAL", []);
     let _ = conn.execute("ALTER TABLE exam_orders ADD COLUMN remain_ml REAL", []);
 
-    // 依頼科・依頼医の一覧。初めて作るときは既存のオーダー・治療依頼から名前を取り込む。
-    crate::requester::init_tables(&conn)?;
+    // アプリ全体の設定（施設名）
+    crate::settings::init_tables(&conn)?;
+
+    // 依頼科・依頼医の一覧は requesters.db に置く。
+    // 初めて作るときは、前の版の一覧か既存のオーダー・治療依頼から名前を取り込む。
+    crate::requester::init_db(&conn)?;
 
     init_user_db()?;
     init_feedback_db()?;

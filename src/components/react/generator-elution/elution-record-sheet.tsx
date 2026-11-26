@@ -1,6 +1,6 @@
 import type { FC } from "react";
 
-import { HOSPITAL_NAME } from "@/lib/secret-utils";
+import { useFacilityName } from "@/lib/settings";
 import styles from "@/styles/elution-record.module.css";
 
 /** 1 枚に並べるジェネレータ欄の数 */
@@ -23,6 +23,7 @@ export const ElutionRecordSheet: FC<{ year: number; month: number }> = ({
   year,
   month,
 }) => {
+  const facilityName = useFacilityName();
   return (
     <div className={styles.sheet}>
       <h2 className={styles.title}>
@@ -35,7 +36,7 @@ export const ElutionRecordSheet: FC<{ year: number; month: number }> = ({
           <span>{month} 月</span>
         </div>
         <div className={styles.facility}>
-          <span>{HOSPITAL_NAME}</span>
+          <span>{facilityName}</span>
           <span>RI検査室</span>
         </div>
       </div>

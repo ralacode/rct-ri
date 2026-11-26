@@ -1,10 +1,11 @@
 // src-tauri/src/requester.rs
 // 依頼科・依頼医の一覧（入力候補）。科と医師は紐付けずに別々に持つ。
-// オーダー・治療依頼を保存するとき、まだ一覧にない名前は自動で登録する。
+// 業務データ（rct_local.db）とは別の requesters.db に保存する。
+// オーダー・治療依頼を保存したあと、まだ一覧にない名前は自動で登録する。
 // オーダー側には名前を文字列のまま残すので、ここで名前を変えても過去の記録は変わらない。
 
 use crate::auth::AuthUser;
-use crate::db::get_db_path;
+use crate::db::get_requesters_db_path;
 use axum::extract::Path;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -117,43 +118,100 @@ fn table_exists(conn: &Connection, table: &str) -> rusqlite::Result<bool> {
     )
 }
 
-/// テーブルだけを作る（テスト用にも使う）。
+fn create_table(conn: &Connection, kind: Kind) -> rusqlite::Result<()> {
+    conn.execute(
+        &format!(
+            "CREATE TABLE IF NOT EXISTS {} (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                use_count INTEGER NOT NULL DEFAULT 0,
+                last_used_at TEXT,
+                created_at TEXT NOT NULL
+            )",
+            kind.table()
+        ),
+        [],
+    )?;
+    Ok(())
+}
+
+/// テーブルだけを作る（テスト用）。
+#[cfg(test)]
 pub fn create_tables(conn: &Connection) -> rusqlite::Result<()> {
+    create_table(conn, Kind::Department)?;
+    create_table(conn, Kind::Physician)
+}
+
+/// requesters.db を開いて準備する。`source` は rct_local.db。
+pub fn init_db(source: &Connection) -> rusqlite::Result<()> {
+    let conn = Connection::open(get_requesters_db_path())?;
+    conn.query_row("PRAGMA journal_mode = WAL;", [], |_| Ok(()))?;
+    init_on(&conn, source)
+}
+
+/// 一覧のテーブルを作る。初めて作ったときは、
+/// - 前の版で rct_local.db に作った一覧があれば、それをそのままコピーする
+/// - なければ、既存のオーダー・治療依頼から名前を取り込む
+/// コピーが済んだ rct_local.db 側の一覧は削除する。
+/// 2回目以降の起動では取り込まないので、一覧から削除した名前が勝手に戻ることはない。
+pub fn init_on(conn: &Connection, source: &Connection) -> rusqlite::Result<()> {
+    normalize_history(source)?;
     for kind in [Kind::Department, Kind::Physician] {
-        conn.execute(
+        let is_new = !table_exists(conn, kind.table())?;
+        create_table(conn, kind)?;
+        let previous = table_exists(source, kind.table())?;
+        if is_new {
+            if previous {
+                copy_previous(conn, source, kind)?;
+            } else {
+                let initial: &[&str] = match kind {
+                    Kind::Department => INITIAL_DEPARTMENTS,
+                    Kind::Physician => &[],
+                };
+                seed(conn, source, kind, initial)?;
+            }
+        }
+        // requesters.db へ移したあとの古い一覧は消す（前回コピー後に削除だけ失敗していた場合も消える）。
+        if previous {
+            source.execute(&format!("DROP TABLE {}", kind.table()), [])?;
+        }
+    }
+    Ok(())
+}
+
+/// 前の版で rct_local.db に作った一覧を、ID・使用回数ごと requesters.db へ写す。
+fn copy_previous(conn: &Connection, source: &Connection, kind: Kind) -> rusqlite::Result<()> {
+    let rows = {
+        let mut stmt = source.prepare(&format!(
+            "SELECT id, name, use_count, last_used_at, created_at FROM {}",
+            kind.table()
+        ))?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, i64>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, String>(4)?,
+            ))
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()?
+    };
+    let tx = conn.unchecked_transaction()?;
+    for (id, name, use_count, last_used_at, created_at) in rows {
+        tx.execute(
             &format!(
-                "CREATE TABLE IF NOT EXISTS {} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL UNIQUE,
-                    use_count INTEGER NOT NULL DEFAULT 0,
-                    last_used_at TEXT,
-                    created_at TEXT NOT NULL
-                )",
+                "INSERT OR IGNORE INTO {} (id, name, use_count, last_used_at, created_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5)",
                 kind.table()
             ),
-            [],
+            params![id, name, use_count, last_used_at, created_at],
         )?;
     }
-    Ok(())
+    tx.commit()
 }
 
-/// テーブルを作り、初めて作ったときだけ既存の記録から名前を取り込む。
-/// 2回目以降の起動では取り込まないので、一覧から削除した名前が勝手に戻ることはない。
-pub fn init_tables(conn: &Connection) -> rusqlite::Result<()> {
-    normalize_history(conn)?;
-    let new_departments = !table_exists(conn, Kind::Department.table())?;
-    let new_physicians = !table_exists(conn, Kind::Physician.table())?;
-    create_tables(conn)?;
-    if new_departments {
-        seed(conn, Kind::Department, INITIAL_DEPARTMENTS)?;
-    }
-    if new_physicians {
-        seed(conn, Kind::Physician, &[])?;
-    }
-    Ok(())
-}
-
-/// 既存のオーダー・治療依頼の依頼科・依頼医を、保存時と同じ表記にそろえる。
+/// 既存のオーダー・治療依頼の依頼科・依頼医を、保存時と同じ表記にそろえる（rct_local.db 側）。
 /// 毎回の起動で呼ぶが、すでにそろっている行は書き換えない。
 fn normalize_history(conn: &Connection) -> rusqlite::Result<()> {
     for table in ["exam_orders", "treatment_requests"] {
@@ -183,26 +241,21 @@ fn normalize_history(conn: &Connection) -> rusqlite::Result<()> {
     Ok(())
 }
 
-fn seed(conn: &Connection, kind: Kind, initial: &[&str]) -> rusqlite::Result<()> {
+fn seed(
+    conn: &Connection,
+    source: &Connection,
+    kind: Kind,
+    initial: &[&str],
+) -> rusqlite::Result<()> {
     let now = now_str();
-    for name in initial {
-        conn.execute(
-            &format!(
-                "INSERT OR IGNORE INTO {} (name, use_count, created_at) VALUES (?1, 0, ?2)",
-                kind.table()
-            ),
-            params![name, now],
-        )?;
-    }
-
     // 既存のオーダー・治療依頼で使われた名前を、使われた回数ごと取り込む。
     let mut counts: BTreeMap<String, i64> = BTreeMap::new();
     for table in ["exam_orders", "treatment_requests"] {
-        if !table_exists(conn, table)? {
+        if !table_exists(source, table)? {
             continue;
         }
         let column = kind.history_column();
-        let mut stmt = conn.prepare(&format!(
+        let mut stmt = source.prepare(&format!(
             "SELECT {column}, COUNT(*) FROM {table} GROUP BY {column}"
         ))?;
         let rows = stmt.query_map([], |row| {
@@ -217,8 +270,19 @@ fn seed(conn: &Connection, kind: Kind, initial: &[&str]) -> rusqlite::Result<()>
             *counts.entry(name).or_default() += count;
         }
     }
+
+    let tx = conn.unchecked_transaction()?;
+    for name in initial {
+        tx.execute(
+            &format!(
+                "INSERT OR IGNORE INTO {} (name, use_count, created_at) VALUES (?1, 0, ?2)",
+                kind.table()
+            ),
+            params![name, now],
+        )?;
+    }
     for (name, count) in counts {
-        conn.execute(
+        tx.execute(
             &format!(
                 "INSERT INTO {} (name, use_count, created_at) VALUES (?1, ?2, ?3)
                  ON CONFLICT(name) DO UPDATE SET use_count = use_count + excluded.use_count",
@@ -227,7 +291,7 @@ fn seed(conn: &Connection, kind: Kind, initial: &[&str]) -> rusqlite::Result<()>
             params![name, count, now],
         )?;
     }
-    Ok(())
+    tx.commit()
 }
 
 fn record_one(conn: &Connection, kind: Kind, raw: &str, now: &str) -> Result<(), String> {
@@ -248,17 +312,26 @@ fn record_one(conn: &Connection, kind: Kind, raw: &str, now: &str) -> Result<(),
     Ok(())
 }
 
-/// オーダー・治療依頼を保存するときに呼ぶ。一覧にない名前は登録し、ある名前は使用回数を増やす。
-/// 呼び出し側のトランザクションの中で実行する。
-pub fn record(conn: &Connection, department: &str, physician: &str) -> Result<(), String> {
+/// 一覧にない名前は登録し、ある名前は使用回数を増やす。
+pub fn record_on(conn: &Connection, department: &str, physician: &str) -> Result<(), String> {
     let now = now_str();
-    record_one(conn, Kind::Department, department, &now)?;
-    record_one(conn, Kind::Physician, physician, &now)?;
-    Ok(())
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    record_one(&tx, Kind::Department, department, &now)?;
+    record_one(&tx, Kind::Physician, physician, &now)?;
+    tx.commit().map_err(|e| e.to_string())
+}
+
+/// オーダー・治療依頼を rct_local.db に保存し終えたあとに呼ぶ。
+/// 一覧は入力の補助なので、ここで失敗してもオーダーの保存は取り消さず、ログに残すだけにする。
+pub fn record(department: &str, physician: &str) {
+    if let Err(error) = open().and_then(|conn| record_on(&conn, department, physician)) {
+        log::warn!("依頼科・依頼医の一覧を更新できませんでした: {error}");
+        eprintln!("依頼科・依頼医の一覧を更新できませんでした: {error}");
+    }
 }
 
 fn open() -> Result<Connection, String> {
-    let conn = Connection::open(get_db_path()).map_err(|e| e.to_string())?;
+    let conn = Connection::open(get_requesters_db_path()).map_err(|e| e.to_string())?;
     conn.busy_timeout(std::time::Duration::from_secs(5))
         .map_err(|e| e.to_string())?;
     Ok(conn)
@@ -504,17 +577,24 @@ mod tests {
         assert_eq!(normalize_name(" \u{3000} "), "");
     }
 
-    #[test]
-    fn seeds_from_existing_records_only_once() {
-        let conn = Connection::open_in_memory().unwrap();
-        conn.execute_batch(
+    /// rct_local.db の代わり
+    fn source_db() -> Connection {
+        let source = Connection::open_in_memory().unwrap();
+        source.execute_batch(
             "CREATE TABLE exam_orders (requesting_department TEXT NOT NULL, requesting_physician TEXT NOT NULL);
              CREATE TABLE treatment_requests (requesting_department TEXT NOT NULL, requesting_physician TEXT NOT NULL);
              INSERT INTO exam_orders VALUES ('外科', '山田 太郎'), ('外科', '山田　太郎'), ('新しい科', ''), ('外科', '佐藤 花子');
              INSERT INTO treatment_requests VALUES ('放射線科', '佐藤 花子'), ('放射線科', '佐藤 花子');",
         )
         .unwrap();
-        init_tables(&conn).unwrap();
+        source
+    }
+
+    #[test]
+    fn seeds_from_existing_records_only_once() {
+        let source = source_db();
+        let conn = Connection::open_in_memory().unwrap();
+        init_on(&conn, &source).unwrap();
 
         let physicians = list_on(&conn, Kind::Physician).unwrap();
         assert_eq!(
@@ -526,7 +606,7 @@ mod tests {
         );
 
         // 既存の記録の表記もそろう
-        let raw: Vec<String> = conn
+        let raw: Vec<String> = source
             .prepare("SELECT requesting_physician FROM exam_orders")
             .unwrap()
             .query_map([], |row| row.get(0))
@@ -543,17 +623,59 @@ mod tests {
         // 削除した名前は、次の起動で取り込み直さない。
         let id = list_on(&conn, Kind::Physician).unwrap()[0].id;
         delete_on(&conn, Kind::Physician, id).unwrap();
-        init_tables(&conn).unwrap();
+        init_on(&conn, &source).unwrap();
         assert_eq!(names(&conn, Kind::Physician), vec!["山田 太郎"]);
+
+        // 一覧は rct_local.db 側には作らない
+        assert!(!table_exists(&source, "physicians").unwrap());
+        assert!(!table_exists(&source, "departments").unwrap());
+    }
+
+    #[test]
+    fn moves_the_previous_lists_out_of_rct_local() {
+        // 前の版は rct_local.db に一覧を作っていた
+        let source = source_db();
+        source
+            .execute_batch(
+                "CREATE TABLE departments (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+                    use_count INTEGER NOT NULL DEFAULT 0, last_used_at TEXT, created_at TEXT NOT NULL);
+                 CREATE TABLE physicians (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE,
+                    use_count INTEGER NOT NULL DEFAULT 0, last_used_at TEXT, created_at TEXT NOT NULL);
+                 INSERT INTO departments VALUES (5, '外科', 7, '2026-11-20 10:00:00', '2026-11-01 09:00:00');
+                 INSERT INTO physicians VALUES (3, '手で直した 名前', 4, NULL, '2026-11-01 09:00:00');",
+            )
+            .unwrap();
+        let conn = Connection::open_in_memory().unwrap();
+        init_on(&conn, &source).unwrap();
+
+        // 既存の記録から取り込み直すのではなく、前の一覧をそのまま写す
+        assert_eq!(
+            list_on(&conn, Kind::Department).unwrap(),
+            vec![Requester {
+                id: 5,
+                name: "外科".into(),
+                use_count: 7,
+                last_used_at: Some("2026-11-20 10:00:00".into()),
+                created_at: "2026-11-01 09:00:00".into(),
+            }]
+        );
+        assert_eq!(names(&conn, Kind::Physician), vec!["手で直した 名前"]);
+        // 写し終えた rct_local.db 側の一覧は消える
+        assert!(!table_exists(&source, "departments").unwrap());
+        assert!(!table_exists(&source, "physicians").unwrap());
+
+        // 次の起動でも変わらない
+        init_on(&conn, &source).unwrap();
+        assert_eq!(names(&conn, Kind::Physician), vec!["手で直した 名前"]);
     }
 
     #[test]
     fn record_adds_new_names_and_counts_known_ones() {
         let conn = Connection::open_in_memory().unwrap();
         create_tables(&conn).unwrap();
-        record(&conn, "外科", "山田 太郎").unwrap();
-        record(&conn, " 外科 ", "鈴木\u{3000}一郎").unwrap();
-        record(&conn, "", "").unwrap();
+        record_on(&conn, "外科", "山田 太郎").unwrap();
+        record_on(&conn, " 外科 ", "鈴木\u{3000}一郎").unwrap();
+        record_on(&conn, "", "").unwrap();
 
         let departments = list_on(&conn, Kind::Department).unwrap();
         assert_eq!(departments.len(), 1);

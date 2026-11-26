@@ -8,6 +8,7 @@ mod feedback;
 mod http;
 mod patient;
 mod requester;
+mod settings;
 mod treatment;
 mod videos;
 
