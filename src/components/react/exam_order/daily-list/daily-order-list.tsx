@@ -21,7 +21,6 @@ import { useFacilityName } from "@/lib/settings";
 import { cn, getTodayLocalString } from "@/lib/utils";
 import type { ExamOrderWithPatient } from "@/types/exam_order";
 import styles from "@styles/daily-order-list.module.css";
-import { EditExamOrderModal } from "@components/react/exam_order/edit-exam-order-modal";
 import {
   PageContainer,
   PageHeader,
@@ -29,6 +28,7 @@ import {
 
 import { DateNavigator } from "./date-navigator";
 import { DeleteOrderDialog } from "./delete-order-dialog";
+import { InjectionRecordDialog } from "./injection-record-dialog";
 import { OrderCard } from "./order-card";
 import { getInjectionStatus } from "./order-status";
 import { printProcedureSheet, printUsageRecord } from "./print";
@@ -140,11 +140,10 @@ export function DailyOrderList() {
         )}
       </PageContainer>
 
-      <EditExamOrderModal
-        isOpen={editingOrder !== null}
-        onClose={() => setEditingOrder(null)}
-        onSuccess={refresh}
+      <InjectionRecordDialog
         order={editingOrder}
+        onOpenChange={(open) => !open && setEditingOrder(null)}
+        onSaved={refresh}
       />
       <DeleteOrderDialog
         order={deletingOrder}

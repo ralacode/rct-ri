@@ -1,6 +1,7 @@
 // src/components/react/exam_order/daily-list/delete-order-dialog.tsx
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +33,9 @@ export function DeleteOrderDialog({ order, onOpenChange, onDeleted }: Props) {
     setError(null);
     try {
       await invoke("delete_exam_order_cmd", { id: order.id });
+      toast.success("オーダーを削除しました", {
+        description: `${order.exam_time} ${order.exam_item}（${order.last_name_kanji} ${order.first_name_kanji} 様）`,
+      });
       onDeleted();
       onOpenChange(false);
     } catch (err) {

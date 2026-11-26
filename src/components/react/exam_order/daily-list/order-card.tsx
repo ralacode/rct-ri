@@ -22,12 +22,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ExamOrderWithPatient } from "@/types/exam_order";
-import {
-  calculateAge,
-  cn,
-  NEEDS_PROCEDURE_ITEMS,
-  toKatakana,
-} from "@/lib/utils";
+import { calculateAge, cn, toKatakana } from "@/lib/utils";
+import { canPrintProcedureSheet } from "@components/react/exam_order/procedure_page/procedure-page";
 import { PediatricDoseNote } from "./pediatric-dose-note";
 import {
   getInjectionStatus,
@@ -50,7 +46,7 @@ export function OrderCard({
 }: Props) {
   const status = getInjectionStatus(order);
   const age = calculateAge(order.birth_date);
-  const needsProcedure = NEEDS_PROCEDURE_ITEMS.includes(order.exam_item);
+  const needsProcedure = canPrintProcedureSheet(order.exam_item);
 
   return (
     <Card className="@container/order gap-0 overflow-hidden py-0">

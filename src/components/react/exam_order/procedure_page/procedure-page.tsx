@@ -4,6 +4,7 @@ import {
   calculateAge,
   cn,
   formatDateTimeWithDay,
+  isTcExamItem,
   toKatakana,
 } from "@lib/utils";
 import styles from "@styles/daily-order-list.module.css";
@@ -25,6 +26,8 @@ interface ProcedurePageProps {
   targetDate: string;
 }
 
+// 標識手順書の様式がある検査項目（キット名・目標量など）。
+// ここにない検査は手順書を印刷できない（canPrintProcedureSheet を参照）。
 const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
   センチネルリンパ節シンチ: {
     kit_name: "テクネフチン酸キット",
@@ -50,6 +53,11 @@ const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
     leave: "標識後静置（室温放置　2～5分）",
   },
 };
+
+/** 標識手順書を印刷できる検査か（Tc を使い、手順書の様式があるもの） */
+export function canPrintProcedureSheet(examItem: string): boolean {
+  return isTcExamItem(examItem) && examItem in PROCEDURE_CONFIGS;
+}
 
 export const ProcedurePage: React.FC<ProcedurePageProps> = ({
   order,

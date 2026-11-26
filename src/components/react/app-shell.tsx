@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { AppSidebar } from "@/components/react/app-sidebar";
 import { ThemeToggle } from "@/components/react/theme/theme-toggle";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { Toaster } from "@/components/ui/sonner";
 import {
   fetchAuthStatus,
   loginUrl,
@@ -108,6 +109,7 @@ export function AppShell({
           <ThemeToggle />
         </div>
       </header>
+      <Toaster position="top-center" />
     </SidebarProvider>
   );
 }

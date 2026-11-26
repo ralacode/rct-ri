@@ -6,7 +6,10 @@
 import React, { memo } from "react";
 import type { ExamOrderWithPatient } from "@/types/exam_order";
 import styles from "@styles/daily-order-list.module.css";
-import { ProcedurePage } from "@components/react/exam_order/procedure_page/procedure-page";
+import {
+  canPrintProcedureSheet,
+  ProcedurePage,
+} from "@components/react/exam_order/procedure_page/procedure-page";
 
 const MemoizedProcedurePage = memo(ProcedurePage);
 
@@ -21,13 +24,15 @@ export const ProcedureSheetsPrint: React.FC<Props> = ({
 }) => {
   return (
     <div className={styles.procedure_for_print}>
-      {orders.map((order) => (
-        <MemoizedProcedurePage
-          key={`proc-${order.id}`}
-          order={order}
-          targetDate={targetDate}
-        />
-      ))}
+      {orders
+        .filter((order) => canPrintProcedureSheet(order.exam_item))
+        .map((order) => (
+          <MemoizedProcedurePage
+            key={`proc-${order.id}`}
+            order={order}
+            targetDate={targetDate}
+          />
+        ))}
     </div>
   );
 };
