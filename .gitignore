@@ -24,3 +24,8 @@ pnpm-debug.log*
 .idea/
 
 docs/
+
+# RIS から受け取る実データは置かない（架空のサンプルだけを残す）
+ris/rt_order/*
+!ris/rt_order/RAWDATA-20261115-20261215-患者～検査依頼.csv
+!ris/rt_order/SAMPLE-*.xlsx

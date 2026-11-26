@@ -22,9 +22,12 @@ function count(rows: RtOrderImportRow[], status: RtOrderImportRow["status"]) {
   return rows.filter((row) => row.status === status).length;
 }
 
-function isCsv(file: File) {
+const EXTENSIONS = [".csv", ".xlsx", ".xlsm", ".xls"];
+
+function isImportable(file: File) {
+  const name = file.name.toLowerCase();
   return (
-    file.name.toLowerCase().endsWith(".csv") ||
+    EXTENSIONS.some((ext) => name.endsWith(ext)) ||
     file.type === "text/csv" ||
     file.type === "application/vnd.ms-excel"
   );
@@ -70,8 +73,8 @@ export function RtOrderImport({
   const take = (next: File | null | undefined) => {
     if (pending) return;
     if (!next) return;
-    if (!isCsv(next)) {
-      setError("CSV ファイルを選んでください。");
+    if (!isImportable(next)) {
+      setError("CSV か Excel のファイルを選んでください。");
       return;
     }
     void read(next);
@@ -99,10 +102,11 @@ export function RtOrderImport({
   return (
     <div className="grid gap-3 rounded-lg border p-3">
       <div className="grid gap-1">
-        <div className="text-sm font-medium">RIS の CSV を読み込む</div>
+        <div className="text-sm font-medium">RIS の CSV・Excel を読み込む</div>
         <p className="text-xs text-muted-foreground">
           13:30 と 14:30 以外の予定時刻は、15:30
-          の臨時枠に入ります。カナはひらがなで登録します。
+          の臨時枠に入ります。カナはひらがなで登録します。アプリを起動した PC の
+          ris/rt_order フォルダに置いたファイルは、自動で取り込まれます。
         </p>
       </div>
       <div
@@ -128,23 +132,23 @@ export function RtOrderImport({
           event.preventDefault();
           setDragging(false);
           const dropped = Array.from(event.dataTransfer.files);
-          take(dropped.find(isCsv) ?? dropped[0]);
+          take(dropped.find(isImportable) ?? dropped[0]);
         }}
       >
         <p className="text-sm">
-          CSV をここにドロップするか、ボタンから選んでください。
+          CSV・Excel をここにドロップするか、ボタンから選んでください。
         </p>
         <Button
           type="button"
           disabled={pending}
           onClick={() => inputRef.current?.click()}
         >
-          CSV を選択
+          ファイルを選択
         </Button>
         <input
           ref={inputRef}
           type="file"
-          accept=".csv,text/csv"
+          accept=".csv,.xlsx,.xlsm,.xls,text/csv"
           className="sr-only"
           disabled={pending}
           onChange={(event) => {
