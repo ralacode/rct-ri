@@ -23,6 +23,8 @@ export type AuthUser = {
 
 export type AuthStatus = {
   needsSetup: boolean;
+  /** 施設名が未登録（登録するまでアプリは使えない） */
+  needsFacilityName: boolean;
   authenticated: boolean;
   user: AuthUser | null;
 };
@@ -348,8 +350,15 @@ export async function redirectForAuthStatus(
       go(nextPathAfterLogin());
       return null;
     }
+    // 施設名が登録されるまでは、施設名の登録画面しか使えない。
+    if (status.needsFacilityName) {
+      go("/setup/facility/");
+      return null;
+    }
     if (
-      (path.startsWith("/users") || path.startsWith("/requesters")) &&
+      (path.startsWith("/users") ||
+        path.startsWith("/requesters") ||
+        path.startsWith("/settings")) &&
       !status.user.canManageUsers
     ) {
       go("/account/");

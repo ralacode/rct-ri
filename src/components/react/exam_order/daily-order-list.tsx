@@ -19,7 +19,7 @@ import { MyButton } from "@components/react/my-button";
 import { PatientName } from "@components/react/patient-name";
 import { ProcedurePage } from "@components/react/exam_order/procedure_page/procedure-page";
 import { ChevronLeft } from "lucide-react";
-import { HOSPITAL_NAME } from "@lib/secret-utils";
+import { useFacilityName } from "@/lib/settings";
 import { EditExamOrderModal } from "@components/react/exam_order/edit-exam-order-modal";
 import { Card } from "@components/react/card";
 import { BorderInGrid } from "@components/react/exam_order/border_in_grid/border-in-grid";
@@ -88,6 +88,7 @@ const EXAM_ITEM_DISPLAY_MAP: Record<string, React.ReactNode> = {
 const MemoizedProcedurePage = memo(ProcedurePage);
 
 export const DailyOrderList: React.FC = () => {
+  const facilityName = useFacilityName();
   const [targetDate, setTargetDate] = useState(getTodayLocalString());
   const [orders, setOrders] = useState<ExamOrderWithPatient[]>([]);
 
@@ -411,7 +412,7 @@ export const DailyOrderList: React.FC = () => {
         >
           <div>
             <h1 className={"text-xl"}>
-              {HOSPITAL_NAME}　放射性医薬品使用記録簿
+              {facilityName}　放射性医薬品使用記録簿
             </h1>
 
             <p>使用日：{formatDateTimeWithDay(targetDate)}</p>

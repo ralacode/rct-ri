@@ -73,7 +73,8 @@ export function SetupForm() {
       });
       setPassword("");
       setConfirm("");
-      go("/");
+      // 次は施設名の登録（登録するまでアプリは使えない）
+      go("/setup/facility/");
     } catch (error) {
       setUserId(nextUserId);
       setMessage(error instanceof Error ? error.message : String(error));
@@ -86,6 +87,7 @@ export function SetupForm() {
     <Card className="w-full">
       <form className="grid gap-4" autoComplete="off" onSubmit={handleSubmit}>
         <div className="grid gap-1">
+          <p className="text-sm text-muted-foreground">初期設定 1 / 2</p>
           <h1 className="text-2xl font-semibold tracking-tight">
             初期管理者の作成
           </h1>

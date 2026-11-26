@@ -309,11 +309,13 @@ async fn auth_status(headers: axum::http::HeaderMap) -> Json<serde_json::Value> 
     match auth::user_from_headers(&headers) {
         Ok(user) => Json(json!({
             "needsSetup": false,
+            "needsFacilityName": crate::settings::needs_facility_name(),
             "authenticated": true,
             "user": user,
         })),
         Err(_) => Json(json!({
             "needsSetup": needs_setup,
+            "needsFacilityName": false,
             "authenticated": false,
             "user": null,
         })),
@@ -548,9 +550,35 @@ async fn set_feedback_permission(
     empty_ok(auth::set_answer_feedback(id, body.can_answer_feedback))
 }
 
+/// 施設名が未登録の間も使える API（自分の情報・パスワード変更・施設名の登録・変更通知）。
+/// ログイン・ログアウト・初期設定は認証前の API なので、ここを通らない。
+fn api_allowed_without_facility(path: &str) -> bool {
+    let path = path.strip_prefix("/api").unwrap_or(path);
+    matches!(
+        path,
+        "/auth/me" | "/auth/password" | "/settings/facility-name" | "/events" | "/events/"
+    )
+}
+
+/// 担当者管理権限を持つ人だけが開けるページ
+fn manager_page(path: &str) -> bool {
+    ["/users", "/requesters", "/settings"]
+        .iter()
+        .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
+}
+
 async fn require_auth(mut request: Request, next: Next) -> Response {
     match auth::user_from_headers(request.headers()) {
         Ok(user) => {
+            // 施設名が登録されるまでは、業務の API を使えない。
+            if !api_allowed_without_facility(request.uri().path())
+                && crate::settings::needs_facility_name()
+            {
+                return auth_fail(
+                    StatusCode::CONFLICT,
+                    "施設名が登録されていません。施設名を登録するまでアプリは使えません".into(),
+                );
+            }
             request.extensions_mut().insert(user);
             next.run(request).await
         }
@@ -577,6 +605,20 @@ async fn gate_pages(request: Request, next: Next) -> Response {
     let user = auth::user_from_headers(request.headers()).ok();
     let authenticated = user.is_some();
 
+    // 施設名の登録画面。ログイン済みで、施設名が未登録のときだけ開ける。
+    if path == "/setup/facility" || path.starts_with("/setup/facility/") {
+        if needs_setup {
+            return redirect_to("/setup/");
+        }
+        if !authenticated {
+            return redirect_to("/login/");
+        }
+        if !crate::settings::needs_facility_name() {
+            return redirect_to("/");
+        }
+        return next.run(request).await;
+    }
+
     if path.starts_with("/setup") {
         if needs_setup {
             return next.run(request).await;
@@ -601,7 +643,11 @@ async fn gate_pages(request: Request, next: Next) -> Response {
     let Some(user) = user else {
         return redirect_to(&login_url_with_next(&path_and_query));
     };
-    if (path.starts_with("/users") || path.starts_with("/requesters")) && !user.can_manage() {
+    // 施設名が登録されるまでは、どのページも使えない（登録画面へ移す）。
+    if crate::settings::needs_facility_name() {
+        return redirect_to("/setup/facility/");
+    }
+    if manager_page(&path) && !user.can_manage() {
         return redirect_to("/account/");
     }
     // 担当モダリティで使えないページは、ホームへ戻す。
@@ -852,6 +898,7 @@ fn protected_api() -> Router {
         )
         .merge(crate::treatment::routes())
         .merge(crate::requester::routes())
+        .merge(crate::settings::routes())
         .merge(crate::videos::routes())
         .merge(crate::feedback::routes())
         .layer(middleware::from_fn(require_auth))
@@ -1005,6 +1052,53 @@ mod login_next_tests {
         }
         for path in ["/", "/feedback/", "/videos/", "/account/", "/patientx/"] {
             assert!(page_allowed(path, &general), "{path}");
+        }
+    }
+
+    #[test]
+    fn only_account_and_facility_apis_work_without_facility_name() {
+        for path in [
+            "/auth/me",
+            "/api/auth/me",
+            "/auth/password",
+            "/settings/facility-name",
+            "/api/settings/facility-name",
+            "/events",
+        ] {
+            assert!(api_allowed_without_facility(path), "{path}");
+        }
+        for path in [
+            "/patients",
+            "/api/patients",
+            "/exam-orders",
+            "/users",
+            "/physicians",
+            "/treatment-board",
+            "/settings/facility-name/x",
+        ] {
+            assert!(!api_allowed_without_facility(path), "{path}");
+        }
+    }
+
+    #[test]
+    fn manager_pages() {
+        for path in [
+            "/users",
+            "/users/",
+            "/requesters/",
+            "/settings",
+            "/settings/",
+        ] {
+            assert!(manager_page(path), "{path}");
+        }
+        for path in [
+            "/setup/",
+            "/setup/facility/",
+            "/settingsx/",
+            "/account/",
+            "/",
+        ] {
+            assert!(!manager_page(path), "{path}");
         }
     }
 

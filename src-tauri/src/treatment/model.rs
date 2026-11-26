@@ -401,6 +401,7 @@ pub fn create_request(
         requesting_department,
         requesting_physician,
     )?;
+    crate::requester::record(requesting_department, requesting_physician);
     crate::events::notify();
     Ok(())
 }
@@ -477,7 +478,6 @@ pub(crate) fn insert_request(
         params![patient_db_id, date, slot, department, physician, now, now],
     )
     .map_err(|error| map_constraint(error, "この枠にはすでに依頼があります"))?;
-    crate::requester::record(conn, &department, &physician)?;
     Ok(())
 }
 
@@ -520,6 +520,7 @@ pub fn update_request(
         requesting_department,
         requesting_physician,
     )?;
+    crate::requester::record(requesting_department, requesting_physician);
     crate::events::notify();
     Ok(())
 }
@@ -565,7 +566,6 @@ pub fn update_request_on(
     if changed == 0 {
         return Err("治療依頼が見つかりません".into());
     }
-    crate::requester::record(&tx, &department, &physician)?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -775,7 +775,6 @@ mod tests {
         )
         .unwrap();
         init_tables(&conn).unwrap();
-        crate::requester::create_tables(&conn).unwrap();
         conn.execute(
             "INSERT INTO patients (patient_id, last_name_kanji, first_name_kanji) VALUES ('0000000001', '山田', '花子')",
             [],
@@ -794,13 +793,30 @@ mod tests {
     }
 
     #[test]
-    fn saving_a_request_registers_department_and_physician() {
-        use crate::requester::{list_on, Kind};
+    fn saves_department_and_physician_with_normalized_spaces() {
         let mut conn = test_db();
-        place(&mut conn, 1, "2026-06-01", "13:30");
+        create_request_on(
+            &mut conn,
+            1,
+            "2026-06-01",
+            "13:30",
+            "　乳腺内分泌外科 ",
+            "依頼医\u{3000}\u{3000}A",
+        )
+        .unwrap();
         let id: i32 = conn
             .query_row("SELECT id FROM treatment_requests", [], |row| row.get(0))
             .unwrap();
+        let stored = |conn: &Connection| -> (String, String) {
+            conn.query_row(
+                "SELECT requesting_department, requesting_physician FROM treatment_requests WHERE id = ?1",
+                params![id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap()
+        };
+        assert_eq!(stored(&conn), ("乳腺内分泌外科".into(), "依頼医 A".into()));
+
         update_request_on(
             &mut conn,
             id,
@@ -810,33 +826,7 @@ mod tests {
             "依頼医\u{3000}B",
         )
         .unwrap();
-        let names = |kind| {
-            list_on(&conn, kind)
-                .unwrap()
-                .into_iter()
-                .map(|item| (item.name, item.use_count))
-                .collect::<Vec<_>>()
-        };
-        assert_eq!(
-            names(Kind::Department),
-            vec![
-                ("乳腺内分泌外科".to_string(), 1),
-                ("放射線科".to_string(), 1)
-            ]
-        );
-        assert_eq!(
-            names(Kind::Physician),
-            vec![("依頼医A".to_string(), 1), ("依頼医 B".to_string(), 1)]
-        );
-        // 治療依頼の本体も同じ表記で保存される
-        let stored: String = conn
-            .query_row(
-                "SELECT requesting_physician FROM treatment_requests WHERE id = ?1",
-                params![id],
-                |row| row.get(0),
-            )
-            .unwrap();
-        assert_eq!(stored, "依頼医 B");
+        assert_eq!(stored(&conn), ("放射線科".into(), "依頼医 B".into()));
     }
 
     #[test]

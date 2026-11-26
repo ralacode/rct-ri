@@ -91,10 +91,15 @@ pub fn preview(bytes: &[u8]) -> Result<Vec<ImportRow>, String> {
 pub fn apply(bytes: &[u8]) -> Result<Vec<ImportRow>, String> {
     let mut conn = model::open()?;
     let rows = apply_on(&mut conn, bytes)?;
-    if rows
+    let mut saved = false;
+    for row in rows
         .iter()
-        .any(|row| row.status == "create" || row.status == "attach")
+        .filter(|row| row.status == "create" || row.status == "attach")
     {
+        crate::requester::record(&row.requesting_department, &row.requesting_physician);
+        saved = true;
+    }
+    if saved {
         crate::events::notify();
     }
     Ok(rows)
@@ -574,7 +579,6 @@ mod tests {
         )
         .unwrap();
         init_tables(&conn).unwrap();
-        crate::requester::create_tables(&conn).unwrap();
         conn
     }
 
