@@ -16,9 +16,14 @@ pub fn get_videos_dir() -> PathBuf {
     exe_dir().join("videos")
 }
 
-/// exe と同じ階層の ris。将来、RIS のバッチが治療依頼 CSV をここへ置く。
+/// exe と同じ階層の ris。RIS から受け取るファイルの置き場所。
 pub fn get_ris_dir() -> PathBuf {
     exe_dir().join("ris")
+}
+
+/// ris/rt_order。ここに置いた治療依頼の Excel・CSV は自動で取り込まれる。
+pub fn get_rt_order_dir() -> PathBuf {
+    get_ris_dir().join("rt_order")
 }
 
 /// DB ファイルをまとめて置くフォルダ（exe と同じ階層の db）。
@@ -81,7 +86,11 @@ fn migrate_to_db_dir(old_dir: &Path, new_dir: &Path) -> std::io::Result<()> {
             }
         }
         std::fs::rename(&old_main, &new_main)?;
-        log::info!("{} を {} へ移しました", old_main.display(), new_main.display());
+        log::info!(
+            "{} を {} へ移しました",
+            old_main.display(),
+            new_main.display()
+        );
     }
     Ok(())
 }
@@ -236,7 +245,9 @@ mod tests {
         let dir = std::env::temp_dir().join(format!(
             "rct_db_migrate_{label}_{}_{}",
             std::process::id(),
-            chrono::Local::now().timestamp_nanos_opt().unwrap_or_default()
+            chrono::Local::now()
+                .timestamp_nanos_opt()
+                .unwrap_or_default()
         ));
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -253,9 +264,18 @@ mod tests {
 
         migrate_to_db_dir(&base, &new_dir).unwrap();
 
-        assert_eq!(fs::read_to_string(new_dir.join("rct_local.db")).unwrap(), "main");
-        assert_eq!(fs::read_to_string(new_dir.join("rct_local.db-wal")).unwrap(), "wal");
-        assert_eq!(fs::read_to_string(new_dir.join("rct_local.db-shm")).unwrap(), "shm");
+        assert_eq!(
+            fs::read_to_string(new_dir.join("rct_local.db")).unwrap(),
+            "main"
+        );
+        assert_eq!(
+            fs::read_to_string(new_dir.join("rct_local.db-wal")).unwrap(),
+            "wal"
+        );
+        assert_eq!(
+            fs::read_to_string(new_dir.join("rct_local.db-shm")).unwrap(),
+            "shm"
+        );
         assert_eq!(fs::read_to_string(new_dir.join("user.db")).unwrap(), "user");
         assert!(!base.join("rct_local.db").exists());
         assert!(!base.join("rct_local.db-wal").exists());
@@ -280,7 +300,10 @@ mod tests {
         assert_eq!(fs::read_to_string(new_dir.join("user.db")).unwrap(), "new");
         assert!(!new_dir.join("user.db-wal").exists());
         assert_eq!(fs::read_to_string(base.join("user.db")).unwrap(), "old");
-        assert_eq!(fs::read_to_string(base.join("user.db-wal")).unwrap(), "old-wal");
+        assert_eq!(
+            fs::read_to_string(base.join("user.db-wal")).unwrap(),
+            "old-wal"
+        );
 
         fs::remove_dir_all(&base).unwrap();
     }
