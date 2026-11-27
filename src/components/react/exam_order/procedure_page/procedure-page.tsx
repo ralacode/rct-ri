@@ -19,8 +19,6 @@ interface ProcedureConfig {
   title: string;
   /** 手順書や添付文書に基づいた目標量 */
   base_target_amount: string;
-  /** 目標量の補足（目標量の下の行に出す） */
-  target_note?: string;
   /**
    * 【標識】の工程。省略すると【標識】がない様式（ジェネレータからの溶出液をそのまま分注する）になる。
    */
@@ -126,25 +124,6 @@ const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
   "甲状腺シンチ Tcのみ": {
     title: "ジェネレータからの溶出液",
     base_target_amount: BLANK_TARGET_AMOUNT,
-  },
-  "心筋シンチ Tc 運動負荷": {
-    title: "マイオビュー「注射用」",
-    base_target_amount: BLANK_TARGET_AMOUNT,
-    target_note: "濃度 555 MBq/mL 以下",
-    labeling: {
-      product_name: "マイオビュー「注射用」",
-      steps: [
-        <CheckItem>バイアルゴム栓を消毒</CheckItem>,
-        <CheckItem>標識用エアー針を穿刺</CheckItem>,
-        <CheckItem>
-          キットバイアルに(a)を入れ、その後そのシリンジにてバイアル内の空気2mLを脱気
-        </CheckItem>,
-        <CheckItem>静かに振とう</CheckItem>,
-        <CheckItem>内容物の溶解と異物・異常着色の確認</CheckItem>,
-      ],
-      leave: "標識後静置（室温放置15分以上）",
-    },
-    prep_note: "標識後、6時間以内に使用すること",
   },
 };
 
@@ -265,9 +244,6 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             （手順書や添付文書に基づいた目標量　{config.base_target_amount}）
           </p>
         </div>
-        {config.target_note && (
-          <p className="pl-4 text-sm">※ 目標量：{config.target_note}</p>
-        )}
         <ul className="grid gap-1 pl-4">
           <li>
             <CheckItem>（溶出）バイアルのゴム栓の消毒</CheckItem>
