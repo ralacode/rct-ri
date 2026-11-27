@@ -15,10 +15,29 @@ import { MbqUnderline } from "./mbq-underline";
 import { FinishTime } from "./finish-time";
 
 interface ProcedureConfig {
-  kit_name: string;
+  /** 見出し「〇〇の調製手順と記録」の〇〇 */
+  title: string;
+  /** 手順書や添付文書に基づいた目標量 */
   base_target_amount: string;
-  return_time?: string;
-  leave?: string;
+  /** 目標量の補足（目標量の下の行に出す） */
+  target_note?: string;
+  /**
+   * 【標識】の工程。省略すると【標識】がない様式（ジェネレータからの溶出液をそのまま分注する）になる。
+   */
+  labeling?: {
+    /** キットバイアル情報の製品名 */
+    product_name: string;
+    /** 常温戻しの時間 */
+    return_time?: string;
+    /** 常温戻し時刻と標識終了時刻の間の工程。省略時は標準の工程 */
+    steps?: React.ReactNode[];
+    /** 標識後静置（・・・(b) が付く） */
+    leave?: string;
+  };
+  /** 【分注】の下に添える注意書き */
+  dispense_note?: string;
+  /** 【投与準備】の下に添える注意書き */
+  prep_note?: string;
 }
 
 interface ProcedurePageProps {
@@ -26,31 +45,106 @@ interface ProcedurePageProps {
   targetDate: string;
 }
 
-// 標識手順書の様式がある検査項目（キット名・目標量など）。
+/** 目標量を施設で書き込む様式用の空欄 */
+const BLANK_TARGET_AMOUNT = "　　～　　MBq / 　～　mL";
+
+/** 標準の標識工程（常温戻し時刻と標識終了時刻の間） */
+const DEFAULT_LABELING_STEPS: React.ReactNode[] = [
+  <CheckItem>キットバイアルゴム栓の消毒</CheckItem>,
+  <CheckItem>内容物の確認</CheckItem>,
+  <>
+    <CheckItem>未使用注射針筒で(a)をキットバイアルに</CheckItem>
+    <div className="grid grid-flow-col justify-start pl-6">
+      <MlUnderline />
+      <p>追加</p>
+    </div>
+  </>,
+  <CheckItem>振とう</CheckItem>,
+  <CheckItem>内容物の溶解と異物・異常着色の確認</CheckItem>,
+];
+
+// 標識手順書の様式がある検査項目。
+// 放射性医薬品取り扱いガイドライン 第4版（日本核医学会ほか）付録４「各種様式例」の
+// 「〇〇の調製手順と記録」をもとにしている。
 // ここにない検査は手順書を印刷できない（canPrintProcedureSheet を参照）。
 const PROCEDURE_CONFIGS: Record<string, ProcedureConfig> = {
   センチネルリンパ節シンチ: {
-    kit_name: "テクネフチン酸キット",
+    title: "テクネフチン酸キット",
     base_target_amount: "18.5～111 MBq / 2～8 mL",
-    leave: "標識後静置不要",
+    labeling: {
+      product_name: "テクネフチン酸キット",
+      leave: "標識後静置不要",
+    },
+    prep_note: "標識後できるだけ早く投与",
   },
   骨シンチ: {
-    kit_name: "クリアボーンキット",
+    title: "クリアボーンキット",
     base_target_amount: "555～740 MBq / 3～9 mL",
-    return_time: "5分",
-    leave: "標識後静置（室温放置　10分）",
+    labeling: {
+      product_name: "テクネクリアボーンキット",
+      return_time: "5分",
+      leave: "標識後静置（室温放置　10分）",
+    },
+    dispense_note: "調製後は6時間以内に使用すること",
   },
   "腎レノグラム ラシックス負荷": {
-    kit_name: "テクネDTPAキット",
+    title: "テクネDTPAキット",
     base_target_amount: "74 ～ 555 MBq / 2 ～ 9 mL",
-    return_time: "5分",
-    leave: "標識後静置（室温放置　2～5分）",
+    labeling: {
+      product_name: "テクネDTPAキット",
+      return_time: "5分",
+      leave: "標識後静置（室温放置　2～5分）",
+    },
   },
   "腎レノグラム 負荷無": {
-    kit_name: "テクネDTPAキット",
+    title: "テクネDTPAキット",
     base_target_amount: "74 ～ 555 MBq / 2 ～ 9 mL",
-    return_time: "5分",
-    leave: "標識後静置（室温放置　2～5分）",
+    labeling: {
+      product_name: "テクネDTPAキット",
+      return_time: "5分",
+      leave: "標識後静置（室温放置　2～5分）",
+    },
+  },
+  // 目標量はガイドラインの様式でも空欄（施設で記入する）
+  肺血流シンチ: {
+    title: "テクネMAAキット",
+    base_target_amount: BLANK_TARGET_AMOUNT,
+    labeling: {
+      product_name: "テクネMAAキット",
+      return_time: "10～20分",
+      steps: [
+        <CheckItem>キットバイアルゴム栓の消毒</CheckItem>,
+        <CheckItem>再凍結無等内部の確認</CheckItem>,
+        <CheckItem>未使用注射針筒で(a)をキットバイアルに添加</CheckItem>,
+        <CheckItem>10～15秒軽く回転振とう</CheckItem>,
+        <CheckItem>内容物の溶解と異物・異常着色の確認</CheckItem>,
+      ],
+      leave: "標識後静置（室温放置　15分）",
+    },
+  },
+  // 過テクネチウム酸ナトリウムをそのまま使うので【標識】はない。目標量は施設で記入する
+  "甲状腺シンチ Tcのみ": {
+    title: "ジェネレータからの溶出液",
+    base_target_amount: BLANK_TARGET_AMOUNT,
+  },
+  "心筋シンチ Tc 運動負荷": {
+    title: "マイオビュー「注射用」",
+    base_target_amount: BLANK_TARGET_AMOUNT,
+    target_note: "濃度 555 MBq/mL 以下",
+    labeling: {
+      product_name: "マイオビュー「注射用」",
+      steps: [
+        <CheckItem>バイアルゴム栓を消毒</CheckItem>,
+        <CheckItem>標識用エアー針を穿刺</CheckItem>,
+        <CheckItem>
+          キットバイアルに(a)を入れ、その後そのシリンジにてバイアル内の空気2mLを脱気
+        </CheckItem>,
+        <CheckItem>静かに振とう</CheckItem>,
+        <CheckItem>内容物の溶解と異物・異常着色の確認</CheckItem>,
+      ],
+      leave: "標識後静置（室温放置15分以上）",
+    },
+    prep_note: "標識後、6時間以内に使用すること",
   },
 };
 
@@ -63,10 +157,12 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
   order,
   targetDate,
 }) => {
-  // 該当する検査項目の設定を取得（未定義の場合はデフォルト表示）
-  const config = PROCEDURE_CONFIGS[order.exam_item] || {
-    title: "標識手順書",
-  };
+  const config = PROCEDURE_CONFIGS[order.exam_item];
+  if (!config) return null;
+  const labeling = config.labeling;
+  // 【標識】がない様式では、分注は (a) から抜き取り (b) とする
+  const dispenseFrom = labeling ? "b" : "a";
+  const dispensed = labeling ? "c" : "b";
 
   return (
     <div
@@ -74,7 +170,7 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
       id={`print-target-${order.id}`}
     >
       {/* ヘッダータイトル */}
-      <h1 className="text-2xl">{config.kit_name}の調製手順と記録</h1>
+      <h1 className="text-2xl">{config.title}の調製手順と記録</h1>
 
       {/* 調製日 */}
       <p className="justify-self-end">
@@ -169,6 +265,9 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             （手順書や添付文書に基づいた目標量　{config.base_target_amount}）
           </p>
         </div>
+        {config.target_note && (
+          <p className="pl-4 text-sm">※ 目標量：{config.target_note}</p>
+        )}
         <ul className="grid gap-1 pl-4">
           <li>
             <CheckItem>（溶出）バイアルのゴム栓の消毒</CheckItem>
@@ -198,63 +297,46 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
       </div>
 
       {/* 標識 */}
-      <div className="grid grid-cols-[auto,1fr] items-start">
-        <div>
-          <h2>【標識】</h2>
-          <ul className="grid gap-1 pl-4">
-            <li
-              className={cn(
-                config.return_time && "grid grid-flow-col justify-start",
-              )}
-            >
-              <CheckItem>常温戻し時刻 (　　：　　)</CheckItem>
+      {labeling && (
+        <div className="grid grid-cols-[auto,1fr] items-start">
+          <div>
+            <h2>【標識】</h2>
+            <ul className="grid gap-1 pl-4">
+              <li
+                className={cn(
+                  labeling.return_time && "grid grid-flow-col justify-start",
+                )}
+              >
+                <CheckItem>常温戻し時刻 (　　：　　)</CheckItem>
 
-              {config.return_time && (
-                <p className="text-sm">（戻し時間 {config.return_time}）</p>
-              )}
-            </li>
-            <li>
-              <CheckItem>キットバイアルゴム栓の消毒</CheckItem>
-            </li>
-            <li>
-              <CheckItem>内容物の確認</CheckItem>
-            </li>
-            <li>
-              <CheckItem>未使用注射針筒で(a)をキットバイアルに</CheckItem>
-              <div className="grid grid-flow-col justify-start pl-6">
-                <MlUnderline />
-                <p>追加</p>
-              </div>
-            </li>
-            <li>
-              <CheckItem>振とう</CheckItem>
-            </li>
-            <li>
-              <CheckItem>内容物の溶解と異物・異常着色の確認</CheckItem>
-            </li>
-            <li>
-              <FinishTime>標識終了時刻</FinishTime>
-            </li>
-            {config.leave && (
-              <li>
-                <CheckItem>{config.leave} ・・・(b)</CheckItem>
+                {labeling.return_time && (
+                  <p className="text-sm">（戻し時間 {labeling.return_time}）</p>
+                )}
               </li>
-            )}
-          </ul>
-        </div>
+              {(labeling.steps ?? DEFAULT_LABELING_STEPS).map((step, i) => (
+                <li key={i}>{step}</li>
+              ))}
+              <li>
+                <FinishTime>標識終了時刻</FinishTime>
+              </li>
+              {labeling.leave && (
+                <li>
+                  <CheckItem>{labeling.leave} ・・・(b)</CheckItem>
+                </li>
+              )}
+            </ul>
+          </div>
 
-        <div className="border border-black px-4 py-8 grid gap-2 col-2">
-          <h3 className="text-lg">キットバイアル情報</h3>
-          <ul>
-            <li>
-              製品名　：{order.exam_item === "骨シンチ" && "テクネ"}
-              {config.kit_name}
-            </li>
-            <li>製造番号：</li>
-            <li>有効期限：</li>
-          </ul>
+          <div className="border border-black px-4 py-8 grid gap-2 col-2">
+            <h3 className="text-lg">キットバイアル情報</h3>
+            <ul>
+              <li>製品名　：{labeling.product_name}</li>
+              <li>製造番号：</li>
+              <li>有効期限：</li>
+            </ul>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 分注 */}
       <div>
@@ -267,18 +349,18 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             <CheckItem>未使用の注射針、注射筒を用意する</CheckItem>
           </li>
           <li className="grid grid-flow-col gap-28 justify-start">
-            <CheckItem>(b)から抜き取った標識薬</CheckItem>
+            <CheckItem>({dispenseFrom})から抜き取った標識薬</CheckItem>
             <div className="grid grid-flow-col gap-8 justify-start">
               <MbqUnderline />
-              <MlUnderline mark="c" />
+              <MlUnderline mark={dispensed} />
             </div>
           </li>
           <li>
             <FinishTime>分注終了時刻</FinishTime>
           </li>
-          {order.exam_item === "骨シンチ" && (
+          {config.dispense_note && (
             <li className="border-b border-black justify-self-start pl-4 pr-4">
-              調製後は6時間以内に使用すること
+              {config.dispense_note}
             </li>
           )}
         </ul>
@@ -291,7 +373,9 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
           <h2>【投与準備】</h2>
           <ul className="grid gap-1 pl-4">
             <li>
-              <CheckItem>誤投与防止対策（注射筒(c)へのラベル貼付）</CheckItem>
+              <CheckItem>
+                誤投与防止対策（注射筒({dispensed})へのラベル貼付）
+              </CheckItem>
             </li>
             <li>
               <CheckItem>貯蔵（保管）箱内にて整頓と保管</CheckItem>
@@ -299,9 +383,9 @@ export const ProcedurePage: React.FC<ProcedurePageProps> = ({
             <li>
               <FinishTime>調製終了時刻</FinishTime>
             </li>
-            {order.exam_item === "センチネルリンパ節シンチ" && (
+            {config.prep_note && (
               <li className="border-b border-black justify-self-start pl-4 pr-4">
-                標識後できるだけ早く投与
+                {config.prep_note}
               </li>
             )}
           </ul>
