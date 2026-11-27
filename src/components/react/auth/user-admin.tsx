@@ -22,6 +22,7 @@ import {
   type AuthUser,
   type Modality,
 } from "@/lib/auth";
+import { normalizeForSearch } from "@/lib/sidebar-menu";
 
 type ProfileEdit = {
   userId: string;
@@ -49,6 +50,20 @@ export function UserAdmin() {
   const [profileEdits, setProfileEdits] = useState<Record<number, ProfileEdit>>(
     {},
   );
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // 氏名・ユーザーID・担当モダリティ名で絞り込む（全角/半角・かな/カナの違いは無視）
+  const normalizedQuery = normalizeForSearch(searchQuery);
+  const filteredUsers = normalizedQuery
+    ? users.filter((user) =>
+        [
+          user.displayName,
+          `${user.lastName}${user.firstName}`,
+          user.userId,
+          ...(user.modalities ?? []).map((item) => item.name),
+        ].some((text) => normalizeForSearch(text).includes(normalizedQuery)),
+      )
+    : users;
 
   const defaultModalityIds = (items: Modality[]) =>
     items.filter((item) => item.isDefault).map((item) => item.id);
@@ -395,11 +410,33 @@ export function UserAdmin() {
           <h2 className="text-lg font-semibold tracking-tight">
             登録済みの担当者
           </h2>
+          {users.length > 0 && (
+            <div className="grid gap-1">
+              <MyInput
+                id="staff-search"
+                label="担当者を検索"
+                type="search"
+                placeholder="氏名・ユーザーID・モダリティで検索"
+                autoComplete="off"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {normalizedQuery
+                  ? `${filteredUsers.length}件 / 全${users.length}件`
+                  : `全${users.length}件`}
+              </p>
+            </div>
+          )}
           {users.length === 0 ? (
             <p className="text-sm text-muted-foreground">担当者がいません。</p>
+          ) : filteredUsers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              該当する担当者がいません。
+            </p>
           ) : (
             <ul className="grid gap-3">
-              {users.map((user) => (
+              {filteredUsers.map((user) => (
                 <li key={user.id} className="grid gap-3 rounded-lg border p-3">
                   <p className="font-medium">
                     {user.displayName}
@@ -499,7 +536,10 @@ export function UserAdmin() {
                       type="checkbox"
                       checked={user.canAnswerFeedback}
                       onChange={(event) =>
-                        void handleFeedbackPermission(user, event.target.checked)
+                        void handleFeedbackPermission(
+                          user,
+                          event.target.checked,
+                        )
                       }
                     />
                     質問・要望に回答する

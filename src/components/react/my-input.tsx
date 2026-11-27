@@ -10,6 +10,7 @@ interface Props extends React.InputHTMLAttributes<HTMLInputElement> {
   inputClassName?: string;
   id: string;
   label: string;
+  ref?: React.Ref<HTMLInputElement>;
 }
 
 export const MyInput = ({

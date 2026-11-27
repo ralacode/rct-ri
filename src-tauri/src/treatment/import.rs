@@ -1,11 +1,13 @@
 //! 治療依頼の RIS CSV を、患者登録と治療依頼にする。
 //!
+//! CSV のほか、RIS の抽出ツールが出す Excel（[`super::xlsx`]）も読める。
 //! 画面で選んだファイルのバイト列を [`preview`] と [`apply`] に渡す。
-//! 解釈と保存はファイルの出どころに依存しない。将来は exe と同じ階層の
-//! [`crate::db::get_ris_dir`] に置かれた CSV を、同じ関数へ渡す。
+//! exe と同じ階層の `ris/rt_order` に置かれたファイルも、[`super::watch`] が
+//! 同じ [`apply`] へ渡す。解釈と保存はファイルの出どころに依存しない。
 
 use crate::patient::model::normalize_and_validate;
 use crate::treatment::model::{self, normalize_text};
+use crate::treatment::xlsx;
 use chrono::NaiveDate;
 use rusqlite::{params, Connection, TransactionBehavior};
 use serde::Serialize;
@@ -260,6 +262,27 @@ fn insert_patient(conn: &Connection, ready: &Ready) -> Result<i32, String> {
 }
 
 fn parse_bytes(bytes: &[u8]) -> Result<Vec<Parsed>, String> {
+    let numbered = if xlsx::is_workbook(bytes) {
+        xlsx::read_rows(bytes)?
+    } else {
+        csv_rows(bytes)?
+    };
+    let rows: Vec<Parsed> = numbered
+        .into_iter()
+        .filter(|(_, raw)| !raw.iter().all(|cell| cell.trim().is_empty()))
+        .map(|(line, raw)| Parsed {
+            line,
+            ready: normalize_row(&raw),
+        })
+        .collect();
+    if rows.is_empty() {
+        return Err("取り込む行がありません".into());
+    }
+    Ok(rows)
+}
+
+/// CSV を（行番号, 列）の一覧にする。見出し行は 1 行目。
+fn csv_rows(bytes: &[u8]) -> Result<Vec<(i32, Vec<String>)>, String> {
     let text = decode_csv(bytes)?;
     let table = parse_csv(&text)?;
     let Some((header, data)) = table.split_first() else {
@@ -268,30 +291,12 @@ fn parse_bytes(bytes: &[u8]) -> Result<Vec<Parsed>, String> {
     if header.len() < HEADERS.len() || header[..HEADERS.len()] != HEADERS {
         return Err("治療依頼の CSV ではありません。列名が RIS の出力と一致しません".into());
     }
-    if data.is_empty()
-        || data
-            .iter()
-            .all(|row| row.iter().all(|cell| cell.trim().is_empty()))
-    {
-        return Err("取り込む行がありません".into());
-    }
-    let mut line = 2;
-    let mut rows = Vec::new();
-    for raw in data {
-        if raw.iter().all(|cell| cell.trim().is_empty()) {
-            line += 1;
-            continue;
-        }
-        rows.push(Parsed {
-            line,
-            ready: normalize_row(raw),
-        });
-        line += 1;
-    }
-    if rows.is_empty() {
-        return Err("取り込む行がありません".into());
-    }
-    Ok(rows)
+    Ok(data
+        .iter()
+        .cloned()
+        .enumerate()
+        .map(|(index, row)| (index as i32 + 2, row))
+        .collect())
 }
 
 fn parse_csv(text: &str) -> Result<Vec<Vec<String>>, String> {
@@ -833,5 +838,48 @@ mod tests {
         assert_eq!(rows[0].slot_time, "13:30");
         assert_eq!(rows[0].weight, Some(40.0));
         assert_eq!(rows[0].last_name_kana, "やまだ");
+    }
+
+    fn sample_xlsx() -> Vec<u8> {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../ris/rt_order/SAMPLE-治療依頼抽出結果.xlsx");
+        std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+    }
+
+    #[test]
+    fn reads_the_extracted_excel() {
+        let mut conn = test_db();
+        let bytes = sample_xlsx();
+        let rows = preview_on(&conn, &bytes).unwrap();
+        assert_eq!(rows.len(), 3);
+        // Excel の行番号（見出しは 5 行目）
+        assert_eq!(rows[0].line, 6);
+        assert_eq!(rows[0].patient_id, "0000123456");
+        assert_eq!(rows[0].last_name_kanji, "山田");
+        assert_eq!(rows[0].first_name_kana, "はなこ");
+        assert_eq!(rows[0].gender, "女");
+        assert_eq!(rows[0].birth_date, "1965-04-12");
+        assert_eq!(rows[0].height, Some(152.4));
+        assert_eq!(rows[0].request_date, "2026-12-02");
+        assert_eq!(rows[0].slot_time, "14:30");
+        assert_eq!(rows[0].requesting_physician, "鈴木 一郎");
+        assert_eq!(rows[1].birth_date, "1934-06-03");
+        assert_eq!(rows[1].height, Some(141.0));
+        assert_eq!(rows[2].slot_time, "13:30");
+        assert_eq!(rows[2].requesting_department, "乳腺内分泌外科");
+        assert!(rows.iter().all(|row| row.status == "create"), "{rows:?}");
+
+        let applied = apply_on(&mut conn, &bytes).unwrap();
+        assert!(applied.iter().all(|row| row.status == "create"));
+        let again = apply_on(&mut conn, &bytes).unwrap();
+        assert!(again.iter().all(|row| row.status == "skip"));
+    }
+
+    #[test]
+    fn rejects_an_excel_without_the_headers() {
+        let conn = test_db();
+        // 壊れた Excel は、CSV として読もうとせずに断る
+        let error = preview_on(&conn, b"PK\x03\x04broken").unwrap_err();
+        assert!(error.starts_with("Excel ファイルを開けません"), "{error}");
     }
 }
