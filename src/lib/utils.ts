@@ -371,3 +371,10 @@ export function formatDateJapanese(date: Date | undefined) {
   // 'eeeeee' で「月」「火」「水」のような一文字の曜日になります
   return format(date, "yyyy年MM月dd日(eeeeee)", { locale: ja });
 }
+
+/** catch した値から画面に出すエラーメッセージを取り出す（取れなければ fallback） */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "string" && err) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
+}

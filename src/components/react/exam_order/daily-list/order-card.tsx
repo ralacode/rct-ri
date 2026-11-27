@@ -2,7 +2,6 @@
 //
 // 検査一覧の 1 件分。左に予約時刻、右に検査・患者・投与記録を並べる「カード行」。
 
-import type { ReactNode } from "react";
 import {
   EllipsisIcon,
   PencilIcon,
@@ -11,7 +10,6 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import {
@@ -24,12 +22,12 @@ import {
 import type { ExamOrderWithPatient } from "@/types/exam_order";
 import { calculateAge, cn, toKatakana } from "@/lib/utils";
 import { canPrintProcedureSheet } from "@components/react/exam_order/procedure_page/procedure-page";
-import { PediatricDoseNote } from "./pediatric-dose-note";
+import { PediatricDoseNote } from "@components/react/exam_order/pediatric-dose-note";
+import { getInjectionStatus } from "@components/react/exam_order/order-status";
 import {
-  getInjectionStatus,
-  INJECTION_STATUS_LABEL,
-  type InjectionStatus,
-} from "./order-status";
+  InjectionRecord,
+  InjectionStatusBadge,
+} from "@components/react/exam_order/injection-record";
 
 interface Props {
   order: ExamOrderWithPatient;
@@ -66,7 +64,7 @@ export function OrderCard({
               <h2 className="text-base font-semibold @md/order:text-lg">
                 {order.exam_item}
               </h2>
-              <StatusBadge status={status} />
+              <InjectionStatusBadge status={status} />
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -157,88 +155,6 @@ function Dot() {
   return (
     <span aria-hidden="true" className="hidden text-border @md/order:inline">
       |
-    </span>
-  );
-}
-
-function StatusBadge({ status }: { status: InjectionStatus }) {
-  return (
-    <Badge
-      variant={
-        status === "done"
-          ? "default"
-          : status === "partial"
-            ? "secondary"
-            : "outline"
-      }
-      className={cn(status === "pending" && "text-muted-foreground")}
-    >
-      {INJECTION_STATUS_LABEL[status]}
-    </Badge>
-  );
-}
-
-/** 投与記録（投与時刻・投与量・残量・実投与量） */
-function InjectionRecord({ order }: { order: ExamOrderWithPatient }) {
-  const actualMbq =
-    order.dosage_mbq !== null && order.remain_mbq !== null
-      ? (order.dosage_mbq - order.remain_mbq).toFixed(1)
-      : null;
-  const actualMl =
-    order.dosage_ml !== null && order.remain_ml !== null
-      ? (order.dosage_ml - order.remain_ml).toFixed(1)
-      : null;
-
-  return (
-    <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-border @xl/order:grid-cols-4">
-      <Stat label="投与時刻">{order.injection_time || "--:--"}</Stat>
-      <Stat label="投与量">
-        <Amount mbq={order.dosage_mbq} ml={order.dosage_ml} />
-      </Stat>
-      <Stat label="残量">
-        <Amount mbq={order.remain_mbq} ml={order.remain_ml} />
-      </Stat>
-      <Stat label="実投与量" emphasis>
-        <Amount mbq={actualMbq} ml={actualMl} />
-      </Stat>
-    </dl>
-  );
-}
-
-function Stat({
-  label,
-  emphasis,
-  children,
-}: {
-  label: string;
-  emphasis?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <div className="grid gap-0.5 bg-card px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={cn("text-sm tabular-nums", emphasis && "font-semibold")}>
-        {children}
-      </dd>
-    </div>
-  );
-}
-
-function Amount({
-  mbq,
-  ml,
-}: {
-  mbq: number | string | null;
-  ml: number | string | null;
-}) {
-  return (
-    <span className="flex flex-wrap gap-x-2">
-      <span>
-        {mbq ?? "-"} <span className="text-muted-foreground">MBq</span>
-      </span>
-      <span>
-        {ml ?? "-"} <span className="text-muted-foreground">mL</span>
-      </span>
     </span>
   );
 }

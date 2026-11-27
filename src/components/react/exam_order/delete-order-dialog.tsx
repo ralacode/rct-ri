@@ -1,4 +1,6 @@
-// src/components/react/exam_order/daily-list/delete-order-dialog.tsx
+// src/components/react/exam_order/delete-order-dialog.tsx
+//
+// 検査オーダーの削除確認。検査一覧と患者詳細で使う。
 
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,16 +15,35 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { invoke } from "@/lib/api";
-import type { ExamOrderWithPatient } from "@/types/exam_order";
+import { formatDateTimeWithDay } from "@/lib/utils";
+import type { ExamOrder } from "@/types/exam_order";
+
+type DeletableOrder = Pick<
+  ExamOrder,
+  "id" | "exam_date" | "exam_time" | "exam_item"
+>;
+
+/** 確認文やお知らせに出す「日付 時刻 検査名（患者名 様）」 */
+function describeOrder(order: DeletableOrder, patientName?: string) {
+  const name = patientName ? `（${patientName} 様）` : "";
+  return `${formatDateTimeWithDay(order.exam_date)} ${order.exam_time} ${order.exam_item}${name}`;
+}
 
 interface Props {
   /** 削除する検査オーダー。null のときは閉じている */
-  order: ExamOrderWithPatient | null;
+  order: DeletableOrder | null;
+  /** 確認文に添える患者名（患者詳細では省く） */
+  patientName?: string;
   onOpenChange: (open: boolean) => void;
   onDeleted: () => void;
 }
 
-export function DeleteOrderDialog({ order, onOpenChange, onDeleted }: Props) {
+export function DeleteOrderDialog({
+  order,
+  patientName,
+  onOpenChange,
+  onDeleted,
+}: Props) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +55,7 @@ export function DeleteOrderDialog({ order, onOpenChange, onDeleted }: Props) {
     try {
       await invoke("delete_exam_order_cmd", { id: order.id });
       toast.success("オーダーを削除しました", {
-        description: `${order.exam_time} ${order.exam_item}（${order.last_name_kanji} ${order.first_name_kanji} 様）`,
+        description: describeOrder(order, patientName),
       });
       onDeleted();
       onOpenChange(false);
@@ -58,8 +79,7 @@ export function DeleteOrderDialog({ order, onOpenChange, onDeleted }: Props) {
         <AlertDialogHeader>
           <AlertDialogTitle>このオーダーを削除しますか？</AlertDialogTitle>
           <AlertDialogDescription>
-            {order &&
-              `${order.exam_time} ${order.exam_item}（${order.last_name_kanji} ${order.first_name_kanji} 様）`}
+            {order && describeOrder(order, patientName)}
             <br />
             削除すると元に戻せません。
           </AlertDialogDescription>

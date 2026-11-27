@@ -1,6 +1,6 @@
-// src/components/react/exam_order/daily-list/order-status.ts
+// src/components/react/exam_order/order-status.ts
 
-import type { ExamOrderWithPatient } from "@/types/exam_order";
+import type { ExamOrder } from "@/types/exam_order";
 
 /**
  * 投与記録の入力状況。
@@ -12,7 +12,7 @@ export type InjectionStatus = "done" | "partial" | "pending";
 
 export function getInjectionStatus(
   order: Pick<
-    ExamOrderWithPatient,
+    ExamOrder,
     "dosage_mbq" | "dosage_ml" | "remain_mbq" | "remain_ml" | "injection_time"
   >,
 ): InjectionStatus {

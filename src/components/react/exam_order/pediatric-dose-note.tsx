@@ -1,4 +1,4 @@
-// src/components/react/exam_order/daily-list/pediatric-dose-note.tsx
+// src/components/react/exam_order/pediatric-dose-note.tsx
 //
 // 検査項目が DMSA / DTPA のとき、体重から 99mTc の推奨投与量を表示する（画面用）。
 

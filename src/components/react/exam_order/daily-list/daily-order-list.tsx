@@ -27,10 +27,10 @@ import {
 } from "@components/react/layout/page-header";
 
 import { DateNavigator } from "./date-navigator";
-import { DeleteOrderDialog } from "./delete-order-dialog";
+import { DeleteOrderDialog } from "@components/react/exam_order/delete-order-dialog";
 import { InjectionRecordDialog } from "./injection-record-dialog";
 import { OrderCard } from "./order-card";
-import { getInjectionStatus } from "./order-status";
+import { getInjectionStatus } from "@components/react/exam_order/order-status";
 import { printProcedureSheet, printUsageRecord } from "./print";
 import { ProcedureSheetsPrint } from "./procedure-sheets-print";
 import { UsageRecordPrint } from "./usage-record-print";
@@ -147,6 +147,11 @@ export function DailyOrderList() {
       />
       <DeleteOrderDialog
         order={deletingOrder}
+        patientName={
+          deletingOrder
+            ? `${deletingOrder.last_name_kanji} ${deletingOrder.first_name_kanji}`
+            : undefined
+        }
         onOpenChange={(open) => !open && setDeletingOrder(null)}
         onDeleted={refresh}
       />
