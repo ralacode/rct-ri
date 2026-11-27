@@ -1,5 +1,5 @@
 // 作業報告書の登録・編集。取り込んだ報告書は、元の PDF・写真を横に見ながら確認できる。
-import { ArrowLeft, Paperclip, Trash2, X } from "lucide-react";
+import { ArrowLeft, Download, Paperclip, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Card } from "@/components/react/card";
@@ -16,6 +16,7 @@ import {
   deleteFile,
   deleteReport,
   fileSizeLabel,
+  downloadUrl,
   fileUrl,
   fromInputValue,
   getOptions,
@@ -132,6 +133,12 @@ function FilePreview({ report }: { report: WorkReport }) {
               ))}
             </select>
           )}
+          <Button asChild variant="outline" size="sm" className="ml-auto">
+            <a href={downloadUrl(current.id)} download={current.fileName}>
+              <Download />
+              ダウンロード
+            </a>
+          </Button>
         </div>
         {current.contentType === "application/pdf" ? (
           <iframe
@@ -713,6 +720,16 @@ export function WorkReportEditor() {
                     <span className="text-muted-foreground">
                       {fileSizeLabel(file.size)}
                     </span>
+                    <Button asChild variant="ghost" size="icon-sm">
+                      <a
+                        href={downloadUrl(file.id)}
+                        download={file.fileName}
+                        aria-label={`${file.fileName} をダウンロード`}
+                        title="ダウンロード"
+                      >
+                        <Download />
+                      </a>
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"

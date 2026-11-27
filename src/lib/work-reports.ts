@@ -171,6 +171,11 @@ export function fileUrl(fileId: number) {
   return `/api/work-report-files/${fileId}`;
 }
 
+/** 開かずに保存させる URL（原本のダウンロード） */
+export function downloadUrl(fileId: number) {
+  return `${fileUrl(fileId)}?download=1`;
+}
+
 type Kind = "manufacturers" | "devices" | "engineers";
 
 export function saveMaster(kind: Kind, id: number | null, body: object) {

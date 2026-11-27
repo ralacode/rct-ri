@@ -24,6 +24,13 @@ struct FileNameQuery {
 }
 
 #[derive(Deserialize)]
+struct DownloadQuery {
+    /// 1 なら、ブラウザで開かずにファイルとして保存させる
+    #[serde(default)]
+    download: Option<String>,
+}
+
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ManufacturerBody {
     name: String,
@@ -186,7 +193,13 @@ fn encode_file_name(name: &str) -> String {
         .collect()
 }
 
-async fn download_file(Path(id): Path<i64>) -> Response {
+/// 添付ファイルを返す。`?download=1` なら保存用（attachment）、なければブラウザで表示する（inline）。
+async fn download_file(Path(id): Path<i64>, Query(query): Query<DownloadQuery>) -> Response {
+    let disposition = if query.download.as_deref() == Some("1") {
+        "attachment"
+    } else {
+        "inline"
+    };
     match with_db(|conn| model::get_file(conn, id)) {
         Ok((file, bytes)) => (
             [
@@ -194,7 +207,7 @@ async fn download_file(Path(id): Path<i64>) -> Response {
                 (
                     header::CONTENT_DISPOSITION,
                     format!(
-                        "inline; filename*=UTF-8''{}",
+                        "{disposition}; filename*=UTF-8''{}",
                         encode_file_name(&file.file_name)
                     ),
                 ),
