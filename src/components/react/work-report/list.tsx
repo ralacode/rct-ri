@@ -43,6 +43,10 @@ export function StatusBadge({ status }: { status: WorkReport["status"] }) {
   );
 }
 
+function isImportable(file: File) {
+  return /\.(pdf|json)$/i.test(file.name);
+}
+
 function editUrl(id: number) {
   return `/work-report/edit/?id=${id}`;
 }
@@ -84,11 +88,19 @@ export function WorkReportList() {
     };
   }, [keyword, deviceId, status]);
 
-  const handleFiles = async (files: FileList | null) => {
-    if (!files || files.length === 0) return;
+  const handleFiles = async (files: FileList | File[] | null) => {
+    if (!files || files.length === 0 || importing) return;
     setImporting(true);
     const lines: ImportLine[] = [];
     for (const file of Array.from(files)) {
+      if (!isImportable(file)) {
+        lines.push({
+          fileName: file.name,
+          error: "PDF か JSON のファイルだけ取り込めます",
+        });
+        setImports([...lines]);
+        continue;
+      }
       try {
         lines.push({ fileName: file.name, result: await importReport(file) });
       } catch (err) {
@@ -100,16 +112,72 @@ export function WorkReportList() {
     if (fileInput.current) fileInput.current.value = "";
   };
 
+  // 画面（サイドバーを含むウィンドウ全体）のどこにドロップしても取り込む。
+  // ブラウザが PDF を開いてアプリから離れてしまわないよう、ウィンドウで受け止める。
+  // 子要素の出入りでちらつかないよう、出入りの回数を数える。
+  const [dragDepth, setDragDepth] = useState(0);
+  const dragging = dragDepth > 0;
+  const handleFilesRef = useRef(handleFiles);
+  handleFilesRef.current = handleFiles;
+
+  useEffect(() => {
+    const hasFiles = (event: DragEvent) =>
+      !!event.dataTransfer &&
+      Array.from(event.dataTransfer.types).includes("Files");
+    const onEnter = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      setDragDepth((depth) => depth + 1);
+    };
+    const onOver = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+    };
+    const onLeave = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      setDragDepth((depth) => Math.max(0, depth - 1));
+    };
+    const onDrop = (event: DragEvent) => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      setDragDepth(0);
+      void handleFilesRef.current(Array.from(event.dataTransfer?.files ?? []));
+    };
+    window.addEventListener("dragenter", onEnter);
+    window.addEventListener("dragover", onOver);
+    window.addEventListener("dragleave", onLeave);
+    window.addEventListener("drop", onDrop);
+    return () => {
+      window.removeEventListener("dragenter", onEnter);
+      window.removeEventListener("dragover", onOver);
+      window.removeEventListener("dragleave", onLeave);
+      window.removeEventListener("drop", onDrop);
+    };
+  }, []);
+
   const reviewCount = reports.filter((r) => r.status === "review").length;
 
   return (
     <div className="grid gap-4">
+      {dragging && (
+        <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-background/70 p-6 backdrop-blur-[2px]">
+          <div className="grid justify-items-center gap-2 rounded-xl border-2 border-dashed border-primary bg-background px-10 py-8 text-center shadow-lg">
+            <FileUp className="size-10 text-primary" />
+            <p className="text-lg font-semibold">ここにドロップして取り込む</p>
+            <p className="text-sm text-muted-foreground">
+              PDF・JSON（複数まとめてでも可）
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-1">
           <h2 className="text-2xl font-semibold tracking-tight">作業報告書</h2>
           <p className="text-sm text-muted-foreground">
             メーカーの保守・修理の報告です。PDF
-            を取り込むと項目を読み取り、「要確認」として登録します。
+            を取り込むと項目を読み取り、「要確認」として登録します。PDF・JSON
+            はこの画面にドラッグ&ドロップしても取り込めます。
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
