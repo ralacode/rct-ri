@@ -11,6 +11,7 @@ mod requester;
 mod settings;
 mod treatment;
 mod videos;
+mod work_report;
 
 use tauri::{LogicalSize, Manager, PhysicalPosition};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -21,6 +22,7 @@ pub fn run() {
         .setup(|app| {
             db::init_db().expect("DB初期化失敗");
             treatment::watch::spawn(db::get_rt_order_dir());
+            work_report::import::spawn(db::get_work_report_import_dir());
             http::spawn_and_wait().map_err(|error| {
                 Box::new(std::io::Error::other(error)) as Box<dyn std::error::Error>
             })?;

@@ -1,0 +1,10 @@
+---
+import Layout from "@layouts/layout.astro";
+import { WorkReportEditor } from "@/components/react/work-report/editor";
+
+// 静的モードなので、報告書の ID は URL クエリ（?id=）を React 側で読む
+---
+
+<Layout pageTitle="作業報告書">
+  <WorkReportEditor client:only="react" />
+</Layout>

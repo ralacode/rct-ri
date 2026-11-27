@@ -3,6 +3,7 @@ import {
   ClipboardList,
   Contact,
   ContactRound,
+  FileText,
   Film,
   Home,
   KeyRound,
@@ -119,6 +120,13 @@ export const menuItems: readonly MenuItem[] = [
     group: "common",
     keywords: ["かんじゃけんさく", "患者", "検索", "patient"],
     access: "patients",
+  },
+  {
+    name: "作業報告書",
+    href: "/work-report/",
+    icon: FileText,
+    group: "common",
+    keywords: ["さぎょうほうこくしょ", "作業報告書", "報告書", "保守", "修理", "点検", "メーカー", "varian", "siemens"],
   },
   {
     name: "動画",
