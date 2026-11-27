@@ -49,6 +49,7 @@ pub fn routes() -> Router {
     Router::new()
         .route("/work-reports", get(list_reports).post(create_report))
         .route("/work-reports/options", get(options))
+        .route("/work-reports/duplicate", get(check_duplicate))
         .route(
             "/work-reports/{id}",
             get(get_report).put(update_report).delete(delete_report),
@@ -127,6 +128,40 @@ async fn options() -> Response {
             }))
         })
     })())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DuplicateQuery {
+    exclude_id: Option<i64>,
+    #[serde(default)]
+    work_order_no: String,
+    device_id: Option<i64>,
+    #[serde(default)]
+    failure_at: String,
+    #[serde(default)]
+    arrival_at: String,
+}
+
+/// 入力中の報告書が登録済みか調べる（保存する前に画面で知らせるため）。
+async fn check_duplicate(Query(query): Query<DuplicateQuery>) -> Response {
+    let datetime = |raw: &str| model::normalize_datetime(raw, "").unwrap_or_default();
+    json_or_bad(with_db(|conn| {
+        Ok(model::find_duplicate(
+            conn,
+            query.exclude_id,
+            &query.work_order_no,
+            query.device_id,
+            &datetime(&query.failure_at),
+            &datetime(&query.arrival_at),
+        )?
+        .map(|duplicate| {
+            serde_json::json!({
+                "id": duplicate.id,
+                "message": duplicate.message(),
+            })
+        }))
+    }))
 }
 
 async fn list_reports(Query(filter): Query<ReportFilter>) -> Response {

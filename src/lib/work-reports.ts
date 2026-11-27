@@ -123,6 +123,27 @@ export function listReports(filter: {
   return apiRequest<WorkReport[]>(`/work-reports${query ? `?${query}` : ""}`);
 }
 
+export type DuplicateReport = { id: number; message: string };
+
+/** 入力中の報告書と同じものが登録済みか調べる（なければ null） */
+export function checkDuplicate(input: {
+  excludeId: number | null;
+  workOrderNo: string;
+  deviceId: number | null;
+  failureAt: string;
+  arrivalAt: string;
+}) {
+  const params = new URLSearchParams();
+  if (input.excludeId) params.set("excludeId", String(input.excludeId));
+  if (input.workOrderNo.trim()) params.set("workOrderNo", input.workOrderNo);
+  if (input.deviceId) params.set("deviceId", String(input.deviceId));
+  if (input.failureAt) params.set("failureAt", input.failureAt);
+  if (input.arrivalAt) params.set("arrivalAt", input.arrivalAt);
+  return apiRequest<DuplicateReport | null>(
+    `/work-reports/duplicate?${params.toString()}`,
+  );
+}
+
 export function getReport(id: number) {
   return apiRequest<WorkReport>(`/work-reports/${id}`);
 }

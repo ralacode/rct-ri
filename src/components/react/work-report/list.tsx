@@ -234,12 +234,24 @@ export function WorkReportList() {
                     )}
                     {line.result && (
                       <>
-                        <span>{line.result.message}</span>
+                        <span
+                          className={
+                            line.result.status === "duplicate"
+                              ? "text-amber-700 dark:text-amber-300"
+                              : undefined
+                          }
+                        >
+                          {line.result.status === "duplicate"
+                            ? `登録しませんでした。${line.result.message}`
+                            : line.result.message}
+                        </span>
                         <a
                           className="text-primary underline underline-offset-4"
                           href={editUrl(line.result.reportId)}
                         >
-                          開く
+                          {line.result.status === "duplicate"
+                            ? "登録済みの報告書を開く"
+                            : "開く"}
                         </a>
                       </>
                     )}

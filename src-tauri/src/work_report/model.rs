@@ -970,7 +970,11 @@ fn clean_input(input: &ReportInput, staff: &[StaffCandidate]) -> Result<CleanInp
         device_id: input.device_id,
         title: text(&input.title, "件名", SHORT_LIMIT)?,
         work_type: text(&input.work_type, "作業区分", SHORT_LIMIT)?,
-        work_order_no: text(&input.work_order_no, "作業指示番号", SHORT_LIMIT)?,
+        work_order_no: normalize_order_no(&text(
+            &input.work_order_no,
+            "作業指示番号",
+            SHORT_LIMIT,
+        )?),
         failure_at: normalize_datetime(&input.failure_at, "障害発生日時")?,
         arrival_at: normalize_datetime(&input.arrival_at, "到着日時")?,
         recovery_at: normalize_datetime(&input.recovery_at, "装置復帰")?,
@@ -1000,11 +1004,135 @@ fn write_engineers(conn: &Connection, report_id: i64, ids: &[i64]) -> Result<(),
     Ok(())
 }
 
+/// 作業指示番号を比べやすい形にそろえる（空白を取り、全角英数字を半角に、英字を大文字にする）。
+pub fn normalize_order_no(raw: &str) -> String {
+    raw.chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| match c {
+            '\u{FF01}'..='\u{FF5E}' => char::from_u32(c as u32 - 0xFEE0).unwrap_or(c),
+            'ー' | '―' | '‐' => '-',
+            _ => c,
+        })
+        .collect::<String>()
+        .to_uppercase()
+}
+
+/// すでに登録されている同じ作業報告書。
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Duplicate {
+    pub id: i64,
+    pub title: String,
+    pub failure_at: String,
+    pub work_order_no: String,
+    /// 同じと判断した理由
+    pub reason: String,
+}
+
+impl Duplicate {
+    pub fn message(&self) -> String {
+        let title = if self.title.is_empty() {
+            "件名なし".to_string()
+        } else {
+            self.title.clone()
+        };
+        let when = if self.failure_at.is_empty() {
+            String::new()
+        } else {
+            format!("{} ", self.failure_at.replace('-', "/"))
+        };
+        format!(
+            "この作業報告書は登録済みです（{}。登録済み: {when}「{title}」）",
+            self.reason
+        )
+    }
+}
+
+/// 同じ作業報告書がすでにあるか調べる。
+///
+/// 1. 作業指示番号が同じ（空白・全角半角・大文字小文字の違いは無視）
+/// 2. 作業指示番号がどちらかで空のときは、装置・障害発生日時・到着日時がすべて同じ
+///    （同じ障害で別の日に来た作業は作業指示番号が違うので、番号があるもの同士は 1 だけで判断する）
+pub fn find_duplicate(
+    conn: &Connection,
+    exclude_id: Option<i64>,
+    work_order_no: &str,
+    device_id: Option<i64>,
+    failure_at: &str,
+    arrival_at: &str,
+) -> Result<Option<Duplicate>, String> {
+    let order_no = normalize_order_no(work_order_no);
+    let exclude = exclude_id.unwrap_or(0);
+    let map = |reason: String| {
+        move |row: &rusqlite::Row| -> rusqlite::Result<Duplicate> {
+            Ok(Duplicate {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                failure_at: row.get(2)?,
+                work_order_no: row.get(3)?,
+                reason: reason.clone(),
+            })
+        }
+    };
+    if !order_no.is_empty() {
+        let mut stmt = conn
+            .prepare(
+                "SELECT id, title, failure_at, work_order_no FROM work_reports
+                 WHERE work_order_no <> '' AND id <> ?1 ORDER BY id",
+            )
+            .map_err(db_error)?;
+        let rows = stmt
+            .query_map(
+                params![exclude],
+                map(format!("作業指示番号 {order_no} が同じです")),
+            )
+            .map_err(db_error)?;
+        for row in rows {
+            let row = row.map_err(db_error)?;
+            if normalize_order_no(&row.work_order_no) == order_no {
+                return Ok(Some(row));
+            }
+        }
+    }
+    let (Some(device_id), false, false) = (device_id, failure_at.is_empty(), arrival_at.is_empty())
+    else {
+        return Ok(None);
+    };
+    conn.query_row(
+        "SELECT id, title, failure_at, work_order_no FROM work_reports
+         WHERE device_id = ?1 AND failure_at = ?2 AND arrival_at = ?3 AND id <> ?4
+           AND (?5 = '' OR work_order_no = '')
+         ORDER BY id LIMIT 1",
+        params![device_id, failure_at, arrival_at, exclude, order_no],
+        map("装置・障害発生日時・到着日時が同じです".into()),
+    )
+    .optional()
+    .map_err(db_error)
+}
+
 fn duplicate_order_message(error: rusqlite::Error) -> String {
     unique_error(
         error,
         "同じ作業指示番号の作業報告書がすでに登録されています",
     )
+}
+
+fn reject_duplicate(
+    conn: &Connection,
+    exclude_id: Option<i64>,
+    clean: &CleanInput,
+) -> Result<(), String> {
+    match find_duplicate(
+        conn,
+        exclude_id,
+        &clean.work_order_no,
+        clean.device_id,
+        &clean.failure_at,
+        &clean.arrival_at,
+    )? {
+        Some(duplicate) => Err(duplicate.message()),
+        None => Ok(()),
+    }
 }
 
 pub fn create_report(
@@ -1014,6 +1142,7 @@ pub fn create_report(
     actor: &str,
 ) -> Result<i64, String> {
     let clean = clean_input(input, staff)?;
+    reject_duplicate(conn, None, &clean)?;
     let tx = conn.transaction().map_err(db_error)?;
     let now = now_str();
     tx.execute(
@@ -1055,6 +1184,7 @@ pub fn update_report(
     actor: &str,
 ) -> Result<(), String> {
     let clean = clean_input(input, staff)?;
+    reject_duplicate(conn, Some(id), &clean)?;
     let tx = conn.transaction().map_err(db_error)?;
     let raw: String = tx
         .query_row(
@@ -1204,24 +1334,16 @@ pub fn import_parsed(
     staff: &[StaffCandidate],
     actor: &str,
 ) -> Result<ImportResult, String> {
-    let work_order_no = text(&parsed.work_order_no, "作業指示番号", SHORT_LIMIT)?;
-    if !work_order_no.is_empty() {
-        let existing: Option<i64> = conn
-            .query_row(
-                "SELECT id FROM work_reports WHERE work_order_no = ?1",
-                params![work_order_no],
-                |row| row.get(0),
-            )
-            .optional()
-            .map_err(db_error)?;
-        if let Some(report_id) = existing {
-            return Ok(ImportResult {
-                status: "duplicate".into(),
-                report_id,
-                message: format!("作業指示番号 {work_order_no} の作業報告書は登録済みです"),
-                warnings: Vec::new(),
-            });
-        }
+    let work_order_no =
+        normalize_order_no(&text(&parsed.work_order_no, "作業指示番号", SHORT_LIMIT)?);
+    let duplicate_result = |duplicate: Duplicate| ImportResult {
+        status: "duplicate".into(),
+        report_id: duplicate.id,
+        message: duplicate.message(),
+        warnings: Vec::new(),
+    };
+    if let Some(duplicate) = find_duplicate(conn, None, &work_order_no, None, "", "")? {
+        return Ok(duplicate_result(duplicate));
     }
 
     let mut warnings = Vec::new();
@@ -1293,6 +1415,19 @@ pub fn import_parsed(
     let arrival_at = datetime(&parsed.arrival_at, "到着日時");
     let recovery_at = datetime(&parsed.recovery_at, "装置復帰");
     let departure_at = datetime(&parsed.departure_at, "退出日時");
+
+    // 作業指示番号がないとき（写真から読み取れなかったなど）は、装置と日時で同じ報告書を探す。
+    // 見つかったら、自動で登録した装置・作業担当者も含めて取り消す（tx を commit しない）。
+    if let Some(duplicate) = find_duplicate(
+        &tx,
+        None,
+        &work_order_no,
+        device_id,
+        &failure_at,
+        &arrival_at,
+    )? {
+        return Ok(duplicate_result(duplicate));
+    }
 
     let now = now_str();
     tx.execute(
@@ -1506,6 +1641,83 @@ mod tests {
             get_report(&conn, result.report_id).unwrap().staff_user_id,
             Some(1)
         );
+    }
+
+    #[test]
+    fn rejects_the_same_report_entered_by_hand() {
+        let mut conn = conn();
+        let first = import_parsed(
+            &mut conn,
+            &parsed(),
+            "pdf",
+            "a.pdf",
+            &[],
+            &staff(),
+            "テスト",
+        )
+        .unwrap();
+        let device_id = get_report(&conn, first.report_id).unwrap().device_id;
+
+        // 空白・全角・小文字の違いがあっても同じ作業指示番号とみなす
+        let input = ReportInput {
+            work_order_no: " ｗｏ－1 ".into(),
+            ..Default::default()
+        };
+        let error = create_report(&mut conn, &input, &staff(), "テスト").unwrap_err();
+        assert!(error.contains("登録済み"), "{error}");
+        assert!(error.contains("定期点検Q2"), "{error}");
+
+        // 作業指示番号なしでも、装置・障害発生日時・到着日時が同じなら同じ報告書
+        let same_visit = ReportInput {
+            device_id,
+            failure_at: "2026-11-09 08:50".into(),
+            arrival_at: "2026-11-10 16:30".into(),
+            ..Default::default()
+        };
+        assert!(create_report(&mut conn, &same_visit, &staff(), "テスト").is_err());
+
+        // 同じ障害でも、作業指示番号が別なら別の作業として登録できる
+        let follow_up = ReportInput {
+            work_order_no: "WO-2".into(),
+            ..same_visit.clone()
+        };
+        let id = create_report(&mut conn, &follow_up, &staff(), "テスト").unwrap();
+        assert_eq!(get_report(&conn, id).unwrap().work_order_no, "WO-2");
+
+        // 自分自身との重複にはならない（保存し直せる）
+        update_report(&mut conn, id, &follow_up, &staff(), "テスト").unwrap();
+        // 別の報告書と同じ番号に書き換えることはできない
+        let clash = ReportInput {
+            work_order_no: "wo-1".into(),
+            ..follow_up
+        };
+        assert!(update_report(&mut conn, id, &clash, &staff(), "テスト").is_err());
+    }
+
+    #[test]
+    fn rejects_an_import_without_a_work_order_when_the_visit_matches() {
+        let mut conn = conn();
+        import_parsed(
+            &mut conn,
+            &parsed(),
+            "pdf",
+            "a.pdf",
+            &[],
+            &staff(),
+            "テスト",
+        )
+        .unwrap();
+        let mut photo = parsed();
+        photo.work_order_no = String::new();
+        photo.engineers = vec!["新しい 人".into()];
+        let result =
+            import_parsed(&mut conn, &photo, "json", "a.json", &[], &staff(), "テスト").unwrap();
+        assert_eq!(result.status, "duplicate");
+        // 重複と分かった取り込みで、作業担当者を増やさない
+        assert!(!list_engineers(&conn)
+            .unwrap()
+            .iter()
+            .any(|e| e.name == "新しい 人"));
     }
 
     #[test]

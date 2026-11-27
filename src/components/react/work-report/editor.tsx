@@ -12,6 +12,7 @@ import { fetchMe } from "@/lib/auth";
 import { go } from "@/lib/nav";
 import {
   addFile,
+  checkDuplicate,
   createReport,
   deleteFile,
   deleteReport,
@@ -26,6 +27,7 @@ import {
   SOURCE_LABELS,
   toInputValue,
   updateReport,
+  type DuplicateReport,
   type ReportStatus,
   type WorkReport,
   type WorkReportInput,
@@ -170,6 +172,35 @@ export function WorkReportEditor() {
   const [pending, setPending] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
+  const [duplicate, setDuplicate] = useState<DuplicateReport | null>(null);
+
+  // 作業指示番号や日時を入れた時点で、同じ報告書が登録済みでないか調べる。
+  useEffect(() => {
+    if (!loaded) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void checkDuplicate({
+        excludeId: reportId,
+        workOrderNo: form.workOrderNo,
+        deviceId: form.deviceId,
+        failureAt: form.failureAt,
+        arrivalAt: form.arrivalAt,
+      })
+        .then((found) => active && setDuplicate(found ?? null))
+        .catch(() => active && setDuplicate(null));
+    }, 300);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [
+    loaded,
+    reportId,
+    form.workOrderNo,
+    form.deviceId,
+    form.failureAt,
+    form.arrivalAt,
+  ]);
 
   const show = (text: string, error = false) => {
     setMessage(text);
@@ -432,12 +463,23 @@ export function WorkReportEditor() {
                     <option key={type} value={type} />
                   ))}
                 </datalist>
-                <MyInput
-                  id="wr-order-no"
-                  label="作業指示番号"
-                  value={form.workOrderNo}
-                  onChange={(event) => set("workOrderNo", event.target.value)}
-                />
+                <div className="grid gap-1">
+                  <MyInput
+                    id="wr-order-no"
+                    label="作業指示番号"
+                    value={form.workOrderNo}
+                    aria-invalid={!!duplicate || undefined}
+                    onChange={(event) => set("workOrderNo", event.target.value)}
+                  />
+                  {duplicate && (
+                    <a
+                      className="text-sm text-destructive underline underline-offset-4"
+                      href={`/work-report/edit/?id=${duplicate.id}`}
+                    >
+                      登録済みの報告書と同じです
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
           </Card>
@@ -614,6 +656,24 @@ export function WorkReportEditor() {
             </div>
           </Card>
 
+          {duplicate && (
+            <div
+              role="alert"
+              className="grid gap-1 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              <p className="font-medium">{duplicate.message}</p>
+              <p>
+                同じ報告書を二重に登録しないよう、保存できなくしています。
+                <a
+                  className="ml-1 underline underline-offset-4"
+                  href={`/work-report/edit/?id=${duplicate.id}`}
+                >
+                  登録済みの報告書を開く
+                </a>
+              </p>
+            </div>
+          )}
+
           {message && (
             <p
               className={
@@ -633,7 +693,7 @@ export function WorkReportEditor() {
                 type="button"
                 size="lg"
                 className="h-10 px-4"
-                disabled={pending}
+                disabled={pending || !!duplicate}
                 onClick={() => void save("confirmed")}
               >
                 確認済みにする
@@ -646,7 +706,7 @@ export function WorkReportEditor() {
                 !reportId || form.status === "review" ? "outline" : "default"
               }
               className="h-10 px-4"
-              disabled={pending}
+              disabled={pending || !!duplicate}
             >
               {!reportId || form.status === "review"
                 ? "要確認のまま保存"
@@ -658,7 +718,7 @@ export function WorkReportEditor() {
                 size="lg"
                 variant="outline"
                 className="h-10 px-4"
-                disabled={pending}
+                disabled={pending || !!duplicate}
                 onClick={() => void save("review")}
               >
                 要確認に戻す
