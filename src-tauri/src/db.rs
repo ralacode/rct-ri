@@ -26,6 +26,11 @@ pub fn get_rt_order_dir() -> PathBuf {
     get_ris_dir().join("rt_order")
 }
 
+/// import/work_report。ここに置いた作業報告書の PDF・JSON は自動で取り込まれる。
+pub fn get_work_report_import_dir() -> PathBuf {
+    exe_dir().join("import").join("work_report")
+}
+
 /// DB ファイルをまとめて置くフォルダ（exe と同じ階層の db）。
 pub fn get_db_dir() -> PathBuf {
     exe_dir().join("db")
@@ -35,6 +40,7 @@ const DB_FILE: &str = "rct_local.db";
 const REQUESTERS_DB_FILE: &str = "requesters.db";
 const USER_DB_FILE: &str = "user.db";
 const FEEDBACK_DB_FILE: &str = "feedback.db";
+const WORK_REPORT_DB_FILE: &str = "work_report.db";
 
 /// db フォルダに置く DB ファイルの一覧（前の版からの移動に使う）。
 const DB_FILES: [&str; 4] = [DB_FILE, REQUESTERS_DB_FILE, USER_DB_FILE, FEEDBACK_DB_FILE];
@@ -55,6 +61,11 @@ pub fn get_user_db_path() -> PathBuf {
 /// 質問・要望（看護師・職員の投稿と回答）。業務データとは別ファイルにする。
 pub fn get_feedback_db_path() -> PathBuf {
     get_db_dir().join(FEEDBACK_DB_FILE)
+}
+
+/// 作業報告書（メーカーの保守・修理の報告と、添付した PDF・写真）。
+pub fn get_work_report_db_path() -> PathBuf {
+    get_db_dir().join(WORK_REPORT_DB_FILE)
 }
 
 /// 前の版は DB ファイルを exe と同じ階層に置いていた。それを db フォルダへ移す。
@@ -167,6 +178,7 @@ pub fn init_db() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
     init_user_db()?;
     init_feedback_db()?;
+    crate::work_report::model::init_db()?;
     let _ = std::fs::create_dir_all(get_videos_dir());
     log::info!(
         "RIS の CSV フォルダ（exe と同じ階層）: {}",

@@ -2,7 +2,7 @@
 //! DB の自動バックアップ。
 //!
 //! - バックアップ先のフォルダ（外付け HDD など）は設定画面で決め、rct_local.db の app_settings に持つ。
-//! - 毎日 9:00 と 16:00 に、db フォルダの 4 つの DB をバックアップ先の `YYYYMMDD_HHMMSS` フォルダへ書き出す。
+//! - 毎日 9:00 と 16:00 に、db フォルダの DB（作業報告書を含む） をバックアップ先の `YYYYMMDD_HHMMSS` フォルダへ書き出す。
 //!   アプリが止まっていた・HDD が外れていたなどで時刻を逃したときは、次に動けたときに 1 回だけ取り直す。
 //!   失敗したときは [`RETRY`] ごとにやり直す。
 //! - 書き出しは SQLite の `VACUUM INTO` を使う。アプリを動かしたまま（WAL の中身も含めて）
@@ -15,6 +15,7 @@
 use crate::auth::AuthUser;
 use crate::db::{
     get_db_dir, get_db_path, get_feedback_db_path, get_requesters_db_path, get_user_db_path,
+    get_work_report_db_path,
 };
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
@@ -58,6 +59,7 @@ fn sources() -> Vec<(&'static str, PathBuf)> {
         ("requesters.db", get_requesters_db_path()),
         ("user.db", get_user_db_path()),
         ("feedback.db", get_feedback_db_path()),
+        ("work_report.db", get_work_report_db_path()),
     ]
 }
 

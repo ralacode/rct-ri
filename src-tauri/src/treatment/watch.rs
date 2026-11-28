@@ -169,7 +169,7 @@ where
     Some(Outcome { moved_to, ok })
 }
 
-fn write_report(path: &Path, report: &str) -> std::io::Result<()> {
+pub fn write_report(path: &Path, report: &str) -> std::io::Result<()> {
     let mut file = fs::File::create(path)?;
     // メモ帳などで文字化けしないよう BOM を付ける。
     file.write_all(b"\xEF\xBB\xBF")?;
@@ -220,7 +220,7 @@ fn report(name: &str, result: &Result<Vec<ImportRow>, String>) -> String {
 }
 
 /// 同じ名前のファイルがあれば、`名前-2.拡張子` のように番号を付ける。
-fn unique_path(path: &Path) -> PathBuf {
+pub fn unique_path(path: &Path) -> PathBuf {
     if !path.exists() {
         return path.to_path_buf();
     }
