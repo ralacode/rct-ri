@@ -1,5 +1,15 @@
 import { useRef, useState } from "react";
+import { FileSpreadsheetIcon, FolderOpenIcon } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   applyRtOrderImport,
   previewRtOrderImport,
@@ -12,6 +22,16 @@ const STATUS_LABEL: Record<RtOrderImportRow["status"], string> = {
   attach: "依頼のみ",
   skip: "取り込み済み",
   error: "失敗",
+};
+
+const STATUS_VARIANT: Record<
+  RtOrderImportRow["status"],
+  "default" | "secondary" | "outline" | "destructive"
+> = {
+  create: "default",
+  attach: "secondary",
+  skip: "outline",
+  error: "destructive",
 };
 
 function errorText(err: unknown) {
@@ -100,18 +120,10 @@ export function RtOrderImport({
   };
 
   return (
-    <div className="grid gap-3 rounded-lg border p-3">
-      <div className="grid gap-1">
-        <div className="text-sm font-medium">RIS の CSV・Excel を読み込む</div>
-        <p className="text-xs text-muted-foreground">
-          13:30 と 14:30 以外の予定時刻は、15:30
-          の臨時枠に入ります。カナはひらがなで登録します。アプリを起動した PC の
-          ris/rt_order フォルダに置いたファイルは、自動で取り込まれます。
-        </p>
-      </div>
+    <div className="grid min-w-0 gap-4">
       <div
         className={cn(
-          "grid justify-items-start gap-3 rounded-lg border border-dashed p-4",
+          "grid justify-items-center gap-3 rounded-xl border border-dashed px-4 py-8 text-center transition-colors",
           dragging && "border-primary bg-muted/60",
         )}
         onDragEnter={(event) => {
@@ -135,14 +147,17 @@ export function RtOrderImport({
           take(dropped.find(isImportable) ?? dropped[0]);
         }}
       >
-        <p className="text-sm">
+        <FileSpreadsheetIcon className="size-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">
           CSV・Excel をここにドロップするか、ボタンから選んでください。
         </p>
         <Button
           type="button"
+          variant="outline"
           disabled={pending}
           onClick={() => inputRef.current?.click()}
         >
+          <FolderOpenIcon />
           ファイルを選択
         </Button>
         <input
@@ -160,18 +175,28 @@ export function RtOrderImport({
           <p className="text-xs text-muted-foreground">{fileName}</p>
         )}
       </div>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
       {rows && (
         <>
-          <p className="text-sm">
-            新規 {count(rows, "create")} 件、依頼のみ {count(rows, "attach")}{" "}
-            件、取り込み済み {count(rows, "skip")} 件、失敗{" "}
-            {count(rows, "error")} 件{applied ? "（登録しました）" : ""}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] border-collapse text-xs">
-              <thead>
-                <tr className="bg-muted/40">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <Badge variant="default">新規 {count(rows, "create")}</Badge>
+            <Badge variant="secondary">依頼のみ {count(rows, "attach")}</Badge>
+            <Badge variant="outline">取り込み済み {count(rows, "skip")}</Badge>
+            <Badge variant="destructive">失敗 {count(rows, "error")}</Badge>
+            {applied && (
+              <span className="text-muted-foreground">登録しました</span>
+            )}
+          </div>
+          <div className="overflow-hidden rounded-lg border">
+            <Table className="min-w-[960px] text-xs">
+              <TableHeader>
+                <TableRow className="bg-muted/40">
                   {[
                     "行",
                     "患者ID",
@@ -184,56 +209,63 @@ export function RtOrderImport({
                     "依頼医",
                     "結果",
                   ].map((label) => (
-                    <th
-                      key={label}
-                      className="border p-2 text-left font-medium"
-                    >
-                      {label}
-                    </th>
+                    <TableHead key={label}>{label}</TableHead>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
                 {rows.map((row) => (
-                  <tr key={row.line}>
-                    <td className="border p-2">{row.line}</td>
-                    <td className="border p-2">{row.patientId}</td>
-                    <td className="border p-2">
+                  <TableRow key={row.line}>
+                    <TableCell className="tabular-nums">{row.line}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {row.patientId}
+                    </TableCell>
+                    <TableCell>
                       {row.lastNameKanji}
                       {row.firstNameKanji}
-                    </td>
-                    <td className="border p-2">
+                    </TableCell>
+                    <TableCell>
                       {row.lastNameKana}
                       {row.firstNameKana}
-                    </td>
-                    <td className="border p-2">{row.requestDate}</td>
-                    <td className="border p-2">{row.sourceTime}</td>
-                    <td className="border p-2">{row.slotTime}</td>
-                    <td className="border p-2">{row.requestingDepartment}</td>
-                    <td className="border p-2">{row.requestingPhysician}</td>
-                    <td
-                      className={
-                        row.status === "error"
-                          ? "border p-2 text-destructive"
-                          : "border p-2"
-                      }
-                    >
-                      {STATUS_LABEL[row.status]}
-                      {row.message ? `。${row.message}` : ""}
-                    </td>
-                  </tr>
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {row.requestDate}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {row.sourceTime}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {row.slotTime}
+                    </TableCell>
+                    <TableCell>{row.requestingDepartment}</TableCell>
+                    <TableCell>{row.requestingPhysician}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      <Badge variant={STATUS_VARIANT[row.status]}>
+                        {STATUS_LABEL[row.status]}
+                      </Badge>
+                      {row.message && (
+                        <span
+                          className={cn(
+                            "ml-1",
+                            row.status === "error" && "text-destructive",
+                          )}
+                        >
+                          {row.message}
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-          <div>
+          <div className="flex justify-end">
             <Button
               type="button"
-              size="sm"
               disabled={pending || !writable || applied}
               onClick={() => void apply()}
             >
-              この内容で登録する
+              {applied ? "登録しました" : "この内容で登録する"}
             </Button>
           </div>
         </>

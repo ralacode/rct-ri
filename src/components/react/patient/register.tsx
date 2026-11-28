@@ -1,526 +1,432 @@
 // src/components/react/patient/register.tsx
-import React, { useCallback, useEffect, useRef, useState } from "react";
+//
+// 患者登録ページ。患者IDが登録済みかどうかは入力中に確かめる。
+
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { CircleCheckIcon, TriangleAlertIcon, UserPlusIcon } from "lucide-react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldSeparator,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { invoke } from "@/lib/api";
 import { go } from "@/lib/nav";
 import {
-  cn,
+  errorMessage,
   normalizeToDbDateFormat,
   toKatakana,
   validateDateString,
   validateHiragana,
   validateKanjiName,
   validatePatientId,
-} from "@lib/utils";
-import { Card } from "@/components/react/card";
-import { MyInput } from "@components/react/my-input";
-import { MyButton } from "../my-button";
-import { PatientName } from "../patient-name";
+} from "@/lib/utils";
+import type { Patient } from "@/types/patient";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 
-const getTodayFormatted = () => {
+import {
+  formatBirthDateInput,
+  GenderToggle,
+  NamePair,
+  UnitInput,
+} from "./patient-fields";
+
+interface Values {
+  patientId: string;
+  lastNameKanji: string;
+  firstNameKanji: string;
+  lastNameKana: string;
+  firstNameKana: string;
+  birthDate: string; // "yyyy / MM / dd"
+  gender: Patient["gender"];
+  height: string;
+  weight: string;
+  createdAt: string; // "yyyy / MM / dd"
+}
+
+type ErrorKey =
+  "patientId" | "kanji" | "kana" | "birthDate" | "createdAt" | "body";
+
+function todayFormatted() {
   const now = new Date();
-  const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
-  return `${y} / ${m} / ${d}`;
-};
+  return `${now.getFullYear()} / ${m} / ${d}`;
+}
 
-export const PatientRegisterForm = () => {
-  const [formData, setFormData] = useState({
-    patient_id: "",
-    last_name_kanji: "",
-    first_name_kanji: "",
-    last_name_kana: "",
-    first_name_kana: "",
-    birth_date: "",
+function emptyValues(): Values {
+  return {
+    patientId: "",
+    lastNameKanji: "",
+    firstNameKanji: "",
+    lastNameKana: "",
+    firstNameKana: "",
+    birthDate: "",
+    gender: "男",
     height: "",
     weight: "",
-    gender: "男",
-    created_at: getTodayFormatted(),
-  });
+    createdAt: todayFormatted(),
+  };
+}
 
-  const [message, setMessage] = useState("");
-  const [saveMessage, setSaveMessage] = useState("");
-  const [isError, setIsError] = useState(false);
-  const [lastRegistered, setLastRegistered] = useState<any>(null);
+const isBadNumber = (text: string) =>
+  text.trim() !== "" && Number.isNaN(parseFloat(text));
+
+function validate(values: Values): Partial<Record<ErrorKey, string>> {
+  const errors: Partial<Record<ErrorKey, string>> = {};
+
+  const id = validatePatientId(values.patientId);
+  if (!id.isValid) errors.patientId = id.errorMessage;
+
+  for (const name of [values.lastNameKanji, values.firstNameKanji]) {
+    const result = validateKanjiName(name);
+    if (!result.isValid) errors.kanji = result.errorMessage;
+  }
+  for (const name of [values.lastNameKana, values.firstNameKana]) {
+    const result = validateHiragana(name);
+    if (!result.isValid) errors.kana = result.errorMessage;
+  }
+
+  const birth = validateDateString(values.birthDate, "生年月日");
+  if (birth) errors.birthDate = birth;
+  const created = validateDateString(values.createdAt, "登録日");
+  if (created) errors.createdAt = created;
+
+  if (isBadNumber(values.height) || isBadNumber(values.weight)) {
+    errors.body = "身長・体重には半角数字を入力してください。";
+  }
+  return errors;
+}
+
+export function PatientRegisterForm() {
+  const id = useId();
+  const [values, setValues] = useState<Values>(emptyValues);
+  const [showErrors, setShowErrors] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registered, setRegistered] = useState<Values | null>(null);
+  // 登録済みだった患者ID（入力中の値と同じときだけ「登録済み」と出す）
   const [registeredId, setRegisteredId] = useState<string | null>(null);
   const requestSeq = useRef(0);
 
-  const patientIdCheck = validatePatientId(formData.patient_id);
-  const showRegistered =
-    patientIdCheck.isValid && registeredId === patientIdCheck.normalizedId;
+  const idCheck = validatePatientId(values.patientId);
+  const isDuplicate = idCheck.isValid && registeredId === idCheck.normalizedId;
 
   const lookupRegisteredId = useCallback(async (rawId: string) => {
-    const idRes = validatePatientId(rawId);
+    const result = validatePatientId(rawId);
     const seq = ++requestSeq.current;
-    if (!idRes.isValid) {
+    if (!result.isValid) {
       setRegisteredId(null);
       return false;
     }
-
     try {
-      const result = await invoke<{ registered: boolean }>("check_patient_id", {
-        patientId: idRes.normalizedId,
-      });
-      if (seq !== requestSeq.current) return result.registered;
-      setRegisteredId(result.registered ? idRes.normalizedId : null);
-      return result.registered;
+      const { registered } = await invoke<{ registered: boolean }>(
+        "check_patient_id",
+        { patientId: result.normalizedId },
+      );
+      if (seq === requestSeq.current) {
+        setRegisteredId(registered ? result.normalizedId : null);
+      }
+      return registered;
     } catch {
       if (seq === requestSeq.current) setRegisteredId(null);
       return false;
     }
   }, []);
 
+  // 患者IDの入力が止まったら、登録済みかどうかを確かめる
   useEffect(() => {
-    const idRes = validatePatientId(formData.patient_id);
-    if (!idRes.isValid) {
+    if (!validatePatientId(values.patientId).isValid) {
       requestSeq.current += 1;
       setRegisteredId(null);
       return;
     }
-
     const timer = setTimeout(() => {
-      void lookupRegisteredId(formData.patient_id);
+      void lookupRegisteredId(values.patientId);
     }, 300);
-
     return () => clearTimeout(timer);
-  }, [formData.patient_id, lookupRegisteredId]);
+  }, [values.patientId, lookupRegisteredId]);
 
-  const formatDatePicker = (value: string, prevValue: string) => {
-    const numbers = value.replace(/\D/g, "");
-    if (value.length < prevValue.length) return value; // 削除時はそのまま
-
-    if (numbers.length <= 4) return numbers;
-    if (numbers.length <= 6)
-      return `${numbers.slice(0, 4)} / ${numbers.slice(4)}`;
-    return `${numbers.slice(0, 4)} / ${numbers.slice(4, 6)} / ${numbers.slice(6, 8)}`;
+  const errors = validate(values);
+  const errorFor = (key: ErrorKey) => (showErrors ? errors[key] : undefined);
+  const set = (key: keyof Values) => (value: string) => {
+    setValues((prev) => ({ ...prev, [key]: value }));
+    setSubmitError(null);
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    const { id, value, name } = e.target;
-    // ラジオボタンの場合は name 属性をキーにする
-    const key = id || name;
-    setFormData((prev) => ({ ...prev, [key]: value }));
-    setMessage("");
-    setSaveMessage("");
-    setLastRegistered(null);
-  };
-
-  const handleBirthDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-
-    // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
-    if (inputValue.length < formData.birth_date.length) {
-      setFormData((prev) => ({ ...prev, birth_date: inputValue }));
-      return;
-    }
-
-    // 1. 数字以外を除去
-    let value = inputValue.replace(/\D/g, "");
-    let formatted = "";
-
-    // 2. 入力された数値の長さに応じて「 / 」を動的に挿入
-    if (value.length > 0) {
-      formatted = value.substring(0, 4);
-
-      if (value.length >= 4) {
-        formatted += " / ";
-        if (value.length > 4) {
-          formatted += value.substring(4, 6);
-        }
-        if (value.length >= 6) {
-          formatted += " / ";
-          if (value.length > 6) {
-            formatted += value.substring(6, 8);
-          }
-        }
-      }
-    }
-
-    setFormData((prev) => ({ ...prev, birth_date: formatted }));
-  };
-
-  const handleRegistrationDateChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    // const formatted = formatDatePicker(e.target.value, formData.created_at);
-    const inputValue = e.target.value;
-
-    // 前回の値より短ければ、削除中と判断してそのままの状態を受け入れる
-    if (inputValue.length < formData.created_at.length) {
-      setFormData((prev) => ({ ...prev, created_at: inputValue }));
-      return;
-    }
-
-    // 1. 数字以外を除去
-    let value = inputValue.replace(/\D/g, "");
-    let formatted = "";
-
-    // 2. 入力された数値の長さに応じて「 / 」を動的に挿入
-    if (value.length > 0) {
-      formatted = value.substring(0, 4);
-
-      if (value.length >= 4) {
-        formatted += " / ";
-        if (value.length > 4) {
-          formatted += value.substring(4, 6);
-        }
-        if (value.length >= 6) {
-          formatted += " / ";
-          if (value.length > 6) {
-            formatted += value.substring(6, 8);
-          }
-        }
-      }
-    }
-
-    setFormData((prev) => ({ ...prev, created_at: formatted }));
-  };
-
-  const isFutureDate = (dateStr: string): boolean => {
-    if (!dateStr) return false;
-
-    // スペースを除去して Date オブジェクトを作成
-    const inputDate = new Date(dateStr.replace(/\s+/g, ""));
-    if (isNaN(inputDate.getTime())) return false;
-
-    const today = new Date();
-    // 時刻を 00:00:00 にリセットして日付のみで比較
-    today.setHours(0, 0, 0, 0);
-
-    return inputDate > today;
-  };
-
-  const handleSubmit = async (e: React.SubmitEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage("保存中...");
-    setSaveMessage("");
-    setIsError(false);
-    setLastRegistered(null);
-
-    // 日付チェック用の設定
-    // const datePattern = /^\d{4} \/ \d{2} \/ \d{2}$/;
-    // const dateFields = [
-    //   { key: "birth_date", label: "生年月日" },
-    //   { key: "created_at", label: "登録日" },
-    // ] as const;
-
-    // const today = new Date();
-    // today.setHours(0, 0, 0, 0);
-
-    // for (const field of dateFields) {
-    //   const rawValue = formData[field.key];
-
-    //   // ① 形式チェック (YYYY / MM / DD)
-    //   if (!datePattern.test(rawValue)) {
-    //     setIsError(true);
-    //     return setMessage(
-    //       `${field.label}は YYYY / MM / DD 形式で入力してください`,
-    //     );
-    //   }
-
-    //   // ② 実在チェック (2月30日などの判定)
-    //   const cleanDateStr = rawValue.replace(/\s+/g, "");
-    //   const [y, m, d] = cleanDateStr.split("/").map(Number);
-    //   const dateObj = new Date(y, m - 1, d);
-
-    //   if (
-    //     dateObj.getFullYear() !== y ||
-    //     dateObj.getMonth() !== m - 1 ||
-    //     dateObj.getDate() !== d
-    //   ) {
-    //     setIsError(true);
-    //     return setMessage(`${field.label}の日付が変です`);
-    //   }
-
-    //   // ③ 未来日チェック
-    //   if (dateObj > today) {
-    //     setIsError(true);
-    //     return setMessage(`${field.label}に未来の日付は入力できません`);
-    //   }
-    // }
-
-    const dateFields = [
-      { key: "birth_date", label: "生年月日" },
-      { key: "created_at", label: "登録日" },
-    ] as const;
-
-    for (const field of dateFields) {
-      const error = validateDateString(formData[field.key], field.label);
-      if (error) {
-        setIsError(true);
-        return setMessage(error);
-      }
+    if (Object.keys(errors).length > 0) {
+      setShowErrors(true);
+      return;
     }
-
-    // 1. バリデーション実行
-    // utils.ts の戻り値が { isValid, errorMessage } なので、.isValid をチェックする
-    const idRes = validatePatientId(formData.patient_id);
-    if (!idRes.isValid) return setMessage(`患者ID: ${idRes.errorMessage}`);
-
-    if (await lookupRegisteredId(formData.patient_id)) {
-      setIsError(true);
-      return setMessage("登録済みです");
-    }
-
-    const lnkRes = validateKanjiName(formData.last_name_kanji);
-    if (!lnkRes.isValid)
-      return setMessage(`名字（漢字）: ${lnkRes.errorMessage}`);
-
-    const fnkRes = validateKanjiName(formData.first_name_kanji);
-    if (!fnkRes.isValid)
-      return setMessage(`名前（漢字）: ${fnkRes.errorMessage}`);
-
-    const lnaRes = validateHiragana(formData.last_name_kana);
-    if (!lnaRes.isValid)
-      return setMessage(`名字（かな）: ${lnaRes.errorMessage}`);
-
-    const fnaRes = validateHiragana(formData.first_name_kana);
-    if (!fnaRes.isValid)
-      return setMessage(`名前（かな）: ${fnaRes.errorMessage}`);
-
-    const cleanBirthDate = normalizeToDbDateFormat(formData.birth_date);
-    const cleanCreatedAt = formData.created_at.replace(/\s+/g, "");
-
+    setIsSubmitting(true);
+    setSubmitError(null);
     try {
-      // 2. Rustコマンド呼び出し
+      if (await lookupRegisteredId(values.patientId)) {
+        setShowErrors(true);
+        return;
+      }
       await invoke("add_patient", {
-        patientId: idRes.normalizedId,
-        lastNameKanji: formData.last_name_kanji,
-        firstNameKanji: formData.first_name_kanji,
-        lastNameKana: formData.last_name_kana,
-        firstNameKana: formData.first_name_kana,
-        birthDate: cleanBirthDate,
-        gender: formData.gender,
-        height: formData.height ? parseFloat(formData.height) : null,
-        weight: formData.weight ? parseFloat(formData.weight) : null,
-        created_at: cleanCreatedAt,
+        patientId: idCheck.normalizedId,
+        lastNameKanji: values.lastNameKanji,
+        firstNameKanji: values.firstNameKanji,
+        lastNameKana: values.lastNameKana,
+        firstNameKana: values.firstNameKana,
+        birthDate: normalizeToDbDateFormat(values.birthDate),
+        gender: values.gender,
+        height: values.height ? parseFloat(values.height) : null,
+        weight: values.weight ? parseFloat(values.weight) : null,
+        // 登録日は "yyyy/MM/dd" で送る（以前と同じ）
+        created_at: values.createdAt.replace(/\s+/g, ""),
       });
-
-      setLastRegistered({ ...formData });
-      setSaveMessage("success");
-      setMessage("");
-
-      // 登録成功時にフォームをリセット
-      setFormData({
-        patient_id: "",
-        last_name_kanji: "",
-        first_name_kanji: "",
-        last_name_kana: "",
-        first_name_kana: "",
-        birth_date: "",
-        gender: "男",
-        height: "",
-        weight: "",
-        created_at: getTodayFormatted(),
-      });
+      toast.success("患者を登録しました");
+      setRegistered({ ...values, patientId: idCheck.normalizedId });
+      setValues(emptyValues());
+      setShowErrors(false);
     } catch (err) {
-      setIsError(true);
-      setMessage(`エラー: ${err}`);
-      setSaveMessage("error");
+      console.error(err);
+      setSubmitError(`登録に失敗しました：${errorMessage(err, "")}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-md">
-      <h2 className="mb-4 text-2xl font-semibold tracking-tight">患者登録</h2>
-      {saveMessage === "success" && lastRegistered ? (
-        <div className={cn("grid gap-4 content-start")}>
-          <p className={cn("grid grid-flow-col gap-2 justify-start items-end")}>
-            <PatientName
-              last_name_kanji={lastRegistered.last_name_kanji}
-              last_name_kana={toKatakana(lastRegistered.last_name_kana)}
-              first_name_kanji={lastRegistered.first_name_kanji}
-              first_name_kana={toKatakana(lastRegistered.first_name_kana)}
-            />
-            <span>様を登録しました</span>
-          </p>
-          <MyButton
-            onClick={() => {
-              go(`/patient/detail/?id=${lastRegistered.patient_id}`);
-            }}
-          >
-            患者情報を見る
-          </MyButton>
-          <MyButton
-            onClick={() => {
-              setLastRegistered(null);
-              setSaveMessage("");
-            }}
-          >
-            続けて別の患者を登録
-          </MyButton>
-        </div>
+    <PageContainer className="max-w-2xl">
+      <PageHeader
+        title="患者登録"
+        description="患者ID・生年月日・登録日は必ず入力してください"
+      />
+
+      {registered ? (
+        <RegisteredCard
+          patient={registered}
+          onContinue={() => setRegistered(null)}
+        />
       ) : (
-        <Card>
-        <form
-          method="post"
-          data-astro-reload
-          onSubmit={handleSubmit}
-          className="grid gap-4"
-        >
-          <div className="grid gap-1">
-            <MyInput
-              id="patient_id"
-              label="患者ID"
-              placeholder="例: 0000000123"
-              required
-              value={formData.patient_id}
-              onChange={handleChange}
-              onBlur={() => {
-                void lookupRegisteredId(formData.patient_id);
-              }}
-              aria-invalid={showRegistered || undefined}
-            />
-            {showRegistered && (
-              <p className="text-sm text-red-700" role="alert">
-                登録済みです
-              </p>
-            )}
-          </div>
+        <Card className="py-0">
+          <form onSubmit={handleSubmit} noValidate>
+            <CardContent className="py-6">
+              <FieldGroup className="gap-5">
+                <Field
+                  data-invalid={
+                    errorFor("patientId") || isDuplicate ? true : undefined
+                  }
+                >
+                  <FieldLabel htmlFor={`${id}-pid`}>患者ID</FieldLabel>
+                  <Input
+                    id={`${id}-pid`}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder="例：0000000123"
+                    value={values.patientId}
+                    onChange={(e) => set("patientId")(e.target.value)}
+                    onBlur={() => void lookupRegisteredId(values.patientId)}
+                    aria-invalid={
+                      errorFor("patientId") || isDuplicate ? true : undefined
+                    }
+                    className="tabular-nums sm:w-64"
+                  />
+                  {isDuplicate ? (
+                    <FieldError className="flex items-center gap-1">
+                      <TriangleAlertIcon className="size-3.5" />
+                      この患者IDは登録済みです
+                    </FieldError>
+                  ) : errorFor("patientId") ? (
+                    <FieldError>{errorFor("patientId")}</FieldError>
+                  ) : (
+                    <FieldDescription>
+                      全角数字でも入力できます（10 桁以内）
+                    </FieldDescription>
+                  )}
+                </Field>
 
-          <div className="grid grid-flow-col gap-2 justify-start">
-            <MyInput
-              id="last_name_kanji"
-              label="姓（漢字）"
-              placeholder="例: 山田"
-              required
-              value={formData.last_name_kanji}
-              onChange={handleChange}
-            />
-            <MyInput
-              id="first_name_kanji"
-              label="名（漢字）"
-              placeholder="例: 太郎"
-              required
-              value={formData.first_name_kanji}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="grid grid-flow-col gap-2 justify-start">
-            <MyInput
-              id="last_name_kana"
-              label="姓（ふりがな）"
-              placeholder="例: やまだ"
-              required
-              value={formData.last_name_kana}
-              onChange={handleChange}
-            />
-            <MyInput
-              id="first_name_kana"
-              label="名（ふりがな）"
-              placeholder="例: たろう"
-              required
-              value={formData.first_name_kana}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="gender-field grid gap-1">
-            <label>性別</label>
-
-            {/* ボタンの並び（横並びで隙間を空ける） */}
-            <div className="flex gap-3">
-              {/* 「男」ボタン */}
-              <label
-                className={`
-                flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
-                ${
-                  formData.gender === "男"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-500/20" // 選択時に明るい緑色系
-                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
-                }
-              `}
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value="男"
-                  checked={formData.gender === "男"}
-                  onChange={handleChange}
-                  className="sr-only"
+                <NamePair
+                  legend="氏名（漢字）"
+                  id={`${id}-kanji`}
+                  last={values.lastNameKanji}
+                  first={values.firstNameKanji}
+                  onLastChange={set("lastNameKanji")}
+                  onFirstChange={set("firstNameKanji")}
+                  lastPlaceholder="山田"
+                  firstPlaceholder="太郎"
+                  error={errorFor("kanji")}
                 />
-                男
-              </label>
-
-              {/* 「女」ボタン */}
-              <label
-                className={`
-                flex-1 flex items-center justify-center h-10 px-4 rounded-md border text-sm font-medium cursor-pointer transition-colors select-none
-                ${
-                  formData.gender === "女"
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold ring-2 ring-emerald-500/20" // 選択時に明るい緑色系
-                    : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400" // 未選択時
-                }
-              `}
-              >
-                <input
-                  type="radio"
-                  name="gender"
-                  value="女"
-                  checked={formData.gender === "女"}
-                  onChange={handleChange}
-                  className="sr-only"
+                <NamePair
+                  legend="氏名（ふりがな）"
+                  id={`${id}-kana`}
+                  last={values.lastNameKana}
+                  first={values.firstNameKana}
+                  onLastChange={set("lastNameKana")}
+                  onFirstChange={set("firstNameKana")}
+                  lastPlaceholder="やまだ"
+                  firstPlaceholder="たろう"
+                  error={errorFor("kana")}
                 />
-                女
-              </label>
-            </div>
-          </div>
 
-          <MyInput
-            id="birth_date"
-            label="生年月日"
-            placeholder="1989 / 09 / 11"
-            required
-            value={formData.birth_date}
-            onChange={handleBirthDateChange}
-            maxLength={14} // "YYYY / MM / DD" は最大14文字
-          />
+                <div className="grid gap-5 sm:grid-cols-2">
+                  <Field
+                    data-invalid={errorFor("birthDate") ? true : undefined}
+                  >
+                    <FieldLabel htmlFor={`${id}-birth`}>生年月日</FieldLabel>
+                    <Input
+                      id={`${id}-birth`}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      placeholder="1989 / 09 / 11"
+                      maxLength={14}
+                      value={values.birthDate}
+                      onChange={(e) =>
+                        set("birthDate")(
+                          formatBirthDateInput(
+                            e.target.value,
+                            values.birthDate,
+                          ),
+                        )
+                      }
+                      aria-invalid={errorFor("birthDate") ? true : undefined}
+                      className="tabular-nums"
+                    />
+                    {errorFor("birthDate") ? (
+                      <FieldError>{errorFor("birthDate")}</FieldError>
+                    ) : (
+                      <FieldDescription>
+                        数字 8 桁で入力できます
+                      </FieldDescription>
+                    )}
+                  </Field>
+                  <Field>
+                    <FieldLabel id={`${id}-gender`}>性別</FieldLabel>
+                    <GenderToggle
+                      labelledBy={`${id}-gender`}
+                      value={values.gender}
+                      onChange={(gender) =>
+                        setValues((prev) => ({ ...prev, gender }))
+                      }
+                    />
+                  </Field>
+                </div>
 
-          <MyInput
-            id="height"
-            label="身長 (cm)"
-            type="text"
-            placeholder="170.5"
-            value={formData.height}
-            onChange={handleChange}
-          />
+                <Field data-invalid={errorFor("body") ? true : undefined}>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="grid gap-2">
+                      <FieldLabel htmlFor={`${id}-height`}>身長</FieldLabel>
+                      <UnitInput
+                        id={`${id}-height`}
+                        unit="cm"
+                        value={values.height}
+                        onChange={set("height")}
+                        invalid={Boolean(errorFor("body"))}
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <FieldLabel htmlFor={`${id}-weight`}>体重</FieldLabel>
+                      <UnitInput
+                        id={`${id}-weight`}
+                        unit="kg"
+                        value={values.weight}
+                        onChange={set("weight")}
+                        invalid={Boolean(errorFor("body"))}
+                      />
+                    </div>
+                  </div>
+                  {errorFor("body") ? (
+                    <FieldError>{errorFor("body")}</FieldError>
+                  ) : (
+                    <FieldDescription>
+                      分からなければ空欄のままで構いません
+                    </FieldDescription>
+                  )}
+                </Field>
 
-          <MyInput
-            id="weight"
-            label="体重 (kg)"
-            type="text"
-            placeholder="50.5"
-            value={formData.weight}
-            onChange={handleChange}
-          />
+                <FieldSeparator />
 
-          <MyInput
-            id="created_at"
-            label="登録日"
-            placeholder={getTodayFormatted()}
-            required
-            value={formData.created_at}
-            onChange={handleRegistrationDateChange}
-            maxLength={14}
-          />
+                <Field data-invalid={errorFor("createdAt") ? true : undefined}>
+                  <FieldLabel htmlFor={`${id}-created`}>登録日</FieldLabel>
+                  <Input
+                    id={`${id}-created`}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    placeholder={todayFormatted()}
+                    maxLength={14}
+                    value={values.createdAt}
+                    onChange={(e) =>
+                      set("createdAt")(
+                        formatBirthDateInput(e.target.value, values.createdAt),
+                      )
+                    }
+                    aria-invalid={errorFor("createdAt") ? true : undefined}
+                    className="tabular-nums sm:w-64"
+                  />
+                  {errorFor("createdAt") ? (
+                    <FieldError>{errorFor("createdAt")}</FieldError>
+                  ) : (
+                    <FieldDescription>
+                      ふつうは今日のままで構いません
+                    </FieldDescription>
+                  )}
+                </Field>
+              </FieldGroup>
 
-          <MyButton type="submit" className="mt-4" disabled={showRegistered}>
-            登録する
-          </MyButton>
-        </form>
+              {submitError && (
+                <p className="mt-5 text-sm text-destructive" role="alert">
+                  {submitError}
+                </p>
+              )}
+            </CardContent>
+            <CardFooter className="justify-end border-t py-4">
+              <Button type="submit" disabled={isSubmitting || isDuplicate}>
+                <UserPlusIcon />
+                {isSubmitting ? "登録中…" : "登録する"}
+              </Button>
+            </CardFooter>
+          </form>
         </Card>
       )}
-
-      {message && (
-        <div
-          className={`mt-4 p-2 rounded ${isError ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}
-        >
-          {message}
-        </div>
-      )}
-    </div>
+    </PageContainer>
   );
-};
+}
+
+function RegisteredCard({
+  patient,
+  onContinue,
+}: {
+  patient: Values;
+  onContinue: () => void;
+}) {
+  return (
+    <Card className="items-center gap-4 px-6 py-10 text-center">
+      <CircleCheckIcon className="size-10 text-muted-foreground" />
+      <div className="grid gap-1">
+        <p className="text-sm text-muted-foreground">
+          {toKatakana(patient.lastNameKana)} {toKatakana(patient.firstNameKana)}
+        </p>
+        <p className="text-xl font-semibold">
+          {patient.lastNameKanji} {patient.firstNameKanji} 様を登録しました
+        </p>
+        <p className="text-sm text-muted-foreground tabular-nums">
+          ID {patient.patientId}
+        </p>
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">
+        <Button onClick={() => go(`/patient/detail/?id=${patient.patientId}`)}>
+          患者情報を見る
+        </Button>
+        <Button variant="outline" onClick={onContinue}>
+          続けて別の患者を登録
+        </Button>
+      </div>
+    </Card>
+  );
+}
