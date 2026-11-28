@@ -901,6 +901,7 @@ fn protected_api() -> Router {
         .merge(crate::settings::routes())
         .merge(crate::videos::routes())
         .merge(crate::feedback::routes())
+        .merge(crate::work_report::routes())
         .layer(middleware::from_fn(require_auth))
 }
 

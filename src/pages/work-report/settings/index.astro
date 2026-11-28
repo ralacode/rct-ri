@@ -1,0 +1,8 @@
+---
+import Layout from "@layouts/layout.astro";
+import { WorkReportSettings } from "@/components/react/work-report/settings";
+---
+
+<Layout pageTitle="作業報告書の設定">
+  <WorkReportSettings client:only="react" />
+</Layout>

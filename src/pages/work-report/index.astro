@@ -1,0 +1,8 @@
+---
+import Layout from "@layouts/layout.astro";
+import { WorkReportList } from "@/components/react/work-report/list";
+---
+
+<Layout pageTitle="作業報告書">
+  <WorkReportList client:only="react" />
+</Layout>
