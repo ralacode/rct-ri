@@ -2,9 +2,10 @@
 import { FileUp, Plus, Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { Card } from "@/components/react/card";
-import { MyInput } from "@/components/react/my-input";
+import { Card, CardContent } from "@/components/ui/card";
+import { LabeledInput } from "@/components/react/work-report/labeled-input";
 import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/react/layout/page-header";
 import { onDataChanged } from "@/lib/live";
 import { go } from "@/lib/nav";
 import { cn } from "@/lib/utils";
@@ -159,7 +160,7 @@ export function WorkReportList() {
   const reviewCount = reports.filter((r) => r.status === "review").length;
 
   return (
-    <div className="grid gap-4">
+    <PageContainer className="max-w-5xl gap-4">
       {dragging && (
         <div className="pointer-events-none fixed inset-0 z-50 grid place-items-center bg-background/70 p-6 backdrop-blur-[2px]">
           <div className="grid justify-items-center gap-2 rounded-xl border-2 border-dashed border-primary bg-background px-10 py-8 text-center shadow-lg">
@@ -215,105 +216,113 @@ export function WorkReportList() {
 
       {imports.length > 0 && (
         <Card>
-          <div className="grid gap-2">
-            <div className="flex items-center justify-between gap-2">
-              <h3 className="font-semibold">取り込み結果</h3>
-              <Button variant="ghost" size="sm" onClick={() => setImports([])}>
-                閉じる
-              </Button>
+          <CardContent>
+            <div className="grid gap-2">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="font-semibold">取り込み結果</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setImports([])}
+                >
+                  閉じる
+                </Button>
+              </div>
+              <ul className="grid gap-2 text-sm">
+                {imports.map((line, index) => (
+                  <li key={index} className="rounded-md border p-2">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="font-medium break-all">
+                        {line.fileName}
+                      </span>
+                      {line.error && (
+                        <span className="text-destructive">{line.error}</span>
+                      )}
+                      {line.result && (
+                        <>
+                          <span
+                            className={
+                              line.result.status === "duplicate"
+                                ? "text-amber-700 dark:text-amber-300"
+                                : undefined
+                            }
+                          >
+                            {line.result.status === "duplicate"
+                              ? `登録しませんでした。${line.result.message}`
+                              : line.result.message}
+                          </span>
+                          <a
+                            className="text-primary underline underline-offset-4"
+                            href={editUrl(line.result.reportId)}
+                          >
+                            {line.result.status === "duplicate"
+                              ? "登録済みの報告書を開く"
+                              : "開く"}
+                          </a>
+                        </>
+                      )}
+                    </div>
+                    {line.result && line.result.warnings.length > 0 && (
+                      <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                        {line.result.warnings.map((warning) => (
+                          <li key={warning}>{warning}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="grid gap-2 text-sm">
-              {imports.map((line, index) => (
-                <li key={index} className="rounded-md border p-2">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="font-medium break-all">
-                      {line.fileName}
-                    </span>
-                    {line.error && (
-                      <span className="text-destructive">{line.error}</span>
-                    )}
-                    {line.result && (
-                      <>
-                        <span
-                          className={
-                            line.result.status === "duplicate"
-                              ? "text-amber-700 dark:text-amber-300"
-                              : undefined
-                          }
-                        >
-                          {line.result.status === "duplicate"
-                            ? `登録しませんでした。${line.result.message}`
-                            : line.result.message}
-                        </span>
-                        <a
-                          className="text-primary underline underline-offset-4"
-                          href={editUrl(line.result.reportId)}
-                        >
-                          {line.result.status === "duplicate"
-                            ? "登録済みの報告書を開く"
-                            : "開く"}
-                        </a>
-                      </>
-                    )}
-                  </div>
-                  {line.result && line.result.warnings.length > 0 && (
-                    <ul className="mt-1 list-disc pl-5 text-muted-foreground">
-                      {line.result.warnings.map((warning) => (
-                        <li key={warning}>{warning}</li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
+          </CardContent>
         </Card>
       )}
 
       <Card>
-        <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
-          <MyInput
-            id="work-report-keyword"
-            label="キーワード"
-            placeholder="件名・作業内容・作業指示番号・担当者で検索..."
-            value={keyword}
-            onChange={(event) => setKeyword(event.target.value)}
-          />
-          <label className="grid gap-1.5 text-sm font-medium">
-            装置
-            <select
-              className={selectClass}
-              value={deviceId ?? ""}
-              onChange={(event) =>
-                setDeviceId(
-                  event.target.value ? Number(event.target.value) : null,
-                )
-              }
-            >
-              <option value="">すべて</option>
-              {devices.map((device) => (
-                <option key={device.id} value={device.id}>
-                  {device.name}
-                  {device.manufacturerName
-                    ? `（${device.manufacturerName}）`
-                    : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1.5 text-sm font-medium">
-            状態
-            <select
-              className={selectClass}
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              <option value="">すべて</option>
-              <option value="review">要確認</option>
-              <option value="confirmed">確認済み</option>
-            </select>
-          </label>
-        </div>
+        <CardContent>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+            <LabeledInput
+              id="work-report-keyword"
+              label="キーワード"
+              placeholder="件名・作業内容・作業指示番号・担当者で検索..."
+              value={keyword}
+              onChange={(event) => setKeyword(event.target.value)}
+            />
+            <label className="grid gap-1.5 text-sm font-medium">
+              装置
+              <select
+                className={selectClass}
+                value={deviceId ?? ""}
+                onChange={(event) =>
+                  setDeviceId(
+                    event.target.value ? Number(event.target.value) : null,
+                  )
+                }
+              >
+                <option value="">すべて</option>
+                {devices.map((device) => (
+                  <option key={device.id} value={device.id}>
+                    {device.name}
+                    {device.manufacturerName
+                      ? `（${device.manufacturerName}）`
+                      : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-1.5 text-sm font-medium">
+              状態
+              <select
+                className={selectClass}
+                value={status}
+                onChange={(event) => setStatus(event.target.value)}
+              >
+                <option value="">すべて</option>
+                <option value="review">要確認</option>
+                <option value="confirmed">確認済み</option>
+              </select>
+            </label>
+          </div>
+        </CardContent>
       </Card>
 
       {error && (
@@ -381,6 +390,6 @@ export function WorkReportList() {
           </li>
         )}
       </ul>
-    </div>
+    </PageContainer>
   );
 }
