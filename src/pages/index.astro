@@ -4,15 +4,5 @@ import Layout from "@layouts/layout.astro";
 ---
 
 <Layout>
-  <div
-    class:list={[
-      "grid h-full content-center justify-center gap-4 pb-16",
-      "@container",
-    ]}
-  >
-    <h2 class:list={["text-center text-xl", "@lg:text-2xl"]}>
-      今日もよろしくお願いします
-    </h2>
-    <HomeActions client:load />
-  </div>
+  <HomeActions client:load />
 </Layout>

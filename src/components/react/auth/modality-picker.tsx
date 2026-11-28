@@ -30,7 +30,7 @@ export function ModalityPicker({
 
   return (
     <fieldset className="grid gap-2">
-      <legend className="text-sm font-medium">
+      <legend className="mb-2 text-sm font-medium">
         担当モダリティ
         <span className="ml-1 text-destructive">*</span>
       </legend>
@@ -42,10 +42,9 @@ export function ModalityPicker({
               key={modality.id}
               id={`${idPrefix}-${modality.id}`}
               type="button"
-              size="lg"
               variant={selected ? "default" : "outline"}
               aria-pressed={selected}
-              className="h-11 w-full px-4"
+              className="w-full"
               onClick={() => toggle(modality.id)}
             >
               {modality.name}

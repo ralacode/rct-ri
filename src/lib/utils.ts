@@ -305,13 +305,24 @@ export const EXAM_ITEMS = [
   "肝受容体アシアロシンチ",
 ];
 
-export const NEEDS_PROCEDURE_ITEMS = [
-  "センチネルリンパ節シンチ",
+/**
+ * 99mTc（テクネチウム）製剤を使う検査項目。
+ * 標識手順書（ジェネレータ溶出 → キット標識）を印刷できるのは、この中の検査だけ。
+ */
+export const TC_EXAM_ITEMS = [
   "骨シンチ",
+  "センチネルリンパ節シンチ",
+  "心筋シンチ Tc 運動負荷",
   "腎レノグラム ラシックス負荷",
   "腎レノグラム 負荷無",
+  "腎形態シンチ DMSA",
   "甲状腺シンチ Tcのみ",
+  "肺血流シンチ",
+  "肝受容体アシアロシンチ",
 ];
+
+export const isTcExamItem = (examItem: string): boolean =>
+  TC_EXAM_ITEMS.includes(examItem);
 
 // 本日の日付を取得する関数
 export const getTodayLocalString = (): string => {
@@ -359,4 +370,11 @@ export function formatDateJapanese(date: Date | undefined) {
   if (!date) return "";
   // 'eeeeee' で「月」「火」「水」のような一文字の曜日になります
   return format(date, "yyyy年MM月dd日(eeeeee)", { locale: ja });
+}
+
+/** catch した値から画面に出すエラーメッセージを取り出す（取れなければ fallback） */
+export function errorMessage(err: unknown, fallback: string): string {
+  if (typeof err === "string" && err) return err;
+  if (err instanceof Error && err.message) return err.message;
+  return fallback;
 }

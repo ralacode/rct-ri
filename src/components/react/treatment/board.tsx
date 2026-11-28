@@ -1,3 +1,8 @@
+// src/components/react/treatment/board.tsx
+//
+// 治療依頼表。月ごとに、診療曜日の枠（13:30・14:30・15:30 臨時）を週単位の表で表示する。
+// 編集できる人（放射線治療の担当者）は、枠の開け閉め・休診・備考・依頼の変更ができる。
+
 import { useEffect, useState } from "react";
 import {
   addDays,
@@ -9,7 +14,39 @@ import {
   startOfMonth,
   startOfWeek,
 } from "date-fns";
+import {
+  CalendarCogIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  EllipsisIcon,
+  FileUpIcon,
+  LockIcon,
+  LockOpenIcon,
+  PencilIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { onDataChanged } from "@/lib/live";
 import {
@@ -24,11 +61,14 @@ import {
   WEEKDAYS,
   weekdayLabel,
   type SlotClosure,
-  type TreatmentBoard,
+  type TreatmentBoard as Board,
   type TreatmentRequest,
 } from "@/lib/treatment";
-import { cn, toKatakana } from "@/lib/utils";
-import { PatientName } from "@/components/react/patient-name";
+import { cn, errorMessage, getTodayLocalString, toKatakana } from "@/lib/utils";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 import {
   TreatmentRequestDialog,
   type TreatmentRequestDraft,
@@ -43,10 +83,7 @@ type DayColumn = {
   month: number;
 };
 
-function errorText(err: unknown) {
-  return err instanceof Error ? err.message : String(err);
-}
-
+/** その月の、診療曜日（と依頼・閉じ枠・備考がある日）を週ごとに並べる */
 function buildWeeks(
   month: string,
   openWeekdays: number[],
@@ -79,7 +116,8 @@ function buildWeeks(
   return weeks;
 }
 
-function extraDates(board: TreatmentBoard) {
+/** 診療曜日以外で、依頼・閉じ枠・備考が入っている日 */
+function extraDates(board: Board) {
   const dates = new Set<string>();
   const consider = (iso: string) => {
     const weekday = getISODay(parse(iso, "yyyy-MM-dd", new Date()));
@@ -91,9 +129,10 @@ function extraDates(board: TreatmentBoard) {
   return dates;
 }
 
+/** 閉じた枠の斜線（ライト・ダークどちらでも見えるよう文字色から作る） */
 const closedStyle = {
   backgroundImage:
-    "repeating-linear-gradient(135deg, transparent, transparent 7px, rgba(100,100,100,0.18) 7px, rgba(100,100,100,0.18) 8px)",
+    "repeating-linear-gradient(135deg, transparent 0 7px, color-mix(in oklab, var(--muted-foreground) 22%, transparent) 7px 8px)",
 };
 
 /** URL の ?month=YYYY-MM があればその月、なければ今月を最初に開く。 */
@@ -107,11 +146,12 @@ function initialMonth(): string {
 
 export function TreatmentBoard() {
   const [month, setMonth] = useState(initialMonth);
-  const [board, setBoard] = useState<TreatmentBoard | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [weekdayDraft, setWeekdayDraft] = useState<number[] | null>(null);
+  const [board, setBoard] = useState<Board | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [remarkDrafts, setRemarkDrafts] = useState<Record<string, string>>({});
   const [editing, setEditing] = useState<TreatmentRequest | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,26 +160,19 @@ export function TreatmentBoard() {
         const next = await getTreatmentBoard(month);
         if (cancelled) return;
         setBoard(next);
-        setError(null);
+        setLoadError(null);
       } catch (err) {
-        if (!cancelled) setError(errorText(err));
+        if (!cancelled)
+          setLoadError(errorMessage(err, "読み込みに失敗しました"));
       }
     };
     void load();
-    const stop = onDataChanged(() => {
-      void load();
-    });
+    const stop = onDataChanged(() => void load());
     return () => {
       cancelled = true;
       stop();
     };
   }, [month]);
-
-  useEffect(() => {
-    if (board && weekdayDraft === null) {
-      setWeekdayDraft(board.openWeekdays);
-    }
-  }, [board, weekdayDraft]);
 
   const requestAt = (date: string, slot: string) =>
     board?.requests.find(
@@ -151,12 +184,12 @@ export function TreatmentBoard() {
       (closure) => closure.closureDate === date && closure.slotTime === slot,
     );
 
+  /** 枠の開け閉めなどを実行し、失敗したら通知で知らせる */
   const run = async (action: () => Promise<unknown>) => {
     try {
       await action();
-      setError(null);
     } catch (err) {
-      setError(errorText(err));
+      toast.error(errorMessage(err, "操作に失敗しました"));
     }
   };
 
@@ -184,17 +217,6 @@ export function TreatmentBoard() {
     });
   };
 
-  const saveWeekdays = () => {
-    if (!weekdayDraft || weekdayDraft.length === 0) {
-      setError("診療曜日は1つ以上選んでください。");
-      return;
-    }
-    void run(async () => {
-      const saved = await saveTreatmentSchedule(weekdayDraft);
-      setWeekdayDraft(saved.openWeekdays);
-    });
-  };
-
   const saveExisting = async (input: TreatmentRequestDraft) => {
     if (!editing) return;
     await updateTreatmentRequest(editing.id, input);
@@ -206,202 +228,201 @@ export function TreatmentBoard() {
   };
 
   const monthDate = parse(`${month}-01`, "yyyy-MM-dd", new Date());
+  const thisMonth = format(new Date(), "yyyy-MM");
   const weeks = board
     ? buildWeeks(board.month, board.openWeekdays, extraDates(board))
     : [];
   const canEdit = board?.canEdit ?? false;
+  const today = getTodayLocalString();
 
   return (
-    <div className="grid gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-2xl font-semibold tracking-tight">治療依頼表</h2>
+    <PageContainer className="max-w-6xl">
+      <PageHeader
+        title="治療依頼表"
+        description={
+          board
+            ? `診療曜日：${board.openWeekdays.map(weekdayLabel).join("・")}　／　13:30・14:30 は通常枠、15:30 は臨時枠`
+            : "13:30・14:30 は通常枠、15:30 は臨時枠"
+        }
+        actions={
+          canEdit && (
+            <>
+              <Button variant="outline" onClick={() => setScheduleOpen(true)}>
+                <CalendarCogIcon />
+                診療曜日
+              </Button>
+              <Button variant="outline" onClick={() => setImportOpen(true)}>
+                <FileUpIcon />
+                RIS から取り込む
+              </Button>
+            </>
+          )
+        }
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
+          <ButtonGroup>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="前の月"
+              onClick={() =>
+                setMonth(format(addMonths(monthDate, -1), "yyyy-MM"))
+              }
+            >
+              <ChevronLeftIcon />
+            </Button>
+            <Button
+              variant="outline"
+              className="min-w-32 font-medium tabular-nums"
+              tabIndex={-1}
+            >
+              {format(monthDate, "yyyy年M月")}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              aria-label="次の月"
+              onClick={() =>
+                setMonth(format(addMonths(monthDate, 1), "yyyy-MM"))
+              }
+            >
+              <ChevronRightIcon />
+            </Button>
+          </ButtonGroup>
           <Button
-            type="button"
-            variant="outline"
-            onClick={() =>
-              setMonth(format(addMonths(monthDate, -1), "yyyy-MM"))
-            }
+            variant="ghost"
+            disabled={month === thisMonth}
+            onClick={() => setMonth(thisMonth)}
           >
-            前月
-          </Button>
-          <div className="min-w-28 text-center font-medium">
-            {format(monthDate, "yyyy年M月")}
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setMonth(format(addMonths(monthDate, 1), "yyyy-MM"))}
-          >
-            次月
+            今月
           </Button>
         </div>
+        {board && (
+          <p className="text-sm text-muted-foreground tabular-nums">
+            この月の依頼{" "}
+            <span className="font-medium text-foreground">
+              {board.requests.length}
+            </span>{" "}
+            件
+          </p>
+        )}
       </div>
 
-      {board && (
-        <div className="grid gap-2 rounded-lg border p-3">
-          <div className="text-sm font-medium">診療曜日</div>
-          {canEdit && weekdayDraft ? (
-            <div className="flex flex-wrap items-center gap-3">
-              {WEEKDAYS.map((day) => (
-                <label
-                  key={day.value}
-                  className="flex items-center gap-1 text-sm"
-                >
-                  <input
-                    type="checkbox"
-                    checked={weekdayDraft.includes(day.value)}
-                    onChange={() =>
-                      setWeekdayDraft((current) => {
-                        const values = current ?? [];
-                        return values.includes(day.value)
-                          ? values.filter((value) => value !== day.value)
-                          : [...values, day.value].sort((a, b) => a - b);
-                      })
-                    }
-                  />
-                  {day.label}
-                </label>
-              ))}
-              <Button type="button" size="sm" onClick={saveWeekdays}>
-                保存
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm">
-              {board.openWeekdays.map(weekdayLabel).join("・")}
-            </p>
-          )}
-          <p className="text-xs text-muted-foreground">
-            13:30 と 14:30 が通常枠、15:30
-            は臨時枠です。曜日を変えても、入っている依頼は残ります。
-          </p>
+      {loadError && (
+        <p className="text-sm text-destructive" role="alert">
+          {loadError}
+        </p>
+      )}
+
+      {!board && !loadError && (
+        <div className="grid gap-4" aria-busy="true" aria-label="読み込み中">
+          {[0, 1].map((i) => (
+            <Skeleton key={i} className="h-72 w-full rounded-xl" />
+          ))}
         </div>
       )}
 
-      {canEdit && (
-        <RtOrderImport
-          onImported={(requestDate) => setMonth(requestDate.slice(0, 7))}
-        />
-      )}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-      {!board && !error && (
-        <p className="text-sm text-muted-foreground">読み込み中...</p>
-      )}
-
-      {board &&
-        weeks.map((week) => (
-          <div key={week[0]?.iso} className="overflow-x-auto">
-            <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
-              <thead>
-                <tr>
-                  <th className="w-24 border bg-muted/40 p-2" />
-                  {week.map((day) => {
-                    const closed = closureAt(day.iso, DAY_CLOSURE);
-                    const occupied = board.requests.some(
-                      (request) => request.requestDate === day.iso,
-                    );
-                    return (
-                      <th
-                        key={day.iso}
-                        className="border bg-muted/40 p-2 font-medium"
-                      >
-                        <div>
-                          {day.label} {day.month}/{day.day}
-                        </div>
-                        {closed && <div className="mt-1 text-xs">休診</div>}
-                        {canEdit && !closed && !occupied && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="mt-1"
-                            onClick={() =>
-                              void run(() =>
-                                closeTreatmentSlot(day.iso, DAY_CLOSURE),
-                              )
-                            }
-                          >
-                            休診にする
-                          </Button>
-                        )}
-                        {canEdit && closed && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="mt-1"
-                            onClick={() =>
-                              void run(() => openTreatmentSlot(closed.id))
-                            }
-                          >
-                            休診を解除
-                          </Button>
-                        )}
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {board.slots.map((slot) => (
-                  <tr key={slot}>
-                    <th className="border bg-muted/20 p-2 text-left font-medium">
-                      {slot}
-                      {slot === "15:30" ? " 臨時" : ""}
-                    </th>
-                    {week.map((day) => (
-                      <SlotCell
-                        key={`${day.iso}-${slot}`}
-                        request={requestAt(day.iso, slot)}
-                        closure={closureAt(day.iso, slot)}
-                        dayClosed={Boolean(closureAt(day.iso, DAY_CLOSURE))}
-                        canEdit={canEdit}
-                        onEdit={setEditing}
-                        onClose={() =>
-                          void run(() => closeTreatmentSlot(day.iso, slot))
-                        }
-                        onOpen={(id) => void run(() => openTreatmentSlot(id))}
-                      />
-                    ))}
-                  </tr>
-                ))}
-                <tr>
-                  <th className="border bg-muted/20 p-2 text-left align-top font-medium">
-                    備考
-                  </th>
-                  {week.map((day) => (
-                    <td
-                      key={`${day.iso}-remark`}
-                      className="border p-2 align-top"
-                    >
-                      {canEdit ? (
-                        <Textarea
-                          value={remarkValue(day.iso)}
-                          rows={3}
-                          className="max-h-48 overflow-y-auto break-words whitespace-pre-wrap"
-                          aria-label={`${day.month}/${day.day} の備考`}
-                          onChange={(event) =>
-                            setRemarkDrafts((prev) => ({
-                              ...prev,
-                              [day.iso]: event.target.value,
-                            }))
+      {board && (
+        <div className="grid gap-4">
+          {weeks.map((week) => (
+            <Card key={week[0]?.iso} className="gap-0 overflow-hidden py-0">
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] table-fixed border-collapse text-sm">
+                  <thead>
+                    <tr className="bg-muted/40">
+                      <th className="w-24 border-r border-b" />
+                      {week.map((day) => (
+                        <DayHeader
+                          key={day.iso}
+                          day={day}
+                          isToday={day.iso === today}
+                          closure={closureAt(day.iso, DAY_CLOSURE)}
+                          occupied={board.requests.some(
+                            (request) => request.requestDate === day.iso,
+                          )}
+                          canEdit={canEdit}
+                          onClose={() =>
+                            void run(() =>
+                              closeTreatmentSlot(day.iso, DAY_CLOSURE),
+                            )
                           }
-                          onBlur={() => commitRemark(day.iso)}
+                          onOpen={(id) => void run(() => openTreatmentSlot(id))}
                         />
-                      ) : (
-                        <p className="min-h-16 max-h-48 overflow-y-auto break-words whitespace-pre-wrap text-sm">
-                          {remarkValue(day.iso) || "—"}
-                        </p>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        ))}
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {board.slots.map((slot) => (
+                      <tr key={slot}>
+                        <th className="border-r border-b bg-muted/20 px-3 py-2 text-left font-medium tabular-nums">
+                          <div>{slot}</div>
+                          {slot === "15:30" && (
+                            <Badge variant="secondary" className="mt-1">
+                              臨時
+                            </Badge>
+                          )}
+                        </th>
+                        {week.map((day) => (
+                          <SlotCell
+                            key={`${day.iso}-${slot}`}
+                            request={requestAt(day.iso, slot)}
+                            closure={closureAt(day.iso, slot)}
+                            dayClosed={Boolean(closureAt(day.iso, DAY_CLOSURE))}
+                            canEdit={canEdit}
+                            onEdit={setEditing}
+                            onClose={() =>
+                              void run(() => closeTreatmentSlot(day.iso, slot))
+                            }
+                            onOpen={(id) =>
+                              void run(() => openTreatmentSlot(id))
+                            }
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                    <tr>
+                      <th className="border-r bg-muted/20 px-3 py-2 text-left align-top font-medium">
+                        備考
+                      </th>
+                      {week.map((day) => (
+                        <td
+                          key={`${day.iso}-remark`}
+                          className="border-r p-2 align-top last:border-r-0"
+                        >
+                          {canEdit ? (
+                            <Textarea
+                              value={remarkValue(day.iso)}
+                              rows={3}
+                              placeholder="備考"
+                              className="max-h-48 min-h-16 overflow-y-auto text-sm break-words whitespace-pre-wrap"
+                              aria-label={`${day.month}/${day.day} の備考`}
+                              onChange={(event) =>
+                                setRemarkDrafts((prev) => ({
+                                  ...prev,
+                                  [day.iso]: event.target.value,
+                                }))
+                              }
+                              onBlur={() => commitRemark(day.iso)}
+                            />
+                          ) : (
+                            <p className="max-h-48 min-h-16 overflow-y-auto text-sm break-words whitespace-pre-wrap">
+                              {remarkValue(day.iso) || (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </p>
+                          )}
+                        </td>
+                      ))}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <TreatmentRequestDialog
         open={editing !== null}
@@ -422,7 +443,97 @@ export function TreatmentBoard() {
         onSubmit={saveExisting}
         onDelete={removeEditing}
       />
-    </div>
+
+      {board && (
+        <ScheduleDialog
+          open={scheduleOpen}
+          onOpenChange={setScheduleOpen}
+          current={board.openWeekdays}
+        />
+      )}
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>RIS の CSV・Excel を取り込む</DialogTitle>
+            <DialogDescription>
+              13:30 と 14:30 以外の予定時刻は 15:30
+              の臨時枠に入ります。カナはひらがなで登録します。アプリを起動した
+              PC の ris/rt_order
+              フォルダに置いたファイルは、自動で取り込まれます。
+            </DialogDescription>
+          </DialogHeader>
+          <RtOrderImport
+            onImported={(requestDate) => setMonth(requestDate.slice(0, 7))}
+          />
+        </DialogContent>
+      </Dialog>
+    </PageContainer>
+  );
+}
+
+function DayHeader({
+  day,
+  isToday,
+  closure,
+  occupied,
+  canEdit,
+  onClose,
+  onOpen,
+}: {
+  day: DayColumn;
+  isToday: boolean;
+  /** 休診（1 日まるごと閉じている）なら、その閉じ枠 */
+  closure?: SlotClosure;
+  /** その日に依頼が入っているか（入っていると休診にできない） */
+  occupied: boolean;
+  canEdit: boolean;
+  onClose: () => void;
+  onOpen: (id: number) => void;
+}) {
+  return (
+    <th className="border-r border-b px-2 py-2 font-medium last:border-r-0">
+      <div className="flex items-center justify-center gap-1">
+        <span
+          className={cn(
+            "rounded-md px-1.5 py-0.5 tabular-nums",
+            isToday && "bg-primary text-primary-foreground",
+          )}
+        >
+          {day.month}/{day.day}（{day.label}）
+        </span>
+        {closure && <Badge variant="outline">休診</Badge>}
+        {canEdit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label={`${day.month}/${day.day} の操作`}
+              >
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuLabel>
+                {day.month}/{day.day}（{day.label}）
+              </DropdownMenuLabel>
+              {closure ? (
+                <DropdownMenuItem onSelect={() => onOpen(closure.id)}>
+                  <LockOpenIcon />
+                  休診を解除
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem disabled={occupied} onSelect={onClose}>
+                  <LockIcon />
+                  {occupied ? "依頼があるため休診にできません" : "休診にする"}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+      </div>
+    </th>
   );
 }
 
@@ -444,65 +555,163 @@ function SlotCell({
   onOpen: (id: number) => void;
 }) {
   const closed = dayClosed || Boolean(closure);
-  const occupied = Boolean(request);
   return (
     <td
-      data-occupied={occupied ? "true" : undefined}
-      className={cn(
-        "relative min-h-28 border p-1 align-middle",
-        occupied && "bg-sky-200 shadow-[inset_4px_0_0_0_#0284c7]",
-        !occupied && closed && "text-muted-foreground",
-      )}
-      style={!occupied && closed ? closedStyle : undefined}
+      data-occupied={request ? "true" : undefined}
+      className="h-24 border-r border-b p-1.5 align-middle last:border-r-0"
+      style={!request && closed ? closedStyle : undefined}
     >
-      {request && (
-        <>
-          <div className="absolute inset-x-1 top-0.5 text-[11px] leading-tight font-medium text-sky-950">
+      {request ? (
+        <div className="relative flex h-full flex-col justify-center rounded-md border-l-4 border-foreground bg-muted px-2 py-1.5">
+          <span className="truncate text-[11px] leading-tight text-muted-foreground">
             {request.requestingDepartment}
-          </div>
+          </span>
           <a
             href={`/patient/detail/?id=${request.patientId}`}
-            className="flex h-full items-center justify-center px-1 pt-4 text-center font-medium text-sky-950"
+            className="font-medium leading-snug underline-offset-2 hover:underline"
           >
-            <PatientName
-              last_name_kanji={request.lastNameKanji}
-              first_name_kanji={request.firstNameKanji}
-              last_name_kana={toKatakana(request.lastNameKana)}
-              first_name_kana={toKatakana(request.firstNameKana)}
-            />
+            {request.lastNameKanji} {request.firstNameKanji}
           </a>
+          <span className="truncate text-[11px] text-muted-foreground">
+            {toKatakana(request.lastNameKana)}{" "}
+            {toKatakana(request.firstNameKana)}
+          </span>
           {canEdit && (
             <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="absolute right-1 bottom-1 z-10 h-7 px-2"
+              variant="ghost"
+              size="icon-xs"
+              className="absolute top-1 right-1"
+              aria-label={`${request.lastNameKanji} ${request.firstNameKanji} 様の依頼を変更`}
               onClick={() => onEdit(request)}
             >
-              変更
+              <PencilIcon />
             </Button>
           )}
-        </>
-      )}
-      {!request && canEdit && !dayClosed && !closure && (
-        <div className="grid h-full place-items-center">
-          <Button type="button" size="sm" variant="outline" onClick={onClose}>
-            閉じる
-          </Button>
         </div>
-      )}
-      {!request && canEdit && !dayClosed && closure && (
-        <div className="grid h-full place-items-center">
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onOpen(closure.id)}
-          >
-            開ける
-          </Button>
+      ) : closed ? (
+        <div className="grid h-full place-items-center gap-1 text-xs text-muted-foreground">
+          <span className="rounded bg-background/80 px-1.5">
+            {dayClosed ? "休診" : "閉じ枠"}
+          </span>
+          {canEdit && !dayClosed && closure && (
+            <Button
+              variant="ghost"
+              size="xs"
+              className="bg-background/80"
+              onClick={() => onOpen(closure.id)}
+            >
+              <LockOpenIcon />
+              開ける
+            </Button>
+          )}
         </div>
+      ) : (
+        canEdit && (
+          <div className="grid h-full place-items-center">
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-muted-foreground"
+              onClick={onClose}
+            >
+              <LockIcon />
+              閉じる
+            </Button>
+          </div>
+        )
       )}
     </td>
+  );
+}
+
+/** 診療曜日の設定。曜日を変えても、入っている依頼は残る */
+function ScheduleDialog({
+  open,
+  onOpenChange,
+  current,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  current: number[];
+}) {
+  const [draft, setDraft] = useState<number[]>(current);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(current);
+    setError(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const toggle = (value: number) =>
+    setDraft((values) =>
+      values.includes(value)
+        ? values.filter((v) => v !== value)
+        : [...values, value].sort((a, b) => a - b),
+    );
+
+  const save = async () => {
+    if (draft.length === 0) {
+      setError("診療曜日は 1 つ以上選んでください。");
+      return;
+    }
+    setPending(true);
+    try {
+      await saveTreatmentSchedule(draft);
+      toast.success("診療曜日を保存しました");
+      onOpenChange(false);
+    } catch (err) {
+      setError(errorMessage(err, "保存に失敗しました。"));
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>診療曜日</DialogTitle>
+          <DialogDescription>
+            治療依頼表に出す曜日を選びます。曜日を変えても、入っている依頼は残ります。
+          </DialogDescription>
+        </DialogHeader>
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="診療曜日"
+        >
+          {WEEKDAYS.map((day) => (
+            <Button
+              key={day.value}
+              type="button"
+              variant={draft.includes(day.value) ? "default" : "outline"}
+              aria-pressed={draft.includes(day.value)}
+              className="w-11"
+              onClick={() => toggle(day.value)}
+            >
+              {day.label}
+            </Button>
+          ))}
+        </div>
+        {error && (
+          <p className="text-sm text-destructive" role="alert">
+            {error}
+          </p>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={pending}>
+              キャンセル
+            </Button>
+          </DialogClose>
+          <Button onClick={() => void save()} disabled={pending}>
+            {pending ? "保存中…" : "保存する"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,13 +1,8 @@
 ---
-import { BackupSettings } from "@/components/react/backup-settings";
 import { SettingsPage } from "@/components/react/settings-page";
 import Layout from "@layouts/layout.astro";
 ---
 
 <Layout pageTitle="設定">
-  <div class="grid gap-4 content-start">
-    <h2 class="text-2xl font-semibold tracking-tight">設定</h2>
-    <SettingsPage client:load />
-    <BackupSettings client:load />
-  </div>
+  <SettingsPage client:load />
 </Layout>

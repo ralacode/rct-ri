@@ -1,9 +1,37 @@
 // 依頼科・依頼医の一覧の管理（名前の変更・削除・追加）。
 import { useEffect, useState } from "react";
 
-import { Card } from "@/components/react/card";
-import { MyButton } from "@/components/react/my-button";
-import { MyInput } from "@/components/react/my-input";
+import { CheckIcon, PlusIcon, SearchIcon, Trash2Icon } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 import { onDataChanged } from "@/lib/live";
 import {
   createRequester,
@@ -26,13 +54,13 @@ function RequesterSection({ kind }: { kind: RequesterKind }) {
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [newName, setNewName] = useState("");
   const [query, setQuery] = useState("");
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
   const [pending, setPending] = useState(false);
+  const [deleting, setDeleting] = useState<Requester | null>(null);
 
+  // 結果は通知で知らせる
   const show = (text: string, error = false) => {
-    setMessage(text);
-    setIsError(error);
+    if (error) toast.error(text);
+    else toast.success(text);
   };
 
   const load = async () => {
@@ -49,7 +77,8 @@ function RequesterSection({ kind }: { kind: RequesterKind }) {
   };
 
   useEffect(() => {
-    const reload = () => void load().catch((error) => show(errorText(error), true));
+    const reload = () =>
+      void load().catch((error) => show(errorText(error), true));
     reload();
     return onDataChanged(reload);
   }, [kind]);
@@ -81,14 +110,10 @@ function RequesterSection({ kind }: { kind: RequesterKind }) {
   };
 
   const handleDelete = (item: Requester) => {
-    if (
-      !window.confirm(
-        `${item.name} を${label}の候補から削除しますか？\n（これまでのオーダーに記録された名前は変わりません）`,
-      )
-    ) {
-      return;
-    }
-    void run(() => deleteRequester(kind, item.id), `${item.name} を削除しました`);
+    void run(
+      () => deleteRequester(kind, item.id),
+      `${item.name} を削除しました`,
+    );
   };
 
   const handleAdd = (event: React.FormEvent) => {
@@ -107,117 +132,149 @@ function RequesterSection({ kind }: { kind: RequesterKind }) {
     : items;
 
   return (
-    <Card>
-      <div className="grid gap-4">
-        <div className="grid gap-1">
-          <h2 className="text-lg font-semibold tracking-tight">
-            {label}（{items.length}件）
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            よく使う順に並んでいます。名前を変えたり削除したりしても、これまでのオーダー・治療依頼に記録された名前は変わりません。
-          </p>
-        </div>
-
-        <form
-          className="grid gap-3 md:grid-cols-[1fr_auto] md:items-end"
-          onSubmit={handleAdd}
-        >
-          <MyInput
+    <Card className="gap-4">
+      <CardHeader>
+        <CardTitle>
+          {label}
+          <span className="ml-2 text-sm font-normal text-muted-foreground tabular-nums">
+            {items.length} 件
+          </span>
+        </CardTitle>
+        <CardDescription>よく使う順に並んでいます。</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        <form className="flex gap-2" onSubmit={handleAdd}>
+          <Input
             id={`new-${kind}`}
-            label={`${label}を追加`}
+            aria-label={`${label}を追加`}
+            placeholder={`${label}を追加`}
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
           />
-          <MyButton type="submit" disabled={pending || !newName.trim()}>
+          <Button type="submit" disabled={pending || !newName.trim()}>
+            <PlusIcon />
             追加
-          </MyButton>
+          </Button>
         </form>
 
-        <MyInput
-          id={`search-${kind}`}
-          label="絞り込み"
-          placeholder={`${label}の名前で絞り込み...`}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
+        <InputGroup>
+          <InputGroupAddon>
+            <SearchIcon />
+          </InputGroupAddon>
+          <InputGroupInput
+            id={`search-${kind}`}
+            aria-label="絞り込み"
+            placeholder={`${label}の名前で絞り込み`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </InputGroup>
 
-        {message && (
-          <p
-            className={
-              isError ? "text-sm text-destructive" : "text-sm text-muted-foreground"
-            }
-            role={isError ? "alert" : "status"}
-          >
-            {message}
-          </p>
-        )}
-
-        <ul className="grid gap-2">
+        <ul className="grid divide-y rounded-lg border">
           {visible.map((item) => {
             const value = edits[item.id] ?? item.name;
             const changed = value.trim() !== item.name;
             return (
-              <li
-                key={item.id}
-                className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_auto] md:items-end"
-              >
-                <div className="grid gap-1">
-                  <MyInput
-                    id={`${kind}-${item.id}`}
-                    label={`使用 ${item.useCount} 回`}
-                    value={value}
-                    onChange={(event) =>
-                      setEdits((current) => ({
-                        ...current,
-                        [item.id]: event.target.value,
-                      }))
+              <li key={item.id} className="flex items-center gap-2 px-3 py-2">
+                <Input
+                  id={`${kind}-${item.id}`}
+                  aria-label={`${item.name} の名前`}
+                  className="h-8 min-w-0 flex-1 border-transparent bg-transparent shadow-none hover:border-input focus-visible:border-ring dark:bg-transparent"
+                  value={value}
+                  onChange={(event) =>
+                    setEdits((current) => ({
+                      ...current,
+                      [item.id]: event.target.value,
+                    }))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleRename(item);
                     }
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        handleRename(item);
-                      }
-                    }}
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <MyButton
+                  }}
+                />
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  使用 {item.useCount} 回
+                </span>
+                {changed ? (
+                  <Button
                     type="button"
-                    disabled={pending || !changed || !value.trim()}
+                    size="sm"
+                    disabled={pending || !value.trim()}
                     onClick={() => handleRename(item)}
                   >
-                    名前を変更
-                  </MyButton>
-                  <MyButton
+                    <CheckIcon />
+                    変更
+                  </Button>
+                ) : (
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={`${item.name} を削除`}
+                    className="text-muted-foreground hover:text-destructive"
                     disabled={pending}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => handleDelete(item)}
+                    onClick={() => setDeleting(item)}
                   >
-                    削除
-                  </MyButton>
-                </div>
+                    <Trash2Icon />
+                  </Button>
+                )}
               </li>
             );
           })}
           {visible.length === 0 && (
-            <li className="text-sm text-muted-foreground">
+            <li className="px-3 py-6 text-center text-sm text-muted-foreground">
               {items.length === 0
                 ? `${label}はまだ登録されていません`
                 : "当てはまる名前がありません"}
             </li>
           )}
         </ul>
-      </div>
+      </CardContent>
+
+      <AlertDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleting?.name} を{label}の候補から削除しますか？
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              これまでのオーダー・治療依頼に記録された名前は変わりません。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (deleting) handleDelete(deleting);
+                setDeleting(null);
+              }}
+            >
+              削除する
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
 
 export function RequesterAdmin() {
   return (
-    <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-      <RequesterSection kind="departments" />
-      <RequesterSection kind="physicians" />
-    </div>
+    <PageContainer className="max-w-6xl">
+      <PageHeader
+        title="依頼科・依頼医"
+        description="検査オーダーと治療依頼の入力候補です。名前を変えたり削除したりしても、これまでのオーダー・治療依頼に記録された名前は変わりません。"
+      />
+      <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
+        <RequesterSection kind="departments" />
+        <RequesterSection kind="physicians" />
+      </div>
+    </PageContainer>
   );
 }

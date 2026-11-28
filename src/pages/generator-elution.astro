@@ -1,18 +1,8 @@
 ---
 import { ElutionRecordPrint } from "@/components/react/generator-elution/elution-record-print";
 import Layout from "@/layouts/layout.astro";
-import { cn } from "@/lib/utils";
 ---
 
 <Layout pageTitle="ジェネレータ溶出記録">
-  <div class={cn("grid gap-4 print:block")}>
-    <h1
-      class={cn(
-        "justify-self-center text-2xl font-semibold tracking-tight print:hidden",
-      )}
-    >
-      ジェネレータ溶出記録 印刷
-    </h1>
-    <ElutionRecordPrint client:load />
-  </div>
+  <ElutionRecordPrint client:load />
 </Layout>

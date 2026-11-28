@@ -27,3 +27,30 @@ const { title } = Astro.props;
     getCurrentWindow().setTitle(title);
   }
 </script>
+
+<script is:inline>
+  // 表示テーマ（src/lib/theme.ts と同じ処理）。描画前に <html> へ .dark を付けてちらつきを防ぐ。
+  // ClientRouter のページ遷移では <html> の属性が差し替わるので、遷移のたびに付け直す。
+  (function () {
+    function apply() {
+      var theme = null;
+      try {
+        theme = localStorage.getItem("rct_theme");
+      } catch (e) {}
+      var dark =
+        theme === "dark" ||
+        (theme !== "light" &&
+          window.matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.classList.toggle("dark", dark);
+      document.documentElement.style.colorScheme = dark ? "dark" : "light";
+    }
+    apply();
+    document.addEventListener("astro:after-swap", apply);
+    // 帳票はダークモードのまま印刷しないよう、印刷中だけライトに戻す。
+    window.addEventListener("beforeprint", function () {
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
+    });
+    window.addEventListener("afterprint", apply);
+  })();
+</script>

@@ -1,8 +1,28 @@
 import { useEffect, useState } from "react";
 import { format, getISODay } from "date-fns";
-import { DatalistInput } from "@/components/react/datalist-input";
+import { TriangleAlertIcon, Trash2Icon } from "lucide-react";
+import { toast } from "sonner";
 import { DatePickerTime } from "@/components/react/date-picker-time";
-import { MyButton } from "@/components/react/my-button";
+import { DatalistField } from "@/components/react/form/datalist-field";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Dialog,
   DialogClose,
@@ -23,7 +43,7 @@ import {
 import type { SlotClosure, TreatmentRequestInput } from "@/lib/treatment";
 import { useRequesterOptions } from "@/lib/requesters";
 import {
-  cn,
+  errorMessage,
   normalizeToDbDateFormat,
   normalizeToDisplayDateFormat,
 } from "@/lib/utils";
@@ -126,17 +146,24 @@ export function TreatmentRequestDialog({
       .map((closure) => closure.slotTime),
   );
 
-  const submit = async () => {
+  /** 臨時枠（15:30）に新しく入れるときと、削除するときは確認する */
+  const [confirming, setConfirming] = useState<"temporary" | "delete" | null>(
+    null,
+  );
+
+  const submit = async (temporaryConfirmed = false) => {
     const requestDate = normalizeToDbDateFormat(date);
     if (!requestDate || !slot || !department.trim() || !physician.trim()) {
       setError("日付、時間枠、依頼科、依頼医を入力してください。");
       return;
     }
-    if (slot === "15:30" && initial?.slotTime !== "15:30") {
-      const confirmed = window.confirm(
-        "15:30 は臨時枠です。この枠に入れますか？",
-      );
-      if (!confirmed) return;
+    if (
+      slot === "15:30" &&
+      initial?.slotTime !== "15:30" &&
+      !temporaryConfirmed
+    ) {
+      setConfirming("temporary");
+      return;
     }
     setPending(true);
     setError(null);
@@ -147,9 +174,10 @@ export function TreatmentRequestDialog({
         requestingDepartment: department.trim(),
         requestingPhysician: physician.trim(),
       });
+      toast.success("治療依頼を保存しました");
       onOpenChange(false);
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err, "保存に失敗しました。"));
     } finally {
       setPending(false);
     }
@@ -157,114 +185,173 @@ export function TreatmentRequestDialog({
 
   const remove = async () => {
     if (!onDelete) return;
-    if (!window.confirm("この治療依頼を削除しますか？")) return;
     setPending(true);
     setError(null);
     try {
       await onDelete();
+      toast.success("治療依頼を削除しました");
       onOpenChange(false);
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err, "削除に失敗しました。"));
     } finally {
       setPending(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="font-(family-name:--font-family)! text-my-gray!">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <DialogDescription className="sr-only">
-          治療依頼の日付、時間枠、依頼科、依頼医を入力します
-        </DialogDescription>
-        <div className="grid gap-4">
-          <DatePickerTime
-            inputId={`${idPrefix}-date`}
-            valueString={date}
-            onChange={setDate}
-            dateText="日付"
-            disabledDates={(day) => {
-              const iso = format(day, "yyyy-MM-dd");
-              if (keptDate && iso === keptDate) return false;
-              return !openWeekdays.includes(getISODay(day));
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md">
+          <form
+            className="grid gap-5"
+            noValidate
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submit();
             }}
-          />
-          {notices.length > 0 && (
-            <div
-              role="status"
-              className="grid gap-1 rounded-md border border-amber-400 bg-amber-100 px-3 py-2 text-sm font-medium text-amber-950"
+          >
+            <DialogHeader>
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>
+                診療曜日の枠に登録できます。15:30 は臨時枠です。
+              </DialogDescription>
+            </DialogHeader>
+
+            <FieldGroup className="gap-5">
+              <DatePickerTime
+                inputId={`${idPrefix}-date`}
+                valueString={date}
+                onChange={setDate}
+                dateText="日付"
+                disabledDates={(day) => {
+                  const iso = format(day, "yyyy-MM-dd");
+                  if (keptDate && iso === keptDate) return false;
+                  return !openWeekdays.includes(getISODay(day));
+                }}
+              />
+              {notices.length > 0 && (
+                <div
+                  role="status"
+                  className="flex gap-2 rounded-lg border border-dashed px-3 py-2.5 text-sm"
+                >
+                  <TriangleAlertIcon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <div className="grid gap-0.5">
+                    {notices.map((notice) => (
+                      <p key={notice}>{notice}</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {closureError && (
+                <p className="text-sm text-destructive">{closureError}</p>
+              )}
+
+              <Field>
+                <FieldLabel htmlFor={`${idPrefix}-slot`}>時間枠</FieldLabel>
+                <Select value={slot} onValueChange={setSlot}>
+                  <SelectTrigger id={`${idPrefix}-slot`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TREATMENT_SLOTS.map((item) => {
+                      const closed = dayClosed || closedSlots.has(item.value);
+                      return (
+                        <SelectItem key={item.value} value={item.value}>
+                          {item.label}
+                          {closed ? "（閉じています）" : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </Field>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <DatalistField
+                  id={`${idPrefix}-department`}
+                  label="依頼科"
+                  value={department}
+                  onChange={setDepartment}
+                  options={departments}
+                />
+                <DatalistField
+                  id={`${idPrefix}-physician`}
+                  label="依頼医"
+                  value={physician}
+                  onChange={setPhysician}
+                  options={physicians}
+                />
+              </div>
+            </FieldGroup>
+
+            {error && (
+              <p className="text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+
+            <DialogFooter className="sm:justify-between">
+              {onDelete ? (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={() => setConfirming("delete")}
+                >
+                  <Trash2Icon />
+                  削除
+                </Button>
+              ) : (
+                <span />
+              )}
+              <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline" disabled={pending}>
+                    キャンセル
+                  </Button>
+                </DialogClose>
+                <Button type="submit" disabled={pending}>
+                  {pending ? "保存中…" : "保存する"}
+                </Button>
+              </div>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(next) => !next && setConfirming(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirming === "delete"
+                ? "この治療依頼を削除しますか？"
+                : "15:30 の臨時枠に入れますか？"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming === "delete"
+                ? "削除すると元に戻せません。"
+                : "15:30 は臨時枠です。通常は 13:30 か 14:30 の枠に入れます。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              variant={confirming === "delete" ? "destructive" : "default"}
+              onClick={() => {
+                const kind = confirming;
+                setConfirming(null);
+                if (kind === "delete") void remove();
+                else void submit(true);
+              }}
             >
-              {notices.map((notice) => (
-                <p key={notice}>{notice}</p>
-              ))}
-            </div>
-          )}
-          {closureError && (
-            <p className="text-sm text-destructive">{closureError}</p>
-          )}
-          <label className="grid gap-2 text-sm">
-            時間枠
-            <select
-              value={slot}
-              onChange={(event) => setSlot(event.target.value)}
-              className="h-10 rounded-md border border-input bg-transparent px-3 text-base"
-            >
-              {TREATMENT_SLOTS.map((item) => {
-                const closed = dayClosed || closedSlots.has(item.value);
-                return (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                    {closed ? "（閉じています）" : ""}
-                  </option>
-                );
-              })}
-            </select>
-          </label>
-          <DatalistInput
-            id={`${idPrefix}-department`}
-            label="依頼科"
-            list={`${idPrefix}-department-list`}
-            placeholder="依頼科を入力..."
-            value={department}
-            onChange={(event) => setDepartment(event.target.value)}
-            options={departments}
-            inputClassName="h-10"
-          />
-          <DatalistInput
-            id={`${idPrefix}-physician`}
-            label="依頼医"
-            list={`${idPrefix}-physician-list`}
-            placeholder="依頼医を入力..."
-            value={physician}
-            onChange={(event) => setPhysician(event.target.value)}
-            options={physicians}
-            inputClassName="h-10"
-          />
-          <p className="text-sm text-muted-foreground">
-            診療曜日の枠に登録できます。15:30 は臨時枠です。
-          </p>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-        </div>
-        <DialogFooter className={cn("grid")}>
-          <MyButton onClick={() => void submit()} disabled={pending}>
-            {pending ? "保存中..." : "保存する"}
-          </MyButton>
-          {onDelete && (
-            <MyButton
-              className="bg-red-500"
-              onClick={() => void remove()}
-              disabled={pending}
-            >
-              削除する
-            </MyButton>
-          )}
-          <DialogClose asChild>
-            <MyButton className="bg-red-500">キャンセル</MyButton>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              {confirming === "delete" ? "削除する" : "臨時枠に入れる"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
