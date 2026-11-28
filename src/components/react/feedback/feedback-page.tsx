@@ -1,10 +1,45 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { Card } from "@/components/react/card";
-import { MyButton } from "@/components/react/my-button";
+import { CircleCheckIcon, MessageSquareIcon, SendIcon } from "lucide-react";
+import { toast } from "sonner";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 import { fetchMe, type AuthUser } from "@/lib/auth";
 import {
   answerFeedback,
@@ -102,16 +137,11 @@ export function FeedbackPage() {
   );
 
   return (
-    <div className="mx-auto grid w-full max-w-3xl content-start gap-6 py-4">
-      <div className="grid gap-1">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          RIS への質問・要望
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          RIS（放射線部門システム）について、わからないことや「こういうことがしたい」を送ってください。
-          送った内容と回答は、下の一覧でみんなが見られます。
-        </p>
-      </div>
+    <PageContainer className="max-w-3xl">
+      <PageHeader
+        title="RIS への質問・要望"
+        description="RIS（放射線部門システム）について、わからないことや「こういうことがしたい」を送ってください。送った内容と回答は、下の一覧でみんなが見られます。"
+      />
 
       <FeedbackForm
         user={user}
@@ -123,40 +153,52 @@ export function FeedbackPage() {
 
       <section className="grid gap-3" aria-labelledby="feedback-list-heading">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 id="feedback-list-heading" className="text-lg font-semibold">
+          <h2 id="feedback-list-heading" className="text-lg font-semibold">
             みんなの質問・要望
-          </h3>
-          <div
-            className="flex flex-wrap gap-1 rounded-lg border p-1"
-            role="group"
-            aria-label="表示する投稿"
-          >
+          </h2>
+          <ButtonGroup aria-label="表示する投稿">
             {FILTERS.map((option) => (
               <Button
                 key={option.value}
                 type="button"
                 size="sm"
-                variant={filter === option.value ? "default" : "ghost"}
+                variant={filter === option.value ? "default" : "outline"}
                 aria-pressed={filter === option.value}
                 onClick={() => setFilter(option.value)}
               >
                 {option.label}
-                <span className="ml-1 tabular-nums">
+                <span className="tabular-nums opacity-70">
                   {counts[option.value]}
                 </span>
               </Button>
             ))}
-          </div>
+          </ButtonGroup>
         </div>
         {loadError && <p className="text-sm text-destructive">{loadError}</p>}
         {loading ? (
-          <p className="text-sm text-muted-foreground">読み込み中...</p>
+          <div className="grid gap-3">
+            {[0, 1].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-xl" />
+            ))}
+          </div>
         ) : visibleItems.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {items.length === 0
-              ? "まだ投稿はありません。最初の質問・要望を送ってみてください。"
-              : "該当する投稿はありません。"}
-          </p>
+          <Empty className="border border-dashed">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <MessageSquareIcon />
+              </EmptyMedia>
+              <EmptyTitle>
+                {items.length === 0
+                  ? "まだ投稿はありません"
+                  : "該当する投稿はありません"}
+              </EmptyTitle>
+              {items.length === 0 && (
+                <EmptyDescription>
+                  最初の質問・要望を送ってみてください。
+                </EmptyDescription>
+              )}
+            </EmptyHeader>
+          </Empty>
         ) : (
           <ul className="grid gap-3">
             {visibleItems.map((item) => (
@@ -172,7 +214,7 @@ export function FeedbackPage() {
           </ul>
         )}
       </section>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -203,7 +245,8 @@ function FeedbackForm({
       const item = await createFeedback({ kind, body, anonymous });
       setBody("");
       setIsError(false);
-      setMessage("送信しました。ありがとうございます。");
+      setMessage("");
+      toast.success("送信しました。ありがとうございます。");
       onCreated(item);
     } catch (error) {
       setIsError(true);
@@ -214,89 +257,85 @@ function FeedbackForm({
   };
 
   return (
-    <Card>
-      <form className="grid gap-4" onSubmit={handleSubmit}>
-        <fieldset className="grid gap-2">
-          <legend className="mb-2 text-sm font-medium">種類</legend>
-          <div className="flex flex-wrap gap-2">
-            {FEEDBACK_KINDS.map((option) => (
-              <label
-                key={option.value}
+    <Card className="py-0">
+      <CardContent className="py-6">
+        <form className="grid gap-5" onSubmit={handleSubmit}>
+          <FieldSet className="gap-2">
+            <FieldLegend variant="label" className="mb-0">
+              種類
+            </FieldLegend>
+            <ButtonGroup aria-label="種類">
+              {FEEDBACK_KINDS.map((option) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  variant={kind === option.value ? "default" : "outline"}
+                  aria-pressed={kind === option.value}
+                  onClick={() => setKind(option.value)}
+                >
+                  {option.label}
+                </Button>
+              ))}
+            </ButtonGroup>
+          </FieldSet>
+          <Field>
+            <FieldLabel htmlFor="feedback-body">
+              内容<span className="text-destructive">*</span>
+            </FieldLabel>
+            <Textarea
+              id="feedback-body"
+              required
+              rows={4}
+              maxLength={FEEDBACK_BODY_MAX}
+              className="min-h-28"
+              placeholder={
+                kind === "request"
+                  ? "例：検査の予定を病棟ごとに一覧で見たい"
+                  : "例：検査予約の確認画面はどこから開けますか？"
+              }
+              value={body}
+              onChange={(event) => setBody(event.target.value)}
+            />
+            <FieldDescription className="text-right tabular-nums">
+              {body.length} / {FEEDBACK_BODY_MAX}
+            </FieldDescription>
+          </Field>
+          <Field orientation="horizontal">
+            <Checkbox
+              id="feedback-anonymous"
+              checked={anonymous}
+              onCheckedChange={(checked) => setAnonymous(checked === true)}
+            />
+            <FieldContent>
+              <FieldLabel htmlFor="feedback-anonymous">
+                匿名で投稿する
+              </FieldLabel>
+              <FieldDescription>
+                {anonymous
+                  ? "一覧に名前は表示されません。自分の投稿として、回答が付く前なら削除できます。"
+                  : `一覧に「${user?.displayName ?? "あなたの名前"}」と表示されます。`}
+              </FieldDescription>
+            </FieldContent>
+          </Field>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {message && (
+              <p
+                role="status"
                 className={cn(
-                  "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors has-focus-visible:ring-3 has-focus-visible:ring-ring/50",
-                  kind === option.value
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "hover:bg-accent",
+                  "mr-auto text-sm",
+                  isError ? "text-destructive" : "text-muted-foreground",
                 )}
               >
-                <input
-                  type="radio"
-                  name="feedback-kind"
-                  value={option.value}
-                  checked={kind === option.value}
-                  onChange={() => setKind(option.value)}
-                  className="sr-only"
-                />
-                {option.label}
-              </label>
-            ))}
+                {message}
+              </p>
+            )}
+            <Button type="submit" disabled={pending}>
+              <SendIcon />
+              {pending ? "送信中…" : "送信する"}
+            </Button>
           </div>
-        </fieldset>
-        <div className="grid gap-1.5">
-          <Label htmlFor="feedback-body">
-            内容<span className="ml-1 text-destructive">*</span>
-          </Label>
-          <Textarea
-            id="feedback-body"
-            required
-            rows={4}
-            maxLength={FEEDBACK_BODY_MAX}
-            className="min-h-28 text-base"
-            placeholder={
-              kind === "request"
-                ? "例：検査の予定を病棟ごとに一覧で見たい"
-                : "例：検査予約の確認画面はどこから開けますか？"
-            }
-            value={body}
-            onChange={(event) => setBody(event.target.value)}
-          />
-          <p className="text-right text-xs text-muted-foreground tabular-nums">
-            {body.length} / {FEEDBACK_BODY_MAX}
-          </p>
-        </div>
-        <div className="grid gap-1">
-          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={anonymous}
-              onChange={(event) => setAnonymous(event.target.checked)}
-            />
-            匿名で投稿する
-          </label>
-          <p className="text-xs text-muted-foreground">
-            {anonymous
-              ? "一覧に名前は表示されません。自分の投稿として、回答が付く前なら削除できます。"
-              : `一覧に「${user?.displayName ?? "あなたの名前"}」と表示されます。`}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <MyButton type="submit" disabled={pending}>
-            {pending ? "送信中..." : "送信する"}
-          </MyButton>
-          {message && (
-            <p
-              role="status"
-              className={cn(
-                "text-sm",
-                isError ? "text-destructive" : "text-muted-foreground",
-              )}
-            >
-              {message}
-            </p>
-          )}
-        </div>
-      </form>
+        </form>
+      </CardContent>
     </Card>
   );
 }
@@ -316,6 +355,9 @@ function FeedbackCard({
   const [draft, setDraft] = useState(item.answer);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [confirming, setConfirming] = useState<"delete" | "unanswer" | null>(
+    null,
+  );
 
   const startEdit = () => {
     setDraft(item.answer);
@@ -337,12 +379,6 @@ function FeedbackCard({
   };
 
   const remove = async () => {
-    const what = item.isMine ? "この投稿" : "この投稿（他の人の投稿）";
-    if (
-      !window.confirm(`${what}を削除しますか？\n削除すると元に戻せません。`)
-    ) {
-      return;
-    }
     setPending(true);
     setError("");
     try {
@@ -358,36 +394,28 @@ function FeedbackCard({
   const author = item.anonymous ? "匿名" : item.authorName || "名前なし";
 
   return (
-    <Card>
-      <article className="grid gap-3">
-        <header className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span className="rounded-md border px-2 py-0.5 font-medium text-foreground">
-            {feedbackKindLabel(item.kind)}
-          </span>
-          <span
-            className={cn(
-              "rounded-md px-2 py-0.5 font-medium",
-              item.answer
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground",
-            )}
-          >
-            {item.answer ? "回答済み" : "未回答"}
-          </span>
-          <span>{author}</span>
-          {item.isMine && (
-            <span className="rounded-md bg-accent px-2 py-0.5 font-medium text-accent-foreground">
-              自分の投稿
-            </span>
+    <Card className="gap-0 py-0">
+      <article className="grid gap-3 p-4">
+        <header className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline">{feedbackKindLabel(item.kind)}</Badge>
+          {item.answer ? (
+            <Badge>
+              <CircleCheckIcon />
+              回答済み
+            </Badge>
+          ) : (
+            <Badge variant="secondary">未回答</Badge>
           )}
+          <span>{author}</span>
+          {item.isMine && <Badge variant="secondary">自分の投稿</Badge>}
           <time className="ml-auto tabular-nums" dateTime={item.createdAt}>
             {formatDateTime(item.createdAt)}
           </time>
         </header>
-        <p className="text-base break-words whitespace-pre-wrap">{item.body}</p>
+        <p className="break-words whitespace-pre-wrap">{item.body}</p>
 
         {item.answer && !editing && (
-          <div className="grid gap-1 rounded-lg border-l-4 border-primary bg-muted/50 p-3">
+          <div className="grid gap-1 rounded-lg border-l-4 border-foreground bg-muted/60 p-3">
             <p className="text-xs text-muted-foreground">
               回答：{item.answeredBy}
               {item.answeredAt && `（${formatDateTime(item.answeredAt)}）`}
@@ -405,7 +433,7 @@ function FeedbackCard({
               id={answerId}
               rows={3}
               maxLength={FEEDBACK_ANSWER_MAX}
-              className="min-h-24 text-base"
+              className="min-h-24"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               autoFocus
@@ -413,13 +441,15 @@ function FeedbackCard({
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
+                size="sm"
                 disabled={pending || !draft.trim()}
                 onClick={() => void save(draft)}
               >
-                {pending ? "保存中..." : "回答を保存"}
+                {pending ? "保存中…" : "回答を保存"}
               </Button>
               <Button
                 type="button"
+                size="sm"
                 variant="outline"
                 disabled={pending}
                 onClick={() => setEditing(false)}
@@ -429,14 +459,11 @@ function FeedbackCard({
               {item.answer && (
                 <Button
                   type="button"
+                  size="sm"
                   variant="ghost"
-                  className="ml-auto text-destructive"
+                  className="ml-auto text-destructive hover:text-destructive"
                   disabled={pending}
-                  onClick={() => {
-                    if (window.confirm("この回答を取り消しますか？")) {
-                      void save("");
-                    }
-                  }}
+                  onClick={() => setConfirming("unanswer")}
                 >
                   回答を取り消す
                 </Button>
@@ -446,7 +473,7 @@ function FeedbackCard({
         )}
 
         {!editing && (canAnswer || item.canDelete || item.isMine) && (
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 border-t pt-3">
             {canAnswer && (
               <Button
                 type="button"
@@ -464,7 +491,7 @@ function FeedbackCard({
                 size="sm"
                 className="ml-auto text-destructive hover:text-destructive"
                 disabled={pending}
-                onClick={() => void remove()}
+                onClick={() => setConfirming("delete")}
               >
                 削除
               </Button>
@@ -479,6 +506,42 @@ function FeedbackCard({
         )}
         {error && <p className="text-sm text-destructive">{error}</p>}
       </article>
+
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(open) => !open && setConfirming(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirming === "delete"
+                ? item.isMine
+                  ? "この投稿を削除しますか？"
+                  : "この投稿（他の人の投稿）を削除しますか？"
+                : "この回答を取り消しますか？"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming === "delete"
+                ? "削除すると元に戻せません。"
+                : "取り消すと、この投稿は「未回答」に戻ります。"}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                const kind = confirming;
+                setConfirming(null);
+                if (kind === "delete") void remove();
+                else void save("");
+              }}
+            >
+              {confirming === "delete" ? "削除する" : "取り消す"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

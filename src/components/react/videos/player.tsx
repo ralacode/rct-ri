@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
-import { MyButton } from "@/components/react/my-button";
+import { ChevronLeftIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/react/layout/page-header";
 import { go } from "@/lib/nav";
 import {
   formatVideoTime,
@@ -313,22 +316,29 @@ export function VideoPlayer({ fileName = "" }: { fileName?: string }) {
 
   if (!name) {
     return (
-      <div className="mx-auto grid w-full max-w-5xl gap-4">
+      <PageContainer className="max-w-5xl">
         <p className="text-sm text-destructive">
           {message || "動画が指定されていません"}
         </p>
-        <MyButton onClick={() => go(backUrl())}>一覧へ戻る</MyButton>
-      </div>
+        <Button
+          variant="outline"
+          className="justify-self-start"
+          onClick={() => go(backUrl())}
+        >
+          <ChevronLeftIcon />
+          動画一覧へ戻る
+        </Button>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-5xl content-start gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-2xl font-semibold tracking-tight">
-          {title || name}
-        </h2>
-        <MyButton
+    <PageContainer className="max-w-5xl">
+      <div className="grid gap-2">
+        <Button
+          variant="link"
+          size="sm"
+          className="justify-self-start px-0 text-muted-foreground"
           onClick={() => {
             if (leavingRef.current) return;
             leavingRef.current = true;
@@ -348,8 +358,12 @@ export function VideoPlayer({ fileName = "" }: { fileName?: string }) {
             })();
           }}
         >
-          一覧へ戻る
-        </MyButton>
+          <ChevronLeftIcon />
+          動画一覧
+        </Button>
+        <h1 className="text-2xl font-semibold tracking-tight wrap-anywhere">
+          {title || name}
+        </h1>
       </div>
       {!resumeReady && !message && (
         <p className="text-sm text-muted-foreground">
@@ -364,7 +378,7 @@ export function VideoPlayer({ fileName = "" }: { fileName?: string }) {
       <video
         key={name}
         ref={videoRef}
-        className="max-h-[70svh] w-full rounded-lg bg-black"
+        className="max-h-[70svh] w-full rounded-xl bg-black"
         src={videoContentUrl(name)}
         controls={resumeReady}
         playsInline
@@ -445,6 +459,6 @@ export function VideoPlayer({ fileName = "" }: { fileName?: string }) {
         }}
       />
       {message && <p className="text-sm text-destructive">{message}</p>}
-    </div>
+    </PageContainer>
   );
 }

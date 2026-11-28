@@ -2,8 +2,14 @@ import { Printer } from "lucide-react";
 import { useState, type FC } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card } from "@/components/ui/card";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+} from "@/components/ui/input-group";
 import {
   Select,
   SelectContent,
@@ -12,6 +18,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 
 import { ElutionRecordSheet } from "./elution-record-sheet";
 
@@ -41,68 +51,69 @@ export const ElutionRecordPrint: FC = () => {
   };
 
   return (
-    <div className="grid gap-6">
-      <div
-        className={cn(
-          "flex flex-wrap items-end justify-center gap-4 print:hidden",
-        )}
-      >
-        <div className="grid gap-2">
-          <Label htmlFor="elution-year">西暦</Label>
-          <div className="flex items-center gap-2">
-            <Input
-              id="elution-year"
-              type="number"
-              inputMode="numeric"
-              min={MIN_YEAR}
-              max={MAX_YEAR}
-              value={yearText}
-              onChange={(e) => setYearText(e.target.value)}
-              aria-invalid={!isValidYear}
-              className="h-10 w-28 text-base"
-            />
-            <span>年</span>
-          </div>
-        </div>
+    // 印刷時は帳票だけを出す（ページの余白や見出しは印刷しない）
+    <PageContainer className="max-w-5xl print:mx-0 print:block print:max-w-none print:pt-0">
+      <PageHeader
+        className="print:hidden"
+        title="ジェネレータ溶出記録"
+        description="年と月を選んで、1 か月分の溶出記録の用紙を印刷します"
+        actions={
+          <Button onClick={handlePrint} disabled={!isValidYear}>
+            <Printer />
+            印刷
+          </Button>
+        }
+      />
 
-        <div className="grid gap-2">
-          <Label htmlFor="elution-month">月</Label>
-          <div className="flex items-center gap-2">
+      <Card className="gap-0 py-0 print:hidden">
+        <div className="flex flex-wrap items-end gap-4 p-4">
+          <Field className="w-auto">
+            <FieldLabel htmlFor="elution-year">西暦</FieldLabel>
+            <InputGroup className="w-32">
+              <InputGroupInput
+                id="elution-year"
+                type="number"
+                inputMode="numeric"
+                min={MIN_YEAR}
+                max={MAX_YEAR}
+                value={yearText}
+                onChange={(e) => setYearText(e.target.value)}
+                aria-invalid={!isValidYear}
+                className="tabular-nums"
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupText>年</InputGroupText>
+              </InputGroupAddon>
+            </InputGroup>
+          </Field>
+          <Field className="w-auto">
+            <FieldLabel htmlFor="elution-month">月</FieldLabel>
             <Select
               value={String(month)}
               onValueChange={(value) => setMonth(Number(value))}
             >
-              <SelectTrigger id="elution-month" className="h-10 w-20 text-base">
+              <SelectTrigger id="elution-month" className="w-24">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                   <SelectItem key={m} value={String(m)}>
-                    {m}
+                    {m} 月
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <span>月</span>
-          </div>
+          </Field>
+          <p className="ml-auto self-center text-sm text-muted-foreground">
+            下の用紙がそのまま印刷されます
+          </p>
         </div>
-
-        <Button
-          size="lg"
-          className="h-10"
-          onClick={handlePrint}
-          disabled={!isValidYear}
-        >
-          <Printer />
-          印刷
-        </Button>
-      </div>
-
-      {!isValidYear && (
-        <p className="text-center text-sm text-destructive print:hidden">
-          西暦は {MIN_YEAR}〜{MAX_YEAR} の 4 桁で入力してください。
-        </p>
-      )}
+        {!isValidYear ? (
+          <FieldError className="px-4 pb-4">
+            西暦は {MIN_YEAR}〜{MAX_YEAR} の 4 桁で入力してください。
+          </FieldError>
+        ) : null}
+      </Card>
 
       {/* 印刷プレビュー（画面では用紙風に表示し、印刷時は帳票だけを出力する） */}
       <div className="overflow-x-auto print:overflow-visible">
@@ -118,6 +129,6 @@ export const ElutionRecordPrint: FC = () => {
           />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 };
