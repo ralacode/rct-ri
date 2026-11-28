@@ -16,10 +16,12 @@ import {
   updateTreatmentRequest,
   type TreatmentRequest,
 } from "@/lib/treatment";
-import { cn, formatDateTimeWithDay } from "@/lib/utils";
-import { Card } from "@/components/react/card";
-import { MyButton } from "@/components/react/my-button";
-import { buttonVariants } from "@/components/ui/button";
+import { CalendarDaysIcon, PencilIcon, PlusIcon } from "lucide-react";
+import { formatDateTimeWithDay } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Section } from "@/components/react/patient/section";
 import {
   TreatmentRequestDialog,
   type TreatmentRequestDraft,
@@ -146,9 +148,10 @@ export function TreatmentRequestOrderButton({
   const { canEdit, startCreate } = useTreatmentRequests();
   if (!canEdit) return null;
   return (
-    <MyButton onClick={startCreate} className={className}>
+    <Button variant="outline" onClick={startCreate} className={className}>
+      <PlusIcon />
       治療依頼オーダー
-    </MyButton>
+    </Button>
   );
 }
 
@@ -168,48 +171,59 @@ export function TreatmentRequestList() {
   const { requests, canEdit, error, startEdit } = useTreatmentRequests();
 
   return (
-    <div className="grid gap-2 content-start">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="text-2xl">治療依頼</h2>
-        {requests.length > 0 && (
-          <a
-            href={treatmentBoardHref(requests)}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "border-2 border-foreground/45",
-            )}
-          >
-            治療依頼表
-          </a>
-        )}
-      </div>
+    <Section
+      title="治療依頼"
+      count={requests.length}
+      actions={
+        requests.length > 0 && (
+          <Button asChild variant="outline" size="sm">
+            <a href={treatmentBoardHref(requests)}>
+              <CalendarDaysIcon />
+              治療依頼表
+            </a>
+          </Button>
+        )
+      }
+    >
       {error && <p className="text-sm text-destructive">{error}</p>}
       {requests.length === 0 ? (
-        <p className="text-gray-500">登録された治療依頼はありません。</p>
+        <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+          登録された治療依頼はありません。
+        </p>
       ) : (
-        <div className={cn("grid gap-4 content-start", "@lg:grid-cols-2")}>
+        <ul className="grid gap-3">
           {requests.map((request) => (
-            <Card key={request.id} className="grid gap-2 content-start">
-              <div className="flex flex-wrap gap-2">
-                <div>{formatDateTimeWithDay(request.requestDate)}</div>
-                <div>
-                  {request.slotTime}
-                  {request.slotTime === "15:30" ? " 臨時" : ""}
+            <li key={request.id}>
+              <Card className="flex-row items-center gap-4 px-4 py-3">
+                <div className="grid min-w-0 flex-1 gap-0.5">
+                  <p className="flex flex-wrap items-center gap-2 font-medium tabular-nums">
+                    {formatDateTimeWithDay(request.requestDate)}
+                    <span>{request.slotTime}</span>
+                    {request.slotTime === "15:30" && (
+                      <Badge variant="secondary">臨時</Badge>
+                    )}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {request.requestingDepartment}
+                    {request.requestingPhysician &&
+                      `・${request.requestingPhysician}`}
+                  </p>
                 </div>
-              </div>
-              <div className="text-right">
-                <div>{request.requestingDepartment}</div>
-                <div>{request.requestingPhysician}</div>
-              </div>
-              {canEdit && (
-                <div className="justify-self-end">
-                  <MyButton onClick={() => startEdit(request)}>変更</MyButton>
-                </div>
-              )}
-            </Card>
+                {canEdit && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => startEdit(request)}
+                  >
+                    <PencilIcon />
+                    変更
+                  </Button>
+                )}
+              </Card>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
-    </div>
+    </Section>
   );
 }

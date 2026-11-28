@@ -1,11 +1,58 @@
-import { useEffect, useMemo, useState } from "react";
+// src/components/react/videos/list.tsx
+//
+// 動画一覧。タイトル・ファイル名と視聴状況で絞り込める。
+// 担当者管理の権限がある人は、タイトルの編集と全員の視聴状況の確認ができる。
 
-import { Card } from "@/components/react/card";
-import { MyButton } from "@/components/react/my-button";
-import { MyInput } from "@/components/react/my-input";
+import { useEffect, useMemo, useState } from "react";
+import {
+  CircleCheckIcon,
+  FilmIcon,
+  PencilIcon,
+  PlayIcon,
+  SearchIcon,
+  SearchXIcon,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { fetchMe, type AuthUser } from "@/lib/auth";
 import { go } from "@/lib/nav";
+import { cn, errorMessage } from "@/lib/utils";
 import {
   EMPTY_VIDEO_FILTER,
   VIDEO_STATUS_OPTIONS,
@@ -23,21 +70,54 @@ import {
   type VideoItem,
   type WatchRow,
 } from "@/lib/videos";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
+import { Section } from "@components/react/patient/section";
 
-function statusLabel(item: VideoItem) {
-  if (item.completed) return "完了";
-  if (item.positionSec > 0) return "途中まで";
-  return "未視聴";
+type WatchStatus = "done" | "partial" | "none";
+
+function watchStatus(item: {
+  completed: boolean;
+  positionSec: number;
+}): WatchStatus {
+  if (item.completed) return "done";
+  if (item.positionSec > 0) return "partial";
+  return "none";
+}
+
+const STATUS_LABEL: Record<WatchStatus, string> = {
+  done: "完了",
+  partial: "途中まで",
+  none: "未視聴",
+};
+
+function StatusBadge({ status }: { status: WatchStatus }) {
+  return (
+    <Badge
+      variant={
+        status === "done"
+          ? "default"
+          : status === "partial"
+            ? "secondary"
+            : "outline"
+      }
+      className={cn(status === "none" && "text-muted-foreground")}
+    >
+      {status === "done" && <CircleCheckIcon />}
+      {STATUS_LABEL[status]}
+    </Badge>
+  );
 }
 
 export function VideoList() {
-  const [videos, setVideos] = useState<VideoItem[]>([]);
+  const [videos, setVideos] = useState<VideoItem[] | null>(null);
   const [progress, setProgress] = useState<WatchRow[]>([]);
   const [me, setMe] = useState<AuthUser | null>(null);
-  const [titleEdits, setTitleEdits] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState("");
-  const [isError, setIsError] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<VideoFilter>(EMPTY_VIDEO_FILTER);
+  const [editing, setEditing] = useState<VideoItem | null>(null);
 
   useEffect(() => {
     setFilter(readVideoFilter(window.location.search));
@@ -50,11 +130,20 @@ export function VideoList() {
     window.history.replaceState(window.history.state, "", listPageUrl(next));
   };
 
+  const all = videos ?? [];
   const visibleVideos = useMemo(
-    () => filterVideos(videos, filter),
+    () => filterVideos(all, filter),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [videos, filter],
   );
   const isFiltering = filter.q.trim() !== "" || filter.status !== "all";
+  const canManage = me?.canManageUsers ?? false;
+
+  const reload = async (nextMe: AuthUser | null = me) => {
+    const nextVideos = await listVideos();
+    setVideos(nextVideos);
+    if (nextMe?.canManageUsers) setProgress(await listVideoProgress());
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -63,239 +152,333 @@ export function VideoList() {
         const nextMe = await fetchMe();
         if (cancelled) return;
         setMe(nextMe);
-        const nextVideos = await listVideos();
-        if (cancelled) return;
-        setVideos(nextVideos);
-        setTitleEdits(
-          Object.fromEntries(
-            nextVideos.map((video) => [video.name, videoTitle(video)]),
-          ),
-        );
-        if (nextMe.canManageUsers) {
-          const nextProgress = await listVideoProgress();
-          if (cancelled) return;
-          setProgress(nextProgress);
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setIsError(true);
-          setMessage(error instanceof Error ? error.message : String(error));
-        }
+        await reload(nextMe);
+      } catch (err) {
+        if (!cancelled) setError(errorMessage(err, "読み込みに失敗しました"));
       }
     };
     void load();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSaveTitle = async (video: VideoItem) => {
+  return (
+    <PageContainer className="max-w-6xl">
+      <PageHeader title="動画" description="研修・手順の動画を見られます" />
+
+      {all.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <InputGroup className="w-full sm:w-80">
+            <InputGroupAddon>
+              <SearchIcon />
+            </InputGroupAddon>
+            <InputGroupInput
+              type="text"
+              enterKeyHint="search"
+              aria-label="動画を検索"
+              placeholder="タイトル・ファイル名（スペースで複数語）"
+              value={filter.q}
+              onChange={(event) => updateFilter({ q: event.target.value })}
+            />
+          </InputGroup>
+          <ButtonGroup aria-label="視聴状況で絞り込み">
+            {VIDEO_STATUS_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={filter.status === option.value ? "default" : "outline"}
+                aria-pressed={filter.status === option.value}
+                onClick={() => updateFilter({ status: option.value })}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </ButtonGroup>
+          <span className="ml-auto text-sm text-muted-foreground tabular-nums">
+            {isFiltering
+              ? `${all.length} 件中 ${visibleVideos.length} 件`
+              : `${all.length} 件`}
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
+
+      {videos === null && !error ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-40 rounded-xl" />
+          ))}
+        </div>
+      ) : all.length === 0 && !error ? (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <FilmIcon />
+            </EmptyMedia>
+            <EmptyTitle>動画がありません</EmptyTitle>
+            <EmptyDescription>
+              サーバー役 PC のアプリと同じ階層にある videos フォルダに、MP4
+              などのファイルを置いてください。
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : visibleVideos.length === 0 ? (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <SearchXIcon />
+            </EmptyMedia>
+            <EmptyTitle>条件に当てはまる動画はありません</EmptyTitle>
+          </EmptyHeader>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => updateFilter(EMPTY_VIDEO_FILTER)}
+          >
+            条件をクリア
+          </Button>
+        </Empty>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {visibleVideos.map((video) => (
+            <li key={video.name}>
+              <VideoCard
+                video={video}
+                canManage={canManage}
+                onPlay={() => go(watchPageUrl(video.name, filter))}
+                onEdit={() => setEditing(video)}
+              />
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {canManage && (
+        <Section
+          title="視聴状況"
+          count={progress.length}
+          description="担当者ごとの視聴の進み具合です"
+        >
+          <WatchProgressTable rows={progress} />
+        </Section>
+      )}
+
+      <TitleDialog
+        video={editing}
+        onOpenChange={(open) => !open && setEditing(null)}
+        onSaved={() => void reload()}
+      />
+    </PageContainer>
+  );
+}
+
+function VideoCard({
+  video,
+  canManage,
+  onPlay,
+  onEdit,
+}: {
+  video: VideoItem;
+  canManage: boolean;
+  onPlay: () => void;
+  onEdit: () => void;
+}) {
+  const status = watchStatus(video);
+  const percent =
+    video.durationSec > 0
+      ? Math.min(100, (video.positionSec / video.durationSec) * 100)
+      : status === "done"
+        ? 100
+        : 0;
+  return (
+    <Card className="h-full gap-3 px-4 py-4">
+      <div className="flex items-start gap-2">
+        <h2 className="min-w-0 flex-1 font-medium wrap-anywhere">
+          {videoTitle(video)}
+        </h2>
+        <StatusBadge status={status} />
+      </div>
+      {canManage && (
+        <p className="text-xs text-muted-foreground wrap-anywhere">
+          {video.name}
+        </p>
+      )}
+      <div className="grid gap-1.5">
+        <div
+          className="h-1.5 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+          aria-valuenow={Math.round(percent)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="視聴の進み具合"
+        >
+          <div
+            className="h-full rounded-full bg-primary"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {video.durationSec > 0
+            ? `${formatVideoTime(video.positionSec)} / ${formatVideoTime(video.durationSec)}`
+            : "長さ不明"}
+          {` ・ ${formatFileSize(video.size)}`}
+        </p>
+      </div>
+      <div className="mt-auto flex gap-2">
+        <Button size="sm" onClick={onPlay}>
+          <PlayIcon />
+          {status === "partial" ? "続きから再生" : "再生"}
+        </Button>
+        {canManage && (
+          <Button size="sm" variant="ghost" onClick={onEdit}>
+            <PencilIcon />
+            タイトル
+          </Button>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function WatchProgressTable({ rows }: { rows: WatchRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+        表示できる視聴状況がありません。
+      </p>
+    );
+  }
+  return (
+    <Card className="gap-0 overflow-hidden py-0">
+      <Table className="min-w-160">
+        <TableHeader>
+          <TableRow className="bg-muted/40">
+            <TableHead className="pl-4">動画</TableHead>
+            <TableHead>担当者</TableHead>
+            <TableHead>位置</TableHead>
+            <TableHead className="text-right">割合</TableHead>
+            <TableHead>状態</TableHead>
+            <TableHead className="pr-4">最終視聴</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((row) => (
+            <TableRow key={`${row.userId}-${row.fileName}`}>
+              <TableCell className="pl-4 whitespace-normal">
+                {row.title || row.fileName}
+                {row.title && row.title !== row.fileName ? (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    ({row.fileName})
+                  </span>
+                ) : null}
+              </TableCell>
+              <TableCell>
+                {row.displayName}
+                <span className="ml-1 text-xs text-muted-foreground">
+                  {row.userId}
+                </span>
+              </TableCell>
+              <TableCell className="tabular-nums">
+                {formatVideoTime(row.positionSec)}
+                {row.durationSec > 0
+                  ? ` / ${formatVideoTime(row.durationSec)}`
+                  : ""}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {Math.round(row.percent)}%
+              </TableCell>
+              <TableCell>
+                <StatusBadge status={watchStatus(row)} />
+              </TableCell>
+              <TableCell className="pr-4 tabular-nums">
+                {row.updatedAt ?? "—"}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
+function TitleDialog({
+  video,
+  onOpenChange,
+  onSaved,
+}: {
+  video: VideoItem | null;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    if (!video) return;
+    setTitle(videoTitle(video));
+    setError(null);
+  }, [video]);
+
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!video) return;
+    setPending(true);
     try {
-      await saveVideoTitle({
-        fileName: video.name,
-        title: titleEdits[video.name] ?? videoTitle(video),
-      });
-      const nextVideos = await listVideos();
-      setVideos(nextVideos);
-      setTitleEdits(
-        Object.fromEntries(
-          nextVideos.map((item) => [item.name, videoTitle(item)]),
-        ),
-      );
-      if (me?.canManageUsers) {
-        setProgress(await listVideoProgress());
-      }
-      setIsError(false);
-      setMessage("タイトルを保存しました");
-    } catch (error) {
-      setIsError(true);
-      setMessage(error instanceof Error ? error.message : String(error));
+      await saveVideoTitle({ fileName: video.name, title });
+      toast.success("タイトルを保存しました");
+      onSaved();
+      onOpenChange(false);
+    } catch (err) {
+      setError(errorMessage(err, "保存に失敗しました。"));
+    } finally {
+      setPending(false);
     }
   };
 
   return (
-    <div className="grid gap-6">
-      {videos.length > 0 && (
-        <Card>
-          <div className="flex flex-wrap items-end gap-x-4 gap-y-3">
-            <MyInput
-              id="video-search"
-              label="検索"
-              type="search"
-              placeholder="タイトル・ファイル名（スペース区切りで複数語）"
-              className="w-full @3xl:w-auto @3xl:max-w-md @3xl:flex-1"
-              value={filter.q}
-              onChange={(event) => updateFilter({ q: event.target.value })}
+    <Dialog open={video !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <form onSubmit={save} className="grid gap-5">
+          <DialogHeader>
+            <DialogTitle>タイトルを編集</DialogTitle>
+            <DialogDescription className="wrap-anywhere">
+              ファイル名：{video?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <Field>
+            <FieldLabel htmlFor="video-title">タイトル</FieldLabel>
+            <Input
+              id="video-title"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="空欄にするとファイル名を表示します"
             />
-            <div
-              className="flex flex-wrap items-center gap-2"
-              role="group"
-              aria-label="視聴状況で絞り込み"
-            >
-              {VIDEO_STATUS_OPTIONS.map((option) => (
-                <Button
-                  key={option.value}
-                  type="button"
-                  size="lg"
-                  className="h-10"
-                  variant={
-                    filter.status === option.value ? "default" : "outline"
-                  }
-                  aria-pressed={filter.status === option.value}
-                  onClick={() => updateFilter({ status: option.value })}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-            <span className="ml-auto self-center text-sm text-muted-foreground @3xl:self-end @3xl:pb-2.5">
-              {isFiltering
-                ? `${videos.length} 件中 ${visibleVideos.length} 件`
-                : `${videos.length} 件`}
-            </span>
-          </div>
-        </Card>
-      )}
-
-      <Card>
-        <div className="grid gap-4">
-          <h2 className="text-lg font-semibold tracking-tight">動画一覧</h2>
-          {videos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              動画がありません。サーバー役 PC のアプリと同じ階層にある videos
-              フォルダに、MP4 などのファイルを置いてください。
+          </Field>
+          {error && (
+            <p className="text-sm text-destructive" role="alert">
+              {error}
             </p>
-          ) : visibleVideos.length === 0 ? (
-            <div className="grid justify-items-start gap-2">
-              <p className="text-sm text-muted-foreground">
-                該当する動画がありません。
-              </p>
-              <MyButton onClick={() => updateFilter(EMPTY_VIDEO_FILTER)}>
-                条件をクリア
-              </MyButton>
-            </div>
-          ) : (
-            <ul className="grid gap-3 @3xl:grid-cols-2 @6xl:grid-cols-3">
-              {visibleVideos.map((video) => (
-                <li
-                  key={video.name}
-                  className="flex min-w-0 flex-col gap-3 rounded-lg border p-3 wrap-anywhere"
-                >
-                  {me?.canManageUsers ? (
-                    <>
-                      <MyInput
-                        id={`video-title-${video.name}`}
-                        label="タイトル"
-                        value={titleEdits[video.name] ?? videoTitle(video)}
-                        onChange={(event) =>
-                          setTitleEdits((prev) => ({
-                            ...prev,
-                            [video.name]: event.target.value,
-                          }))
-                        }
-                      />
-                      <p className="text-sm text-muted-foreground">
-                        ファイル名: {video.name}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="font-medium">{videoTitle(video)}</p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {statusLabel(video)}
-                    {video.durationSec > 0
-                      ? ` ・ ${formatVideoTime(video.positionSec)} / ${formatVideoTime(video.durationSec)}`
-                      : ""}
-                    {` ・ ${formatFileSize(video.size)}`}
-                  </p>
-                  <div className="mt-auto flex flex-wrap gap-2">
-                    {me?.canManageUsers && (
-                      <MyButton onClick={() => void handleSaveTitle(video)}>
-                        タイトルを保存
-                      </MyButton>
-                    )}
-                    <MyButton onClick={() => go(watchPageUrl(video.name, filter))}>
-                      再生
-                    </MyButton>
-                  </div>
-                </li>
-              ))}
-            </ul>
           )}
-        </div>
-      </Card>
-
-      {me?.canManageUsers && (
-        <Card>
-          <div className="grid gap-4">
-            <h2 className="text-lg font-semibold tracking-tight">視聴状況</h2>
-            {progress.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                表示できる視聴状況がありません。
-              </p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-160 text-left text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="py-2 pr-3 font-medium">動画</th>
-                      <th className="py-2 pr-3 font-medium">担当者</th>
-                      <th className="py-2 pr-3 font-medium">位置</th>
-                      <th className="py-2 pr-3 font-medium">割合</th>
-                      <th className="py-2 pr-3 font-medium">状態</th>
-                      <th className="py-2 font-medium">最終視聴</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {progress.map((row) => (
-                      <tr
-                        key={`${row.userId}-${row.fileName}`}
-                        className="border-b last:border-b-0"
-                      >
-                        <td className="py-2 pr-3">
-                          {row.title || row.fileName}
-                          {row.title && row.title !== row.fileName ? (
-                            <span className="ml-1 text-muted-foreground">
-                              ({row.fileName})
-                            </span>
-                          ) : null}
-                        </td>
-                        <td className="py-2 pr-3">
-                          {row.displayName}
-                          <span className="ml-1 text-muted-foreground">
-                            {row.userId}
-                          </span>
-                        </td>
-                        <td className="py-2 pr-3">
-                          {formatVideoTime(row.positionSec)}
-                          {row.durationSec > 0
-                            ? ` / ${formatVideoTime(row.durationSec)}`
-                            : ""}
-                        </td>
-                        <td className="py-2 pr-3">{Math.round(row.percent)}%</td>
-                        <td className="py-2 pr-3">
-                          {row.completed
-                            ? "完了"
-                            : row.positionSec > 0
-                              ? "途中まで"
-                              : "未視聴"}
-                        </td>
-                        <td className="py-2">{row.updatedAt ?? "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {message && (
-        <p className={isError ? "text-sm text-destructive" : "text-sm text-muted-foreground"}>
-          {message}
-        </p>
-      )}
-    </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button" variant="outline" disabled={pending}>
+                キャンセル
+              </Button>
+            </DialogClose>
+            <Button type="submit" disabled={pending}>
+              {pending ? "保存中…" : "保存する"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

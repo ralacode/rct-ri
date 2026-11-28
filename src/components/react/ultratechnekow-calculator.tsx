@@ -1,10 +1,14 @@
 // src/components/react/ultratechnekow-calculator.tsx
+//
+// ウルトラテクネカウ（99Mo-99mTc ジェネレータ）の減衰計算。
+// 検定日時と検定時放射能から、翌日以降の 12:00 の推定放射能を出す。
 
-import { useMemo, useState, type FC } from "react";
-import { Card } from "@components/react/card";
-import { DatePickerTime } from "@components/react/date-picker-time";
-import { format, parse } from "date-fns";
-import { cn, formatDateJapanese } from "@/lib/utils";
+import { useId, useMemo, useState } from "react";
+import { format, isValid, parse } from "date-fns";
+
+import { Card, CardContent } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -21,106 +25,135 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { calculateMo99Decay } from "@/lib/mo99-decay";
+import { formatDateJapanese } from "@/lib/utils";
+import { DateField } from "@components/react/form/date-field";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 
-export const UltraTechnekowCalculator: FC = () => {
-  const [calibrationDate, setCalibrationDate] = useState(() => {
-    // 既存のフォーマット "yyyy / MM / dd" に合わせて今日の文字列を生成
-    return format(new Date(), "yyyy/MM/dd");
-  });
-  const [calibrationTime, setCalibrationTime] = useState<string>("12:00");
-  const [calibrationActivity, setCalibrationActivity] = useState<string>("925");
+const ACTIVITY_OPTIONS = [
+  { label: "925 MBq", value: "925" },
+  { label: "1.85 GBq", value: "1850" },
+  { label: "3.7 GBq", value: "3700" },
+];
 
-  const activityOptions = [
-    { label: "925 MBq", value: "925" },
-    { label: "1.85 GBq", value: "1850" },
-    { label: "3.7 GBq", value: "3700" },
-  ];
-
-  // const results = [
-  //   { day: "+1日", date: "2026/08/02", activity: "902 MBq" },
-  //   { day: "+2日", date: "2026/08/03", activity: "879 MBq" },
-  //   { day: "+3日", date: "2026/08/04", activity: "856 MBq" },
-  // ];
+export function UltraTechnekowCalculator() {
+  const id = useId();
+  const [calibrationDate, setCalibrationDate] = useState(() =>
+    format(new Date(), "yyyy-MM-dd"),
+  );
+  const [calibrationTime, setCalibrationTime] = useState("12:00");
+  const [calibrationActivity, setCalibrationActivity] = useState("925");
 
   const results = useMemo(() => {
+    const date = parse(calibrationDate, "yyyy-MM-dd", new Date());
+    if (!isValid(date) || !calibrationTime) return [];
+    // 計算は "yyyy/MM/dd" で受け取る
     return calculateMo99Decay(
-      calibrationDate,
+      format(date, "yyyy/MM/dd"),
       calibrationTime,
       Number(calibrationActivity),
     );
   }, [calibrationDate, calibrationTime, calibrationActivity]);
 
   return (
-    <div className={cn("@container")}>
-      <Card className={cn("grid gap-4", "@lg:mx-auto @lg:max-w-md")}>
-        <DatePickerTime
-          valueString={calibrationDate}
-          timeString={calibrationTime}
-          onChange={setCalibrationDate}
-          onChangeTime={(e) => setCalibrationTime(e.target.value)}
-          dateText="検定日"
-          timeText="時間"
-          className={cn("@md:grid @md:grid-flow-col")}
-        />
+    <PageContainer className="max-w-2xl">
+      <PageHeader
+        title="ウルトラテクネカウ減衰計算"
+        description="検定日時と検定時放射能から、各日 12:00 の推定放射能を計算します"
+      />
 
-        {/* 検定時放射能 */}
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">検定時放射能</label>
+      <Card className="py-0">
+        <CardContent className="py-6">
+          <FieldGroup className="gap-5">
+            <div className="grid gap-5 sm:grid-cols-[1fr_auto]">
+              <Field>
+                <FieldLabel htmlFor={`${id}-date`}>検定日</FieldLabel>
+                <DateField
+                  id={`${id}-date`}
+                  value={calibrationDate}
+                  onChange={setCalibrationDate}
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor={`${id}-time`}>検定時刻</FieldLabel>
+                <Input
+                  id={`${id}-time`}
+                  type="time"
+                  value={calibrationTime}
+                  onChange={(e) => setCalibrationTime(e.target.value)}
+                  className="w-32 tabular-nums [&::-webkit-calendar-picker-indicator]:hidden"
+                />
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel htmlFor={`${id}-activity`}>検定時放射能</FieldLabel>
+              <Select
+                value={calibrationActivity}
+                onValueChange={setCalibrationActivity}
+              >
+                <SelectTrigger id={`${id}-activity`} className="w-full sm:w-48">
+                  <SelectValue placeholder="放射能を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ACTIVITY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+          </FieldGroup>
+        </CardContent>
+      </Card>
 
-          <Select
-            value={calibrationActivity}
-            onValueChange={setCalibrationActivity}
-          >
-            <SelectTrigger
-              className={cn("h-auto min-h-10 px-3 py-3 text-base")}
-            >
-              <SelectValue placeholder="放射能を選択" />
-            </SelectTrigger>
-
-            <SelectContent>
-              {activityOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <label className="text-sm font-medium">
-            推定放射能（12:00の放射能）
-          </label>
-
-          <div className={cn("rounded-md border")}>
-            <Table>
-              <TableHeader>
+      <section className="grid gap-3">
+        <h2 className="text-lg font-semibold">推定放射能（各日 12:00）</h2>
+        <Card className="gap-0 overflow-hidden py-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/40">
+                <TableHead className="pl-4">経過日数</TableHead>
+                <TableHead>日付</TableHead>
+                <TableHead className="pr-4 text-right">放射能</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {results.length === 0 ? (
                 <TableRow>
-                  <TableHead>経過日数</TableHead>
-                  <TableHead>日付</TableHead>
-                  <TableHead className="text-right">放射能</TableHead>
+                  <TableCell
+                    colSpan={3}
+                    className="py-6 text-center text-muted-foreground"
+                  >
+                    検定日と検定時刻を入力してください
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {results.map((result) => (
+              ) : (
+                results.map((result) => (
                   <TableRow key={result.date}>
-                    <TableCell className="text-base">+{result.day}日</TableCell>
-                    <TableCell className="text-base">
+                    <TableCell className="pl-4 tabular-nums">
+                      +{result.day}日
+                    </TableCell>
+                    <TableCell className="tabular-nums">
                       {formatDateJapanese(
                         parse(result.date, "yyyy/MM/dd", new Date()),
                       )}
                     </TableCell>
-                    <TableCell className="font-medium text-right text-base">
-                      {result.activity} MBq
+                    <TableCell className="pr-4 text-right font-semibold tabular-nums">
+                      {result.activity}{" "}
+                      <span className="font-normal text-muted-foreground">
+                        MBq
+                      </span>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </div>
-      </Card>
-    </div>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Card>
+      </section>
+    </PageContainer>
   );
-};
+}

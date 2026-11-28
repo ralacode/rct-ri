@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 
 import { ModalityPicker } from "@/components/react/auth/modality-picker";
-import { Card } from "@/components/react/card";
-import { MyButton } from "@/components/react/my-button";
-import { MyInput } from "@/components/react/my-input";
+import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   fetchAuthStatus,
   listPublicModalities,
@@ -12,6 +17,8 @@ import {
 } from "@/lib/auth";
 import { go } from "@/lib/nav";
 import { RADIATION_THERAPY_CODE, RI_CODE } from "@/lib/permissions";
+
+import { AuthCard } from "./auth-card";
 
 export function SetupForm() {
   const [userId, setUserId] = useState("");
@@ -84,79 +91,97 @@ export function SetupForm() {
   };
 
   return (
-    <Card className="w-full">
-      <form className="grid gap-4" autoComplete="off" onSubmit={handleSubmit}>
-        <div className="grid gap-1">
-          <p className="text-sm text-muted-foreground">初期設定 1 / 2</p>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            初期管理者の作成
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            最初の担当者アカウントを作成します。この画面はユーザーが0人のときだけ表示されます。
+    <AuthCard
+      step="初期設定 1 / 2"
+      title="初期管理者の作成"
+      description="最初の担当者アカウントを作成します。この画面はユーザーが 0 人のときだけ表示されます。"
+    >
+      <form className="grid gap-5" autoComplete="off" onSubmit={handleSubmit}>
+        <FieldGroup className="gap-4">
+          <Field>
+            <FieldLabel htmlFor="staff-setup-id">ユーザーID</FieldLabel>
+            <Input
+              id="staff-setup-id"
+              name="rct-no-store"
+              required
+              inputMode="numeric"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              maxLength={8}
+              className="tabular-nums"
+              value={userId}
+              onChange={(event) => setUserId(event.target.value)}
+            />
+            <FieldDescription>8 桁の数字</FieldDescription>
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="lastName">姓</FieldLabel>
+              <Input
+                id="lastName"
+                required
+                autoComplete="family-name"
+                value={lastName}
+                onChange={(event) => setLastName(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="firstName">名</FieldLabel>
+              <Input
+                id="firstName"
+                required
+                autoComplete="given-name"
+                value={firstName}
+                onChange={(event) => setFirstName(event.target.value)}
+              />
+            </Field>
+          </div>
+          <ModalityPicker
+            modalities={modalities}
+            selectedIds={modalityIds}
+            onChange={setModalityIds}
+            idPrefix="setup-modality"
+          />
+          <Field>
+            <FieldLabel htmlFor="password">パスワード</FieldLabel>
+            <Input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+            <FieldDescription>8 文字以上</FieldDescription>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="confirm">パスワード（確認）</FieldLabel>
+            <Input
+              id="confirm"
+              type="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(event) => setConfirm(event.target.value)}
+            />
+          </Field>
+        </FieldGroup>
+        {message && (
+          <p className="text-sm text-destructive" role="alert">
+            {message}
           </p>
-        </div>
-        <MyInput
-          id="staff-setup-id"
-          name="rct-no-store"
-          label="ユーザーID（8桁の数字）"
-          required
-          inputMode="numeric"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          maxLength={8}
-          value={userId}
-          onChange={(event) => setUserId(event.target.value)}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <MyInput
-            id="lastName"
-            label="姓"
-            required
-            autoComplete="family-name"
-            value={lastName}
-            onChange={(event) => setLastName(event.target.value)}
-          />
-          <MyInput
-            id="firstName"
-            label="名"
-            required
-            autoComplete="given-name"
-            value={firstName}
-            onChange={(event) => setFirstName(event.target.value)}
-          />
-        </div>
-        <ModalityPicker
-          modalities={modalities}
-          selectedIds={modalityIds}
-          onChange={setModalityIds}
-          idPrefix="setup-modality"
-        />
-        <MyInput
-          id="password"
-          label="パスワード（8文字以上）"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
-        <MyInput
-          id="confirm"
-          label="パスワード（確認）"
-          type="password"
-          required
-          minLength={8}
-          autoComplete="new-password"
-          value={confirm}
-          onChange={(event) => setConfirm(event.target.value)}
-        />
-        {message && <p className="text-sm text-destructive">{message}</p>}
-        <MyButton type="submit" disabled={pending || modalities.length === 0}>
-          {pending ? "作成中..." : "作成してログイン"}
-        </MyButton>
+        )}
+        <Button
+          type="submit"
+          disabled={pending || modalities.length === 0}
+          className="w-full"
+        >
+          {pending ? "作成中…" : "作成してログイン"}
+        </Button>
       </form>
-    </Card>
+    </AuthCard>
   );
 }

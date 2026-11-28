@@ -1,98 +1,135 @@
 // src/components/react/patient/list.tsx
+//
+// 患者一覧ページ。最近登録した患者を新しい順に表示する（すべての患者は「患者検索」で探す）。
+
 import { useEffect, useState } from "react";
+import { SearchIcon, UserPlusIcon, UsersIcon } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { invoke } from "@/lib/api";
 import { onDataChanged } from "@/lib/live";
 import type { Patient } from "@/types/patient";
-import { FadeIn } from "../fade-in";
-import { cn } from "@/lib/utils";
-import { PulseAnimation } from "../pulse-animation";
-import { PatientCard } from "./patient-card";
+import {
+  PageContainer,
+  PageHeader,
+} from "@components/react/layout/page-header";
 
-export const PatientList = () => {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [showSkeleton, setShowSkeleton] = useState<boolean>(false);
+import { PatientRow, PatientRowSkeleton } from "./patient-row";
+
+/** 一覧に出す件数 */
+const RECENT_COUNT = 6;
+
+export function PatientList() {
+  const [patients, setPatients] = useState<Patient[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchPatients = async (silent = false) => {
+  const fetchPatients = async () => {
     try {
-      if (!silent) setIsLoading(true);
+      // 登録日の新しい順に返ってくる
       const data = await invoke<Patient[]>("get_patients");
       setPatients(data);
       setError(null);
     } catch (err) {
-      setError(err as string);
       console.error(err);
-    } finally {
-      if (!silent) setIsLoading(false);
+      setError(String(err));
     }
   };
 
   useEffect(() => {
-    fetchPatients();
-    const stop = onDataChanged(() => fetchPatients(true));
-
-    const timer = setTimeout(() => {
-      setShowSkeleton(true);
-    }, 150);
-
-    return () => {
-      stop();
-      clearTimeout(timer);
-    };
+    void fetchPatients();
+    return onDataChanged(() => void fetchPatients());
   }, []);
 
-  if (error) return <div className="text-red-500">エラー: {error}</div>;
-
-  // 🚀 1. 読み込み中はダミー（PulseAnimation）を即座に表示する
-  if (isLoading && showSkeleton) {
-    return (
-      <div className={cn("@container")}>
-        <div className={cn("grid gap-4 content-start", "@md:grid-cols-2")}>
-          <PulseAnimation />
-          <PulseAnimation />
-          <PulseAnimation />
-          <PulseAnimation />
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoading && !showSkeleton) {
-    return <div className="min-h-50" />; // 高さがガタつかないように最低限の余白だけ確保して静かに待つ
-  }
-
-  // 🚀 2. 読み込みが終わり、かつデータが本当に1件もない場合
-  if (patients.length === 0) {
-    return (
-      <div className="py-4 text-center text-muted-foreground">
-        登録されている患者はいません。
-      </div>
-    );
-  }
+  const recent = patients?.slice(0, RECENT_COUNT) ?? [];
 
   return (
-    <ul
-      className={cn(
-        "grid gap-4 content-start",
-        "@md:grid-cols-2",
-        "@xl:grid-cols-3",
+    <PageContainer>
+      <PageHeader
+        title="患者一覧"
+        description={`最近登録した ${RECENT_COUNT} 人を新しい順に表示しています`}
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <a href="/patient/search/">
+                <SearchIcon />
+                患者検索
+              </a>
+            </Button>
+            <Button asChild>
+              <a href="/patient/register/">
+                <UserPlusIcon />
+                患者を登録
+              </a>
+            </Button>
+          </>
+        }
+      />
+
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          患者一覧を読み込めませんでした：{error}
+        </p>
+      ) : patients === null ? (
+        <PatientListSkeleton />
+      ) : patients.length === 0 ? (
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <UsersIcon />
+            </EmptyMedia>
+            <EmptyTitle>登録されている患者はいません</EmptyTitle>
+            <EmptyDescription>
+              「患者を登録」から最初の患者を登録してください。
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <Button asChild size="sm">
+              <a href="/patient/register/">
+                <UserPlusIcon />
+                患者を登録
+              </a>
+            </Button>
+          </EmptyContent>
+        </Empty>
+      ) : (
+        <>
+          <ul className="grid gap-3">
+            {recent.map((patient) => (
+              <li key={patient.id}>
+                <PatientRow patient={patient} />
+              </li>
+            ))}
+          </ul>
+          {patients.length > RECENT_COUNT && (
+            <p className="text-center text-sm text-muted-foreground">
+              ほかに {patients.length - RECENT_COUNT} 人が登録されています。
+              <Button asChild variant="link" size="sm" className="px-1">
+                <a href="/patient/search/">患者検索で探す</a>
+              </Button>
+            </p>
+          )}
+        </>
       )}
-    >
-      {patients.slice(0, 6).map((p) => (
-        <li key={p.id}>
-          <a
-            href={`/patient/detail/?id=${p.patient_id}`}
-            className={cn(
-              "block rounded-xl transition-colors duration-200 hover:bg-accent",
-            )}
-          >
-            <FadeIn>
-              <PatientCard patient={p} />
-            </FadeIn>
-          </a>
+    </PageContainer>
+  );
+}
+
+function PatientListSkeleton() {
+  return (
+    <ul className="grid gap-3" aria-busy="true" aria-label="読み込み中">
+      {[0, 1, 2, 3].map((i) => (
+        <li key={i}>
+          <PatientRowSkeleton />
         </li>
       ))}
     </ul>
   );
-};
+}
