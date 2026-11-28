@@ -1,7 +1,8 @@
-// 設定画面。いまは施設名だけを変更できる（担当者管理権限が必要）。
+// 設定画面の施設名（担当者管理権限が必要）。バックアップの設定は backup-settings.tsx。
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
+import { BackupSettings } from "@/components/react/backup-settings";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -91,6 +92,7 @@ export function SettingsPage() {
           </CardFooter>
         </form>
       </Card>
+      <BackupSettings />
     </PageContainer>
   );
 }
