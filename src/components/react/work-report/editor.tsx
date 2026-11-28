@@ -2,10 +2,11 @@
 import { ArrowLeft, Download, Paperclip, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Card } from "@/components/react/card";
-import { MyInput } from "@/components/react/my-input";
+import { Card, CardContent } from "@/components/ui/card";
+import { LabeledInput } from "@/components/react/work-report/labeled-input";
 import { StatusBadge } from "@/components/react/work-report/list";
 import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/react/layout/page-header";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchMe } from "@/lib/auth";
@@ -96,7 +97,7 @@ function DateTimeField({
   onChange: (value: string) => void;
 }) {
   return (
-    <MyInput
+    <LabeledInput
       id={id}
       label={label}
       type="datetime-local"
@@ -119,43 +120,45 @@ function FilePreview({ report }: { report: WorkReport }) {
   if (!current) return null;
   return (
     <Card className="lg:sticky lg:top-0">
-      <div className="grid gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-semibold">原本</h3>
-          {previewable.length > 1 && (
-            <select
-              className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
-              value={current.id}
-              onChange={(event) => setSelected(Number(event.target.value))}
-            >
-              {previewable.map((file) => (
-                <option key={file.id} value={file.id}>
-                  {file.fileName}
-                </option>
-              ))}
-            </select>
+      <CardContent>
+        <div className="grid gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-semibold">原本</h3>
+            {previewable.length > 1 && (
+              <select
+                className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+                value={current.id}
+                onChange={(event) => setSelected(Number(event.target.value))}
+              >
+                {previewable.map((file) => (
+                  <option key={file.id} value={file.id}>
+                    {file.fileName}
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button asChild variant="outline" size="sm" className="ml-auto">
+              <a href={downloadUrl(current.id)} download={current.fileName}>
+                <Download />
+                ダウンロード
+              </a>
+            </Button>
+          </div>
+          {current.contentType === "application/pdf" ? (
+            <iframe
+              title={current.fileName}
+              src={fileUrl(current.id)}
+              className="h-[75svh] w-full rounded-md border bg-white"
+            />
+          ) : (
+            <img
+              src={fileUrl(current.id)}
+              alt={current.fileName}
+              className="max-h-[75svh] w-full rounded-md border object-contain"
+            />
           )}
-          <Button asChild variant="outline" size="sm" className="ml-auto">
-            <a href={downloadUrl(current.id)} download={current.fileName}>
-              <Download />
-              ダウンロード
-            </a>
-          </Button>
         </div>
-        {current.contentType === "application/pdf" ? (
-          <iframe
-            title={current.fileName}
-            src={fileUrl(current.id)}
-            className="h-[75svh] w-full rounded-md border bg-white"
-          />
-        ) : (
-          <img
-            src={fileUrl(current.id)}
-            alt={current.fileName}
-            className="max-h-[75svh] w-full rounded-md border object-contain"
-          />
-        )}
-      </div>
+      </CardContent>
     </Card>
   );
 }
@@ -373,7 +376,7 @@ export function WorkReportEditor() {
   );
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
+    <PageContainer className="max-w-7xl grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="ghost" size="lg" onClick={() => go("/work-report/")}>
           <ArrowLeft />
@@ -412,248 +415,258 @@ export function WorkReportEditor() {
           )}
 
           <Card>
-            <div className="grid gap-4">
-              <h3 className="font-semibold">装置・件名</h3>
-              <label className="grid gap-1.5 text-sm font-medium">
-                装置
-                <select
-                  className={selectClass}
-                  value={form.deviceId ?? ""}
-                  onChange={(event) =>
-                    set(
-                      "deviceId",
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
-                >
-                  <option value="">選んでください</option>
-                  {options.devices.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                      {item.serialNo ? ` [${item.serialNo}]` : ""}
-                      {item.manufacturerName
-                        ? `（${item.manufacturerName}）`
-                        : ""}
-                    </option>
-                  ))}
-                </select>
-                {options.devices.length === 0 && (
-                  <span className="font-normal text-muted-foreground">
-                    装置は「装置・担当者の設定」で登録できます（PDF
-                    を取り込むと自動で登録されます）
-                  </span>
-                )}
-              </label>
-              <MyInput
-                id="wr-title"
-                label="件名"
-                value={form.title}
-                onChange={(event) => set("title", event.target.value)}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <MyInput
-                  id="wr-work-type"
-                  label="作業区分"
-                  list="wr-work-types"
-                  value={form.workType}
-                  onChange={(event) => set("workType", event.target.value)}
-                />
-                <datalist id="wr-work-types">
-                  {WORK_TYPES.map((type) => (
-                    <option key={type} value={type} />
-                  ))}
-                </datalist>
-                <div className="grid gap-1">
-                  <MyInput
-                    id="wr-order-no"
-                    label="作業指示番号"
-                    value={form.workOrderNo}
-                    aria-invalid={!!duplicate || undefined}
-                    onChange={(event) => set("workOrderNo", event.target.value)}
-                  />
-                  {duplicate && (
-                    <a
-                      className="text-sm text-destructive underline underline-offset-4"
-                      href={`/work-report/edit/?id=${duplicate.id}`}
-                    >
-                      登録済みの報告書と同じです
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="grid gap-4">
-              <h3 className="font-semibold">作業日時</h3>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <DateTimeField
-                  id="wr-failure"
-                  label="障害発生日時"
-                  value={form.failureAt}
-                  onChange={(value) => set("failureAt", value)}
-                />
-                <DateTimeField
-                  id="wr-arrival"
-                  label="到着日時"
-                  value={form.arrivalAt}
-                  onChange={(value) => set("arrivalAt", value)}
-                />
-                <DateTimeField
-                  id="wr-recovery"
-                  label="装置復帰"
-                  value={form.recoveryAt}
-                  onChange={(value) => set("recoveryAt", value)}
-                />
-                <DateTimeField
-                  id="wr-departure"
-                  label="退出日時"
-                  value={form.departureAt}
-                  onChange={(value) => set("departureAt", value)}
-                />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="grid gap-4">
-              <h3 className="font-semibold">作業内容</h3>
-              <div className="grid gap-1.5">
-                <Label htmlFor="wr-content">作業内容</Label>
-                <Textarea
-                  id="wr-content"
-                  className="min-h-40"
-                  value={form.workContent}
-                  onChange={(event) => set("workContent", event.target.value)}
-                />
-              </div>
-              <div className="grid gap-1.5">
-                <Label htmlFor="wr-notes">連絡事項</Label>
-                <Textarea
-                  id="wr-notes"
-                  value={form.notes}
-                  onChange={(event) => set("notes", event.target.value)}
-                />
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <div className="grid gap-4">
-              <h3 className="font-semibold">担当者</h3>
-              <div className="grid gap-2">
-                <span className="text-sm font-medium">
-                  作業担当者（メーカー）
-                </span>
-                <div className="flex flex-wrap gap-2">
-                  {form.engineerIds.map((id, index) => (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1 rounded-full border bg-muted px-3 py-1 text-sm"
-                    >
-                      {engineerName(id)}
-                      {index > 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          共同
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        aria-label={`${engineerName(id)} を外す`}
-                        className="rounded-full p-0.5 hover:bg-background"
-                        onClick={() =>
-                          set(
-                            "engineerIds",
-                            form.engineerIds.filter((item) => item !== id),
-                          )
-                        }
-                      >
-                        <X className="size-3.5" />
-                      </button>
-                    </span>
-                  ))}
-                  {form.engineerIds.length === 0 && (
-                    <span className="text-sm text-muted-foreground">
-                      未選択
-                    </span>
-                  )}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
+            <CardContent>
+              <div className="grid gap-4">
+                <h3 className="font-semibold">装置・件名</h3>
+                <label className="grid gap-1.5 text-sm font-medium">
+                  装置
                   <select
-                    aria-label="作業担当者を追加"
                     className={selectClass}
-                    value={engineerToAdd}
-                    onChange={(event) => {
-                      const id = Number(event.target.value);
-                      if (id) set("engineerIds", [...form.engineerIds, id]);
-                      setEngineerToAdd("");
-                    }}
+                    value={form.deviceId ?? ""}
+                    onChange={(event) =>
+                      set(
+                        "deviceId",
+                        event.target.value ? Number(event.target.value) : null,
+                      )
+                    }
                   >
-                    <option value="">一覧から追加...</option>
-                    {addableEngineers.map((item) => (
+                    <option value="">選んでください</option>
+                    {options.devices.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
+                        {item.serialNo ? ` [${item.serialNo}]` : ""}
                         {item.manufacturerName
                           ? `（${item.manufacturerName}）`
                           : ""}
                       </option>
                     ))}
                   </select>
-                  <div className="flex gap-2">
-                    <input
-                      aria-label="新しい作業担当者の氏名"
-                      placeholder="新しい人の氏名"
-                      className="h-10 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-base"
-                      value={newEngineer}
-                      onChange={(event) => setNewEngineer(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          void addNewEngineer();
-                        }
-                      }}
+                  {options.devices.length === 0 && (
+                    <span className="font-normal text-muted-foreground">
+                      装置は「装置・担当者の設定」で登録できます（PDF
+                      を取り込むと自動で登録されます）
+                    </span>
+                  )}
+                </label>
+                <LabeledInput
+                  id="wr-title"
+                  label="件名"
+                  value={form.title}
+                  onChange={(event) => set("title", event.target.value)}
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <LabeledInput
+                    id="wr-work-type"
+                    label="作業区分"
+                    list="wr-work-types"
+                    value={form.workType}
+                    onChange={(event) => set("workType", event.target.value)}
+                  />
+                  <datalist id="wr-work-types">
+                    {WORK_TYPES.map((type) => (
+                      <option key={type} value={type} />
+                    ))}
+                  </datalist>
+                  <div className="grid gap-1">
+                    <LabeledInput
+                      id="wr-order-no"
+                      label="作業指示番号"
+                      value={form.workOrderNo}
+                      aria-invalid={!!duplicate || undefined}
+                      onChange={(event) =>
+                        set("workOrderNo", event.target.value)
+                      }
                     />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-10"
-                      disabled={!newEngineer.trim()}
-                      onClick={() => void addNewEngineer()}
-                    >
-                      登録して追加
-                    </Button>
+                    {duplicate && (
+                      <a
+                        className="text-sm text-destructive underline underline-offset-4"
+                        href={`/work-report/edit/?id=${duplicate.id}`}
+                      >
+                        登録済みの報告書と同じです
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
 
-              <label className="grid gap-1.5 text-sm font-medium">
-                担当技師
-                <select
-                  className={selectClass}
-                  value={form.staffUserId ?? ""}
-                  onChange={(event) =>
-                    set(
-                      "staffUserId",
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
-                >
-                  <option value="">選んでください</option>
-                  {options.staff.map((person) => (
-                    <option key={person.id} value={person.id}>
-                      {person.name}
-                    </option>
-                  ))}
-                </select>
-                {staffUnmatched && (
-                  <span className="font-normal text-amber-700 dark:text-amber-300">
-                    報告書には「{report.staffNameRaw}
-                    」とあります。担当者一覧から選んで保存すると、次からは自動で選びます。
+          <Card>
+            <CardContent>
+              <div className="grid gap-4">
+                <h3 className="font-semibold">作業日時</h3>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <DateTimeField
+                    id="wr-failure"
+                    label="障害発生日時"
+                    value={form.failureAt}
+                    onChange={(value) => set("failureAt", value)}
+                  />
+                  <DateTimeField
+                    id="wr-arrival"
+                    label="到着日時"
+                    value={form.arrivalAt}
+                    onChange={(value) => set("arrivalAt", value)}
+                  />
+                  <DateTimeField
+                    id="wr-recovery"
+                    label="装置復帰"
+                    value={form.recoveryAt}
+                    onChange={(value) => set("recoveryAt", value)}
+                  />
+                  <DateTimeField
+                    id="wr-departure"
+                    label="退出日時"
+                    value={form.departureAt}
+                    onChange={(value) => set("departureAt", value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <div className="grid gap-4">
+                <h3 className="font-semibold">作業内容</h3>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wr-content">作業内容</Label>
+                  <Textarea
+                    id="wr-content"
+                    className="min-h-40"
+                    value={form.workContent}
+                    onChange={(event) => set("workContent", event.target.value)}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <Label htmlFor="wr-notes">連絡事項</Label>
+                  <Textarea
+                    id="wr-notes"
+                    value={form.notes}
+                    onChange={(event) => set("notes", event.target.value)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent>
+              <div className="grid gap-4">
+                <h3 className="font-semibold">担当者</h3>
+                <div className="grid gap-2">
+                  <span className="text-sm font-medium">
+                    作業担当者（メーカー）
                   </span>
-                )}
-              </label>
-            </div>
+                  <div className="flex flex-wrap gap-2">
+                    {form.engineerIds.map((id, index) => (
+                      <span
+                        key={id}
+                        className="inline-flex items-center gap-1 rounded-full border bg-muted px-3 py-1 text-sm"
+                      >
+                        {engineerName(id)}
+                        {index > 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            共同
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          aria-label={`${engineerName(id)} を外す`}
+                          className="rounded-full p-0.5 hover:bg-background"
+                          onClick={() =>
+                            set(
+                              "engineerIds",
+                              form.engineerIds.filter((item) => item !== id),
+                            )
+                          }
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </span>
+                    ))}
+                    {form.engineerIds.length === 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        未選択
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <select
+                      aria-label="作業担当者を追加"
+                      className={selectClass}
+                      value={engineerToAdd}
+                      onChange={(event) => {
+                        const id = Number(event.target.value);
+                        if (id) set("engineerIds", [...form.engineerIds, id]);
+                        setEngineerToAdd("");
+                      }}
+                    >
+                      <option value="">一覧から追加...</option>
+                      {addableEngineers.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                          {item.manufacturerName
+                            ? `（${item.manufacturerName}）`
+                            : ""}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        aria-label="新しい作業担当者の氏名"
+                        placeholder="新しい人の氏名"
+                        className="h-10 min-w-0 flex-1 rounded-md border border-input bg-transparent px-3 text-base"
+                        value={newEngineer}
+                        onChange={(event) => setNewEngineer(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void addNewEngineer();
+                          }
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-10"
+                        disabled={!newEngineer.trim()}
+                        onClick={() => void addNewEngineer()}
+                      >
+                        登録して追加
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <label className="grid gap-1.5 text-sm font-medium">
+                  担当技師
+                  <select
+                    className={selectClass}
+                    value={form.staffUserId ?? ""}
+                    onChange={(event) =>
+                      set(
+                        "staffUserId",
+                        event.target.value ? Number(event.target.value) : null,
+                      )
+                    }
+                  >
+                    <option value="">選んでください</option>
+                    {options.staff.map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                  </select>
+                  {staffUnmatched && (
+                    <span className="font-normal text-amber-700 dark:text-amber-300">
+                      報告書には「{report.staffNameRaw}
+                      」とあります。担当者一覧から選んで保存すると、次からは自動で選びます。
+                    </span>
+                  )}
+                </label>
+              </div>
+            </CardContent>
           </Card>
 
           {duplicate && (
@@ -740,74 +753,76 @@ export function WorkReportEditor() {
           </div>
 
           <Card>
-            <div className="grid gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="font-semibold">添付ファイル</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={!reportId || pending}
-                  onClick={() => fileInput.current?.click()}
-                >
-                  <Paperclip />
-                  PDF・写真を添付
-                </Button>
-                <input
-                  ref={fileInput}
-                  type="file"
-                  multiple
-                  accept=".pdf,image/*"
-                  className="hidden"
-                  onChange={(event) => void uploadFiles(event.target.files)}
-                />
-              </div>
-              {!reportId && (
-                <p className="text-sm text-muted-foreground">
-                  登録したあとで添付できます
-                </p>
-              )}
-              <ul className="grid gap-1 text-sm">
-                {report?.files.map((file) => (
-                  <li key={file.id} className="flex items-center gap-2">
-                    <a
-                      href={fileUrl(file.id)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="min-w-0 flex-1 truncate text-primary underline-offset-4 hover:underline"
-                    >
-                      {file.fileName}
-                    </a>
-                    <span className="text-muted-foreground">
-                      {fileSizeLabel(file.size)}
-                    </span>
-                    <Button asChild variant="ghost" size="icon-sm">
-                      <a
-                        href={downloadUrl(file.id)}
-                        download={file.fileName}
-                        aria-label={`${file.fileName} をダウンロード`}
-                        title="ダウンロード"
-                      >
-                        <Download />
-                      </a>
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label={`${file.fileName} を削除`}
-                      onClick={() => void removeFile(file.id, file.fileName)}
-                    >
-                      <Trash2 />
-                    </Button>
-                  </li>
-                ))}
-                {reportId && report?.files.length === 0 && (
-                  <li className="text-muted-foreground">
-                    添付ファイルはありません
-                  </li>
+            <CardContent>
+              <div className="grid gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold">添付ファイル</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={!reportId || pending}
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    <Paperclip />
+                    PDF・写真を添付
+                  </Button>
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    multiple
+                    accept=".pdf,image/*"
+                    className="hidden"
+                    onChange={(event) => void uploadFiles(event.target.files)}
+                  />
+                </div>
+                {!reportId && (
+                  <p className="text-sm text-muted-foreground">
+                    登録したあとで添付できます
+                  </p>
                 )}
-              </ul>
-            </div>
+                <ul className="grid gap-1 text-sm">
+                  {report?.files.map((file) => (
+                    <li key={file.id} className="flex items-center gap-2">
+                      <a
+                        href={fileUrl(file.id)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="min-w-0 flex-1 truncate text-primary underline-offset-4 hover:underline"
+                      >
+                        {file.fileName}
+                      </a>
+                      <span className="text-muted-foreground">
+                        {fileSizeLabel(file.size)}
+                      </span>
+                      <Button asChild variant="ghost" size="icon-sm">
+                        <a
+                          href={downloadUrl(file.id)}
+                          download={file.fileName}
+                          aria-label={`${file.fileName} をダウンロード`}
+                          title="ダウンロード"
+                        >
+                          <Download />
+                        </a>
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-label={`${file.fileName} を削除`}
+                        onClick={() => void removeFile(file.id, file.fileName)}
+                      >
+                        <Trash2 />
+                      </Button>
+                    </li>
+                  ))}
+                  {reportId && report?.files.length === 0 && (
+                    <li className="text-muted-foreground">
+                      添付ファイルはありません
+                    </li>
+                  )}
+                </ul>
+              </div>
+            </CardContent>
           </Card>
 
           {report && (
@@ -820,6 +835,6 @@ export function WorkReportEditor() {
 
         {report && hasPreview && <FilePreview report={report} />}
       </div>
-    </div>
+    </PageContainer>
   );
 }
