@@ -10,16 +10,24 @@ import tailwindcss from "@tailwindcss/vite";
 
 const AXUM_DEV = { hostname: "127.0.0.1", port: 8080 };
 
+// vite は astro の依存として入るだけで、このプロジェクトから直接 import できない（pnpm）。
+// そのため Plugin 型は astro が公開している ViteUserConfig から取り出す。
+/** @typedef {Extract<NonNullable<import("astro").ViteUserConfig["plugins"]>[number], { name: string }>} VitePlugin */
+
 /**
  * Astro の trailingSlash 検査より先に /api を Axum へ渡す。
- * @returns {import("vite").Plugin}
+ * @returns {VitePlugin}
  */
 function proxyApiBeforeTrailingSlash() {
   return {
     name: "proxy-api-before-trailing-slash",
     enforce: "pre",
     configureServer(server) {
-      /** @type {import("connect").NextHandleFunction} */
+      /**
+       * @param {http.IncomingMessage} req
+       * @param {http.ServerResponse} res
+       * @param {(error?: unknown) => void} next
+       */
       const proxyApi = (req, res, next) => {
         if (!req.url?.startsWith("/api")) {
           next();
