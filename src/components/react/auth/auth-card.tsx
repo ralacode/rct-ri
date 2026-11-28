@@ -29,7 +29,7 @@ export function AuthCard({ title, description, step, children }: Props) {
           RCT
         </span>
         <span className="text-sm text-muted-foreground">
-          {siteMeta.siteTitle}（RI 業務支援アプリ）
+          {siteMeta.siteTitle}（放射線業務支援アプリ）
         </span>
       </div>
       <Card>
